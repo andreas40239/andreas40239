@@ -1,10 +1,10 @@
 👋 Hi, I’m @andreas40239
 
-👀 I’m interested in shell scripting, Python and have >20 years experience in test engineering and agile development. 
+👀 I’m interested in shell scripting, Python. 
 
 🌱 I’m currently learning all around robotics and found new interest in mechatronics.
 
 💞️ I’m looking to collaborate on robotics projects, and I am a quick learner :)
 
-📫 You can drop me a message here or at aw40239 @ gmail.com
+📫 You can drop me a message here or at aw40239  gmail.com
 
