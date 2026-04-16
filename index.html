@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>City Drive</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: monospace;
+  color: #eee;
+  user-select: none;
+}
+#game { display: block; border: 3px solid #555; }
+#info { margin-top: 8px; font-size: 12px; color: #777; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="info">WASD / Arrow Keys to drive &nbsp;·&nbsp; Green car drives itself</div>
+
+<script>
+'use strict';
+
+const VW = 900, VH = 600;   // viewport
+const WW = 1400, WH = 900;  // world
+const RW = 48;               // road width
+
+const canvas = document.getElementById('game');
+canvas.width = VW;
+canvas.height = VH;
+const ctx = canvas.getContext('2d');
+
+// ── Road network: polylines matching the hand-drawn map ─────────────────────
+// The drawing shows ~6 orange city blocks separated by winding roads.
+const roads = [
+  // Upper horizontal artery
+  [[0,195],[200,205],[400,198],[560,182],[760,188],[920,198],[1120,183],[1210,172],[1400,162]],
+  // Main central artery
+  [[0,448],[120,442],[360,428],[560,418],[710,410],[920,414],[1120,424],[1320,440],[1400,448]],
+  // Lower artery
+  [[0,708],[185,702],[410,692],[620,682],[810,720],[1020,708],[1220,692],[1400,698]],
+  // Far-right vertical (world edge connector)
+  [[1400,162],[1400,448],[1400,698],[1400,900]],
+  // Left vertical
+  [[200,205],[158,322],[120,442],[154,576],[185,702]],
+  // Center-left vertical
+  [[560,182],[502,302],[425,428],[468,558],[410,692]],
+  // Center vertical
+  [[920,198],[845,308],[710,410],[748,562],[620,682]],
+  // Right vertical
+  [[1210,172],[1162,292],[1120,424],[1148,558],[1220,692]],
+  // Diagonal shortcut across upper-center (adds a fun block)
+  [[560,182],[630,295],[710,410]],
+  // Lower diagonal connector
+  [[410,692],[620,682],[810,720],[1020,708]],
+];
+
+// ── Deterministic PRNG (seeded) ─────────────────────────────────────────────
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ── Point-to-segment distance ────────────────────────────────────────────────
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+
+function onRoad(x, y, margin) {
+  if (margin === undefined) margin = RW / 2;
+  for (const r of roads) {
+    for (let i = 0; i < r.length - 1; i++) {
+      if (segDist(x, y, r[i][0], r[i][1], r[i+1][0], r[i+1][1]) < margin) return true;
+    }
+  }
+  return false;
+}
+
+// ── Pre-render world onto an offscreen canvas ────────────────────────────────
+const wc = document.createElement('canvas');
+wc.width = WW; wc.height = WH;
+const wctx = wc.getContext('2d');
+
+(function buildWorld() {
+  const rng = mulberry32(13);
+
+  // Orange city-block ground (matching the drawing's amber tone)
+  wctx.fillStyle = '#C87020';
+  wctx.fillRect(0, 0, WW, WH);
+
+  // Building footprints — darker rectangles scattered on blocks
+  for (let i = 0; i < 110; i++) {
+    const bx = rng() * WW, by = rng() * WH;
+    if (!onRoad(bx, by, RW / 2 + 28)) {
+      wctx.fillStyle = `rgba(90, 40, 5, ${0.25 + rng() * 0.35})`;
+      wctx.fillRect(bx, by, 35 + rng() * 85, 28 + rng() * 65);
+    }
+  }
+
+  wctx.lineCap = 'round';
+  wctx.lineJoin = 'round';
+
+  // Curb / road border
+  wctx.strokeStyle = '#4A4840';
+  wctx.lineWidth = RW + 10;
+  for (const r of roads) {
+    wctx.beginPath();
+    r.forEach(([x, y], i) => i ? wctx.lineTo(x, y) : wctx.moveTo(x, y));
+    wctx.stroke();
+  }
+
+  // Road surface — muted warm grey
+  wctx.strokeStyle = '#898480';
+  wctx.lineWidth = RW;
+  for (const r of roads) {
+    wctx.beginPath();
+    r.forEach(([x, y], i) => i ? wctx.lineTo(x, y) : wctx.moveTo(x, y));
+    wctx.stroke();
+  }
+
+  // Center-line dashes — yellow
+  wctx.strokeStyle = '#D8C035';
+  wctx.lineWidth = 2.5;
+  wctx.setLineDash([18, 22]);
+  wctx.lineDashOffset = 8;
+  for (const r of roads) {
+    wctx.beginPath();
+    r.forEach(([x, y], i) => i ? wctx.lineTo(x, y) : wctx.moveTo(x, y));
+    wctx.stroke();
+  }
+  wctx.setLineDash([]);
+
+  // Trees — dark green blobs on the city blocks
+  for (let i = 0; i < 160; i++) {
+    const tx = rng() * WW, ty = rng() * WH;
+    if (!onRoad(tx, ty, RW / 2 + 18)) {
+      const r2 = 6 + rng() * 11;
+      const g = 52 + (rng() * 38) | 0;
+      wctx.fillStyle = `rgba(18,${g},14,0.88)`;
+      wctx.beginPath();
+      wctx.arc(tx, ty, r2, 0, Math.PI * 2);
+      wctx.fill();
+      // highlight
+      wctx.fillStyle = `rgba(40,${g + 28},22,0.45)`;
+      wctx.beginPath();
+      wctx.arc(tx - r2 * 0.3, ty - r2 * 0.3, r2 * 0.52, 0, Math.PI * 2);
+      wctx.fill();
+    }
+  }
+
+  // Blue scribble zone — matches the blue area in the drawing (top-right block)
+  wctx.save();
+  wctx.globalAlpha = 0.18;
+  wctx.fillStyle = '#2255DD';
+  wctx.fillRect(1230, 190, 160, 240);
+  wctx.globalAlpha = 0.12;
+  wctx.fillRect(1000, 200, 180, 190);
+  wctx.restore();
+})();
+
+// ── Player car ───────────────────────────────────────────────────────────────
+const car = {
+  x: 710, y: 410,
+  angle: 0,
+  speed: 0,
+  maxFwd: 5.2,
+  maxRev: 2.6,
+  acc: 0.15,
+  brk: 0.28,
+  fric: 0.92,
+  turn: 0.047,
+  w: 18, h: 34,
+};
+
+// ── NPC car (represents the second car in the drawing) ───────────────────────
+// Drives a loop around the outer roads.
+const npc = {
+  x: 200, y: 205,
+  angle: 0,
+  speed: 1.6,
+  routeIdx: 0,
+  route: [
+    [200, 205], [560, 182], [920, 198], [1210, 172],
+    [1162, 292], [1120, 424], [1148, 558], [1220, 692],
+    [1020, 708], [810, 720], [620, 682], [410, 692],
+    [154, 576], [120, 442], [158, 322], [200, 205],
+  ],
+  w: 16, h: 32,
+};
+
+// ── Camera ───────────────────────────────────────────────────────────────────
+let camX = car.x - VW / 2;
+let camY = car.y - VH / 2;
+
+// ── Input ────────────────────────────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ── Update ───────────────────────────────────────────────────────────────────
+function updateCar() {
+  const fwd = keys['ArrowUp']    || keys['KeyW'];
+  const rev = keys['ArrowDown']  || keys['KeyS'];
+  const lft = keys['ArrowLeft']  || keys['KeyA'];
+  const rgt = keys['ArrowRight'] || keys['KeyD'];
+
+  if (fwd)      car.speed = Math.min(car.speed + car.acc, car.maxFwd);
+  else if (rev) car.speed = Math.max(car.speed - car.brk, -car.maxRev);
+  else          car.speed *= car.fric;
+
+  // Off-road drag
+  if (!onRoad(car.x, car.y)) car.speed *= 0.86;
+
+  if (Math.abs(car.speed) > 0.08) {
+    const dir = Math.sign(car.speed);
+    if (lft) car.angle -= car.turn * dir;
+    if (rgt) car.angle += car.turn * dir;
+  }
+
+  car.x = Math.max(5, Math.min(WW - 5, car.x + Math.sin(car.angle) * car.speed));
+  car.y = Math.max(5, Math.min(WH - 5, car.y - Math.cos(car.angle) * car.speed));
+
+  // Smooth camera follow
+  camX += (car.x - VW / 2 - camX) * 0.12;
+  camY += (car.y - VH / 2 - camY) * 0.12;
+  camX = Math.max(0, Math.min(WW - VW, camX));
+  camY = Math.max(0, Math.min(WH - VH, camY));
+}
+
+function updateNPC() {
+  const target = npc.route[npc.routeIdx];
+  const dx = target[0] - npc.x;
+  const dy = target[1] - npc.y;
+
+  if (Math.hypot(dx, dy) < 14) {
+    npc.routeIdx = (npc.routeIdx + 1) % npc.route.length;
+  }
+
+  const want = Math.atan2(dx, -dy);
+  let da = want - npc.angle;
+  while (da >  Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  npc.angle += da * 0.06;
+
+  npc.x += Math.sin(npc.angle) * npc.speed;
+  npc.y -= Math.cos(npc.angle) * npc.speed;
+}
+
+// ── Draw a car (player = red, NPC = olive-green) ─────────────────────────────
+function drawCarShape(c, bodyColor, braking) {
+  const sx = c.x - camX;
+  const sy = c.y - camY;
+  // cull if off-screen
+  if (sx < -50 || sx > VW + 50 || sy < -50 || sy > VH + 50) return;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(c.angle);
+
+  // Drop shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(-c.w / 2 + 4, -c.h / 2 + 5, c.w + 2, c.h + 2);
+
+  // Wheels
+  ctx.fillStyle = '#111';
+  ctx.fillRect(-c.w / 2 - 4, -c.h / 2 + 3,  5, 10);
+  ctx.fillRect( c.w / 2 - 1, -c.h / 2 + 3,  5, 10);
+  ctx.fillRect(-c.w / 2 - 4,  c.h / 2 - 13, 5, 10);
+  ctx.fillRect( c.w / 2 - 1,  c.h / 2 - 13, 5, 10);
+
+  // Body
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+
+  // Roof/cabin shading
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(-c.w / 2 + 3, -c.h / 2 + 9, c.w - 6, c.h - 21);
+
+  // Front windshield
+  ctx.fillStyle = 'rgba(170,215,255,0.75)';
+  ctx.fillRect(-c.w / 2 + 2, -c.h / 2 + 2, c.w - 4, 7);
+
+  // Rear window
+  ctx.fillStyle = 'rgba(170,215,255,0.45)';
+  ctx.fillRect(-c.w / 2 + 2, c.h / 2 - 9, c.w - 4, 6);
+
+  // Headlights
+  ctx.fillStyle = '#FFFF99';
+  ctx.fillRect(-c.w / 2 + 2, -c.h / 2,     4, 3);
+  ctx.fillRect( c.w / 2 - 6, -c.h / 2,     4, 3);
+
+  // Taillights
+  ctx.fillStyle = braking ? '#FF2222' : '#881111';
+  ctx.fillRect(-c.w / 2 + 2, c.h / 2 - 3,  4, 3);
+  ctx.fillRect( c.w / 2 - 6, c.h / 2 - 3,  4, 3);
+
+  ctx.restore();
+}
+
+// ── HUD ──────────────────────────────────────────────────────────────────────
+function drawHUD() {
+  const spd = (Math.abs(car.speed) * 20) | 0;
+  const maxSpd = car.maxFwd * 20;
+  const cx2 = VW - 58, cy2 = VH - 58, r = 42;
+
+  // Gauge background
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.beginPath();
+  ctx.arc(cx2, cy2, r + 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Track arc
+  ctx.strokeStyle = '#2A2A2A';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(cx2, cy2, r, -Math.PI * 0.8, Math.PI * 0.8);
+  ctx.stroke();
+
+  // Speed arc
+  const pct = Math.min(spd / maxSpd, 1);
+  ctx.strokeStyle = pct > 0.75 ? '#FF4444' : pct > 0.5 ? '#FFAA22' : '#44DD88';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(cx2, cy2, r, -Math.PI * 0.8, -Math.PI * 0.8 + pct * Math.PI * 1.6);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  ctx.fillStyle = '#DDD';
+  ctx.font = 'bold 17px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(spd, cx2, cy2 + 6);
+  ctx.font = '9px monospace';
+  ctx.fillText('km/h', cx2, cy2 + 19);
+  ctx.textAlign = 'left';
+
+  // Gear
+  const gear = car.speed > 0.12 ? 'D' : car.speed < -0.12 ? 'R' : 'N';
+  ctx.fillStyle = gear === 'R' ? '#FF8844' : '#BBBBBB';
+  ctx.font = '13px monospace';
+  ctx.fillText(gear, VW - 22, VH - 12);
+
+  // Off-road flash
+  if (!onRoad(car.x, car.y)) {
+    const alpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.012);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#FF6600';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠  OFF ROAD  ⚠', VW / 2, VH - 14);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+}
+
+// ── Mini-map ─────────────────────────────────────────────────────────────────
+function drawMiniMap() {
+  const mw = 145, mh = 94;
+  const mx = 10, my = 10;
+  const sx = mw / WW, sy = mh / WH;
+
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.68)';
+  ctx.fillRect(mx, my, mw, mh);
+
+  // Roads
+  ctx.strokeStyle = '#606060';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (const r of roads) {
+    ctx.beginPath();
+    r.forEach(([x, y], i) => i ? ctx.lineTo(mx + x * sx, my + y * sy) : ctx.moveTo(mx + x * sx, my + y * sy));
+    ctx.stroke();
+  }
+
+  // Camera viewport rectangle
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx + camX * sx, my + camY * sy, VW * sx, VH * sy);
+
+  // NPC dot
+  ctx.fillStyle = '#88CC44';
+  ctx.beginPath();
+  ctx.arc(mx + npc.x * sx, my + npc.y * sy, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Player dot
+  ctx.fillStyle = '#FF4444';
+  ctx.beginPath();
+  ctx.arc(mx + car.x * sx, my + car.y * sy, 3.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx, my, mw, mh);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, VW, VH);
+  ctx.drawImage(wc, -Math.round(camX), -Math.round(camY));
+
+  const braking = keys['ArrowDown'] || keys['KeyS'];
+  drawCarShape(npc, '#5DAA28', false);
+  drawCarShape(car, '#DD2020', !!braking);
+
+  drawMiniMap();
+  drawHUD();
+}
+
+// ── Game loop ────────────────────────────────────────────────────────────────
+(function loop() {
+  updateCar();
+  updateNPC();
+  render();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
