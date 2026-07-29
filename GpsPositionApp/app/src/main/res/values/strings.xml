@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GPS Position</string>
+
+    <string name="latitude_label">Breite: %s</string>
+    <string name="longitude_label">Länge: %s</string>
+    <string name="direction_label">Richtung: %1$d° (%2$s)</string>
+    <string name="direction_unavailable">Richtung: nicht verfügbar</string>
+    <string name="speed_label">Geschwindigkeit: %.1f km/h</string>
+    <string name="speed_unavailable">Geschwindigkeit: nicht verfügbar</string>
+    <string name="accuracy_label">Genauigkeit: ±%d m</string>
+
+    <string name="waiting_for_fix">Warte auf GPS-Signal…</string>
+    <string name="gps_active">GPS aktiv</string>
+    <string name="gps_disabled">GPS ist deaktiviert</string>
+    <string name="gps_disabled_title">GPS aktivieren</string>
+    <string name="gps_disabled_message">Bitte aktiviere den GPS-Standort in den Systemeinstellungen, um die Position zu ermitteln.</string>
+    <string name="settings">Einstellungen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="permission_denied">Standortberechtigung wurde verweigert. Die App benötigt Zugriff auf den Standort, um zu funktionieren.</string>
+</resources>
