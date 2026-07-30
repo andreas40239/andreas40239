@@ -249,7 +249,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             val canvas = try { holder2.lockCanvas() } catch (_: Exception) { null }
             if (canvas != null) {
                 try {
-                    synchronized(holder2) { draw(canvas) }
+                    synchronized(holder2) { renderFrame(canvas) }
                 } finally {
                     try { holder2.unlockCanvasAndPost(canvas) } catch (_: Exception) {}
                 }
@@ -438,7 +438,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     // ---------------------------------------------------------------
     // draw
     // ---------------------------------------------------------------
-    private fun draw(canvas: Canvas) {
+    private fun renderFrame(canvas: Canvas) {
         if (canvasH <= 0) return
         when (state) {
             GameState.MENU -> drawMenu(canvas)
