@@ -23,6 +23,7 @@ class GameAudio(context: Context) {
     private var jumpId = 0
     private var hitId = 0
     private var highscoreId = 0
+    private var pickupId = 0
     private var loaded = false
 
     private var music: MediaPlayer? = null
@@ -31,6 +32,7 @@ class GameAudio(context: Context) {
         jumpId = soundPool.load(appContext, R.raw.sfx_jump, 1)
         hitId = soundPool.load(appContext, R.raw.sfx_hit, 1)
         highscoreId = soundPool.load(appContext, R.raw.sfx_highscore, 1)
+        pickupId = soundPool.load(appContext, R.raw.sfx_pickup, 1)
         soundPool.setOnLoadCompleteListener { _, _, _ -> loaded = true }
     }
 
@@ -44,6 +46,10 @@ class GameAudio(context: Context) {
 
     fun playHighscore() {
         if (highscoreId != 0) soundPool.play(highscoreId, 0.9f, 0.9f, 2, 0, 1f)
+    }
+
+    fun playPickup() {
+        if (pickupId != 0) soundPool.play(pickupId, 0.85f, 0.85f, 1, 0, 1f)
     }
 
     fun startMusic() {
