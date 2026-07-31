@@ -24,15 +24,18 @@ class GameAudio(context: Context) {
     private var hitId = 0
     private var highscoreId = 0
     private var pickupId = 0
+    private var throwId = 0
     private var loaded = false
 
     private var music: MediaPlayer? = null
+    private var bossMusic: MediaPlayer? = null
 
     init {
         jumpId = soundPool.load(appContext, R.raw.sfx_jump, 1)
         hitId = soundPool.load(appContext, R.raw.sfx_hit, 1)
         highscoreId = soundPool.load(appContext, R.raw.sfx_highscore, 1)
         pickupId = soundPool.load(appContext, R.raw.sfx_pickup, 1)
+        throwId = soundPool.load(appContext, R.raw.sfx_throw, 1)
         soundPool.setOnLoadCompleteListener { _, _, _ -> loaded = true }
     }
 
@@ -50,6 +53,10 @@ class GameAudio(context: Context) {
 
     fun playPickup() {
         if (pickupId != 0) soundPool.play(pickupId, 0.85f, 0.85f, 1, 0, 1f)
+    }
+
+    fun playThrow() {
+        if (throwId != 0) soundPool.play(throwId, 0.9f, 0.9f, 1, 0, 1f)
     }
 
     fun startMusic() {
@@ -70,9 +77,30 @@ class GameAudio(context: Context) {
         music?.let { if (!it.isPlaying) it.start() }
     }
 
+    fun startBossMusic() {
+        pauseMusic()
+        if (bossMusic == null) {
+            bossMusic = MediaPlayer.create(appContext, R.raw.boss_music)?.apply {
+                isLooping = true
+                setVolume(0.6f, 0.6f)
+            }
+        }
+        bossMusic?.let { if (!it.isPlaying) it.start() }
+    }
+
+    fun stopBossMusic() {
+        bossMusic?.let {
+            if (it.isPlaying) it.pause()
+            it.seekTo(0)
+        }
+        resumeMusic()
+    }
+
     fun release() {
         soundPool.release()
         music?.release()
         music = null
+        bossMusic?.release()
+        bossMusic = null
     }
 }

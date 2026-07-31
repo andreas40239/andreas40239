@@ -52,6 +52,23 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         Scenery.UNDERGROUND to listOf(decode(R.drawable.fly_underground_0), decode(R.drawable.fly_underground_1)),
         Scenery.SEA to listOf(decode(R.drawable.fly_sea_0), decode(R.drawable.fly_sea_1)),
     )
+    private val srcPitWater = decode(R.drawable.pit_water)
+    private val srcPitLava = decode(R.drawable.pit_lava)
+    private val srcBoss = mapOf(
+        Scenery.MOUNTAINS to listOf(decode(R.drawable.boss_mountains_0), decode(R.drawable.boss_mountains_1)),
+        Scenery.UNDERGROUND to listOf(decode(R.drawable.boss_underground_0), decode(R.drawable.boss_underground_1)),
+        Scenery.SEA to listOf(decode(R.drawable.boss_sea_0), decode(R.drawable.boss_sea_1)),
+    )
+    private val srcBall = mapOf(
+        Scenery.MOUNTAINS to decode(R.drawable.ball_green),
+        Scenery.UNDERGROUND to decode(R.drawable.ball_fire),
+        Scenery.SEA to decode(R.drawable.ball_blue),
+    )
+    private val bossName = mapOf(
+        Scenery.MOUNTAINS to "Gorilla",
+        Scenery.UNDERGROUND to "Drache",
+        Scenery.SEA to "Oktopus",
+    )
     private val sceneryLabel = mapOf(
         Scenery.MOUNTAINS to "Berge & Wiesen",
         Scenery.UNDERGROUND to "Unter der Erde",
@@ -68,6 +85,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var scaledBgWidth = 0f
     private var scaledObstacle: MutableMap<Scenery, Bitmap> = mutableMapOf()
     private var scaledFly: MutableMap<Scenery, List<Bitmap>> = mutableMapOf()
+    private var scaledBoss: MutableMap<Scenery, List<Bitmap>> = mutableMapOf()
+    private var scaledBall: MutableMap<Scenery, Bitmap> = mutableMapOf()
     private var playerFrames: List<Bitmap> = emptyList() // idle, run1, run2, jump, hit (scaled)
     private var heartFullScaled: Bitmap? = null
     private var heartEmptyScaled: Bitmap? = null
@@ -107,6 +126,26 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     // arrive at the player at nearly the same time (that would be unavoidable)
     private val dangerWindowSeconds = 0.9f
 
+    // pits: a wider, shallow-hitbox gap (filled with water or lava) jumped over
+    // instead of a solid obstacle
+    private val pitChance = 0.35
+    private val pitHitboxHFrac = 0.05f
+    private val pitVisualRimFrac = 0.04f
+    private val pitVisualDepthFrac = 0.14f
+    private val pitWidthOfJumpFrac = 0.55f
+
+    // levels & bosses
+    private val levelDurationSeconds = 100f
+    private val levelSpeedGrowthFactor = 1.35f
+    private val levelSpeedMultiplierCap = 3.0f
+    private val bossDodgesToWin = 5
+    private val bossHeightFrac = 0.34f
+    private val bossXFrac = 0.80f
+    private val ballSizeFrac = 0.085f
+    private val ballSpeedFrac = 0.62f
+    private val bossThrowMinInterval = 1.8f
+    private val bossThrowMaxInterval = 2.6f
+
     // ---- game state ----
     private var state = GameState.MENU
     private var scenery = Scenery.MOUNTAINS
@@ -130,6 +169,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val heartPickups = Array(2) { HeartPickup() }
     private var heartSpawnTimer = 0f
     private var bgOffset = 0f
+
+    private var levelIndex = 0
+    private var levelTime = 0f
+    private var bossActive = false
+    private var bossDodgeCount = 0
+    private var bossThrowTimer = 0f
+    private var bossBobTimer = 0f
+    private val balls = Array(3) { Ball() }
+    private var transitionText = ""
+    private var transitionTimer = 0f
 
     private var lastNanos = 0L
 
@@ -234,6 +283,21 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             }
         }
 
+        val bossH = (canvasH * bossHeightFrac).toInt().coerceAtLeast(1)
+        scaledBoss.clear()
+        for ((k, frames) in srcBoss) {
+            scaledBoss[k] = frames.map { f ->
+                val w = (bossH.toFloat() * f.width / f.height).toInt().coerceAtLeast(1)
+                Bitmap.createScaledBitmap(f, w, bossH, true)
+            }
+        }
+
+        val ballSize = (canvasH * ballSizeFrac).toInt().coerceAtLeast(1)
+        scaledBall.clear()
+        for ((k, bmp) in srcBall) {
+            scaledBall[k] = Bitmap.createScaledBitmap(bmp, ballSize, ballSize, true)
+        }
+
         scorePaint.textSize = canvasH * 0.075f
         labelPaint.textSize = canvasH * 0.055f
         titlePaint.textSize = canvasH * 0.09f
@@ -321,10 +385,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         survivalTime += dt
         score = survivalTime.toInt()
 
-        val speed = currentSpeed()
-        bgOffset = (bgOffset + speed * 0.8f * dt) % scaledBgWidth
-
-        // player physics
+        // player physics (jumping still works during a boss fight)
         val gravity = gravityFrac * canvasH
         velY += gravity * dt
         playerY += velY * dt
@@ -337,6 +398,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
 
         if (invulnTimer > 0f) invulnTimer -= dt
+        if (transitionTimer > 0f) transitionTimer -= dt
 
         // animation
         animTimer += dt
@@ -349,18 +411,33 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             animFrame = 3
         }
 
-        updateObstacles(dt, speed)
-        updateFlyingObstacles(dt, speed)
-        updateHeartPickups(dt, speed)
+        if (bossActive) {
+            updateBossFight(dt)
+        } else {
+            levelTime += dt
+            val speed = currentSpeed()
+            bgOffset = (bgOffset + speed * 0.8f * dt) % scaledBgWidth
+            updateObstacles(dt, speed)
+            updateFlyingObstacles(dt, speed)
+            updateHeartPickups(dt, speed)
+            if (levelTime >= levelDurationSeconds) startBossFight()
+        }
+    }
+
+    private fun levelSpeedMultiplier(): Float {
+        return min(Math.pow(levelSpeedGrowthFactor.toDouble(), levelIndex.toDouble()).toFloat(), levelSpeedMultiplierCap)
     }
 
     private fun currentSpeed(): Float {
-        val t = min(survivalTime / speedGrowTime, 1f)
-        return (baseSpeedFrac + (maxSpeedFrac - baseSpeedFrac) * t) * canvasH
+        val mult = levelSpeedMultiplier()
+        val t = min(levelTime / speedGrowTime, 1f)
+        val base = baseSpeedFrac * mult
+        val max = maxSpeedFrac * mult
+        return (base + (max - base) * t) * canvasH
     }
 
     private fun currentObstacleHeight(): Float {
-        val t = min(survivalTime / obstacleGrowTime, 1f)
+        val t = min(levelTime / obstacleGrowTime, 1f)
         return (baseObstacleHFrac + (maxObstacleHFrac - baseObstacleHFrac) * t) * canvasH
     }
 
@@ -383,9 +460,18 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private fun spawnObstacle(speed: Float) {
         val free = obstacles.firstOrNull { !it.active }
-        val h = currentObstacleHeight()
-        val srcObs = srcObstacle.getValue(scenery)
-        val w = h * (srcObs.width.toFloat() / srcObs.height.toFloat())
+        val willBePit = Math.random() < pitChance
+
+        val h: Float
+        val w: Float
+        if (willBePit) {
+            h = canvasH * pitHitboxHFrac
+            w = speed * jumpAirTime * pitWidthOfJumpFrac
+        } else {
+            h = currentObstacleHeight()
+            val srcObs = srcObstacle.getValue(scenery)
+            w = h * (srcObs.width.toFloat() / srcObs.height.toFloat())
+        }
         val spawnX = canvasW.toFloat() + w
         val candidateArrival = arrivalTime(spawnX, speed)
 
@@ -394,11 +480,23 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             return
         }
 
-        free.spawn(spawnX, w, h)
+        if (willBePit) {
+            val visualH = ((pitVisualRimFrac + pitVisualDepthFrac) * canvasH).toInt().coerceAtLeast(1)
+            val bmp = makePitBitmap(scenery, w.toInt(), visualH)
+            free.spawn(spawnX, w, h, pit = true, bmp = bmp)
+        } else {
+            free.spawn(spawnX, w, h)
+        }
+
         val minGap = speed * jumpAirTime * 1.4f
         val extra = speed * jumpAirTime * (0.3f + Math.random().toFloat() * 0.7f)
-        val distance = minGap + extra
+        val distance = minGap + extra + w
         spawnTimer = distance / speed
+    }
+
+    private fun makePitBitmap(scenery: Scenery, w: Int, h: Int): Bitmap {
+        val src = if (scenery == Scenery.UNDERGROUND) srcPitLava else srcPitWater
+        return Bitmap.createScaledBitmap(src, w.coerceAtLeast(1), h.coerceAtLeast(1), true)
     }
 
     /** Seconds until an object at world-x `x` (moving at `speed`) reaches the player. */
@@ -515,6 +613,90 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
     }
 
+    // ---------------------------------------------------------------
+    // level progression & boss fights
+    // ---------------------------------------------------------------
+    private fun startBossFight() {
+        bossActive = true
+        bossDodgeCount = 0
+        bossThrowTimer = 1.2f
+        bossBobTimer = 0f
+        for (o in obstacles) o.active = false
+        for (o in flyingObstacles) o.active = false
+        for (h in heartPickups) h.active = false
+        for (b in balls) b.active = false
+        audio.startBossMusic()
+        transitionText = "Boss-Kampf: ${bossName.getValue(scenery)}!"
+        transitionTimer = 1.8f
+    }
+
+    private fun updateBossFight(dt: Float) {
+        bossBobTimer += dt
+        val ballSpeed = ballSpeedFrac * canvasH
+        for (b in balls) {
+            if (!b.active) continue
+            b.x -= ballSpeed * dt
+            checkBallCollision(b)
+            if (!b.active) continue
+            if (b.right() < -20f) {
+                val wasDodged = !b.hasHit
+                b.active = false
+                if (wasDodged) {
+                    bossDodgeCount += 1
+                    if (bossDodgeCount >= bossDodgesToWin) {
+                        defeatBoss()
+                        return
+                    }
+                }
+            }
+        }
+
+        bossThrowTimer -= dt
+        if (bossThrowTimer <= 0f) throwBossBall()
+    }
+
+    private fun throwBossBall() {
+        val free = balls.firstOrNull { !it.active } ?: return
+        val size = canvasH * ballSizeFrac
+        val bossX = canvasW * bossXFrac
+        free.spawn(bossX - size / 2f, size)
+        audio.playThrow()
+        bossThrowTimer = bossThrowMinInterval + Math.random().toFloat() * (bossThrowMaxInterval - bossThrowMinInterval)
+    }
+
+    private fun checkBallCollision(b: Ball) {
+        if (b.hasHit) return
+        if (invulnTimer > 0f) return
+        val pLeft = playerX + playerW * 0.22f
+        val pRight = playerX + playerW * 0.82f
+        val pTop = playerY + playerH * 0.15f
+        val pBottom = playerY + playerH * 0.98f
+        val bTop = groundY - b.size
+        val overlap = pRight > b.x && pLeft < b.right() && pBottom > bTop && pTop < groundY
+        if (overlap) {
+            b.hasHit = true
+            onPlayerHit()
+        }
+    }
+
+    private fun defeatBoss() {
+        bossActive = false
+        audio.stopBossMusic()
+        levelIndex += 1
+        scenery = nextScenery(scenery)
+        levelTime = 0f
+        spawnTimer = 1.0f
+        flyingSpawnTimer = 3f + Math.random().toFloat() * 3f
+        heartSpawnTimer = heartSpawnIntervalSeconds
+        transitionText = "Level geschafft! Weiter geht's..."
+        transitionTimer = 1.8f
+    }
+
+    private fun nextScenery(s: Scenery): Scenery {
+        val idx = sceneryOrder.indexOf(s)
+        return sceneryOrder[(idx + 1) % sceneryOrder.size]
+    }
+
     private fun checkCollision(o: Obstacle) {
         if (o.hasHit) return
         if (invulnTimer > 0f) return
@@ -609,10 +791,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         spawnTimer = 1.0f
         flyingSpawnTimer = 3f + Math.random().toFloat() * 3f
         heartSpawnTimer = heartSpawnIntervalSeconds
+        levelIndex = 0
+        levelTime = 0f
+        bossActive = false
+        bossDodgeCount = 0
+        transitionTimer = 0f
         for (o in obstacles) o.active = false
         for (o in flyingObstacles) o.active = false
         for (h in heartPickups) h.active = false
+        for (b in balls) b.active = false
         state = GameState.PLAYING
+        audio.stopBossMusic()
         audio.startMusic()
     }
 
@@ -660,23 +849,31 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private fun drawGame(canvas: Canvas) {
         drawScrollingBackground(canvas)
 
-        for (o in obstacles) {
-            if (!o.active) continue
-            val bmp = getObstacleBitmap(scenery, o.width.toInt(), o.height.toInt())
-            canvas.drawBitmap(bmp, o.x, groundY - o.height, null)
-        }
+        if (bossActive) {
+            drawBossFight(canvas)
+        } else {
+            for (o in obstacles) {
+                if (!o.active) continue
+                if (o.isPit) {
+                    o.pitBitmap?.let { canvas.drawBitmap(it, o.x, groundY - pitVisualRimFrac * canvasH, null) }
+                } else {
+                    val bmp = getObstacleBitmap(scenery, o.width.toInt(), o.height.toInt())
+                    canvas.drawBitmap(bmp, o.x, groundY - o.height, null)
+                }
+            }
 
-        val flyFrames = scaledFly.getValue(scenery)
-        for (o in flyingObstacles) {
-            if (!o.active) continue
-            val frameIdx = if ((o.bobPhase * 2f).toInt() % 2 == 0) 0 else 1
-            canvas.drawBitmap(flyFrames[frameIdx], o.x, o.currentY(canvasH * flyBobAmplitudeFrac), null)
-        }
+            val flyFrames = scaledFly.getValue(scenery)
+            for (o in flyingObstacles) {
+                if (!o.active) continue
+                val frameIdx = if ((o.bobPhase * 2f).toInt() % 2 == 0) 0 else 1
+                canvas.drawBitmap(flyFrames[frameIdx], o.x, o.currentY(canvasH * flyBobAmplitudeFrac), null)
+            }
 
-        heartPickupScaled?.let { pickupBmp ->
-            for (h in heartPickups) {
-                if (!h.active) continue
-                canvas.drawBitmap(pickupBmp, h.x, h.y, null)
+            heartPickupScaled?.let { pickupBmp ->
+                for (h in heartPickups) {
+                    if (!h.active) continue
+                    canvas.drawBitmap(pickupBmp, h.x, h.y, null)
+                }
             }
         }
 
@@ -707,6 +904,31 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
         // HUD: score top-right
         canvas.drawText(score.toString(), canvasW - canvasH * 0.03f, canvasH * 0.12f, scorePaint)
+
+        if (bossActive) {
+            canvas.drawText(
+                "Bälle ausweichen: $bossDodgeCount/$bossDodgesToWin",
+                canvasW / 2f, canvasH * 0.12f, labelPaint
+            )
+        }
+
+        if (transitionTimer > 0f) {
+            canvas.drawText(transitionText, canvasW / 2f, canvasH * 0.30f, titlePaint)
+        }
+    }
+
+    private fun drawBossFight(canvas: Canvas) {
+        val frames = scaledBoss.getValue(scenery)
+        val frameIdx = if ((bossBobTimer * 1.2f).toInt() % 2 == 0) 0 else 1
+        val bmp = frames[frameIdx]
+        val bossX = canvasW * bossXFrac
+        canvas.drawBitmap(bmp, bossX - bmp.width / 2f, groundY - bmp.height, null)
+
+        val ballBmp = scaledBall.getValue(scenery)
+        for (b in balls) {
+            if (!b.active) continue
+            canvas.drawBitmap(ballBmp, b.x, groundY - b.size, null)
+        }
     }
 
     private fun drawSceneryCards(canvas: Canvas) {

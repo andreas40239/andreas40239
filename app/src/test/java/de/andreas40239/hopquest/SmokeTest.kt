@@ -43,12 +43,23 @@ class SmokeTest {
 
         dispatchTap(view, tapX, tapY)
 
-        // run long enough (>10s) to exercise obstacle spawns, flying obstacles and the heart pickup
+        // run long enough (>10s) to exercise obstacle spawns, flying obstacles, pits and the heart pickup
         Thread.sleep(11_000)
 
         // tap again — now in PLAYING state this should just jump, not crash
         dispatchTap(view, tapX, tapY)
         Thread.sleep(300)
+
+        // run past the 100s level boundary to trigger the boss fight
+        Thread.sleep(92_000)
+
+        // keep tapping (jump attempts) through ~20s of boss activity: whether balls are
+        // dodged (advancing to the next level) or hit (possibly ending the run), both
+        // paths must run cleanly
+        repeat(14) {
+            dispatchTap(view, tapX, tapY)
+            Thread.sleep(1_400)
+        }
 
         controller.pause().stop().destroy()
     }
