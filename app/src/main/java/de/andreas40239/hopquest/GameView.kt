@@ -133,6 +133,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val pitVisualRimFrac = 0.04f
     private val pitVisualDepthFrac = 0.14f
     private val pitWidthOfJumpFrac = 0.55f
+    private val pitMaxWidthPx = 1600f
 
     // levels & bosses
     private val levelDurationSeconds = 100f
@@ -233,13 +234,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        canvasW = width
-        canvasH = height
-        rebuildScaledAssets()
-        layoutMenuCards()
-        groundY = canvasH * 0.83f
-        if (state == GameState.MENU) {
-            // keep player idle preview centered-ish; nothing else to do
+        // Must not run concurrently with update()/renderFrame() on the game thread —
+        // both now synchronize on holder2 too (see run()).
+        synchronized(holder2) {
+            canvasW = width
+            canvasH = height
+            rebuildScaledAssets()
+            layoutMenuCards()
+            groundY = canvasH * 0.83f
         }
     }
 
@@ -354,7 +356,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             lastNanos = now
             if (dt > 0.05f) dt = 0.05f // clamp to avoid spiral of death after a stall
 
-            update(dt)
+            synchronized(holder2) { update(dt) }
 
             val canvas = try { holder2.lockCanvas() } catch (_: Exception) { null }
             if (canvas != null) {
@@ -466,7 +468,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val w: Float
         if (willBePit) {
             h = canvasH * pitHitboxHFrac
-            w = speed * jumpAirTime * pitWidthOfJumpFrac
+            // cap width defensively: at high level speed multipliers this would otherwise
+            // grow unbounded and could exceed a device's max bitmap/texture dimension
+            w = (speed * jumpAirTime * pitWidthOfJumpFrac).coerceAtMost(canvasW * 0.42f).coerceAtMost(pitMaxWidthPx)
         } else {
             h = currentObstacleHeight()
             val srcObs = srcObstacle.getValue(scenery)
