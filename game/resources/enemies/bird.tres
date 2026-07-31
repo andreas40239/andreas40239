@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_bird"]
+
+[resource]
+script = ExtResource("1_bird")
+species_id = "bird"
+display_name = "Moewe"
+category = 2
+shape = 2
+color = Color(0.92, 0.92, 0.92, 1)
+base_scale = 1.1
+move_speed = 260.0
+wander_radius = 200.0
+detection_radius = 220.0
+attack_range = 30.0
+satiety_value = 0.0
+rival_level = 0

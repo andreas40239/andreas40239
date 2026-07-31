@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_ant"]
+
+[resource]
+script = ExtResource("1_ant")
+species_id = "ant"
+display_name = "Ameise"
+category = 0
+shape = 0
+color = Color(0.2, 0.14, 0.08, 1)
+base_scale = 0.4
+move_speed = 70.0
+wander_radius = 90.0
+detection_radius = 110.0
+attack_range = 20.0
+satiety_value = 10.0
+rival_level = 0

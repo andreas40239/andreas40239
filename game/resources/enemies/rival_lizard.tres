@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_rival"]
+
+[resource]
+script = ExtResource("1_rival")
+species_id = "rival_lizard"
+display_name = "Fremde Eidechse"
+category = 1
+shape = 1
+color = Color(0.55, 0.28, 0.55, 1)
+base_scale = 0.9
+move_speed = 150.0
+wander_radius = 140.0
+detection_radius = 160.0
+attack_range = 26.0
+satiety_value = 40.0
+rival_level = 1

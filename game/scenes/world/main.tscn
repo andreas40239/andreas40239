@@ -1,0 +1,168 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/main.gd" id="MainScript"]
+[ext_resource type="PackedScene" path="res://scenes/player/lizard.tscn" id="LizardScene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="HudScene"]
+[ext_resource type="PackedScene" path="res://scenes/world/den.tscn" id="DenScene"]
+[ext_resource type="PackedScene" path="res://scenes/world/fruit_bush.tscn" id="FruitBushScene"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/enemy.tscn" id="EnemyScene"]
+[ext_resource type="Resource" path="res://resources/enemies/ant.tres" id="AntData"]
+[ext_resource type="Resource" path="res://resources/enemies/rival_lizard.tres" id="RivalData"]
+[ext_resource type="Resource" path="res://resources/enemies/bird.tres" id="BirdData"]
+[ext_resource type="Resource" path="res://resources/enemies/crab.tres" id="CrabData"]
+
+[sub_resource type="RectangleShape2D" id="BarrierShape"]
+size = Vector2(20, 650)
+
+[sub_resource type="RectangleShape2D" id="TopBottomWallShape"]
+size = Vector2(2540, 20)
+
+[sub_resource type="RectangleShape2D" id="SideWallShape"]
+size = Vector2(20, 690)
+
+[node name="Main" type="Node2D"]
+script = ExtResource("MainScript")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="ZoneGround1" type="Polygon2D" parent="World"]
+position = Vector2(0, 0)
+color = Color(0.86, 0.78, 0.55, 1)
+polygon = PackedVector2Array(0, 0, 900, 0, 900, 650, 0, 650)
+
+[node name="ZoneGround2" type="Polygon2D" parent="World"]
+position = Vector2(900, 0)
+color = Color(0.8, 0.72, 0.5, 1)
+polygon = PackedVector2Array(0, 0, 800, 0, 800, 650, 0, 650)
+
+[node name="ZoneGround3" type="Polygon2D" parent="World"]
+position = Vector2(1700, 0)
+color = Color(0.74, 0.66, 0.46, 1)
+polygon = PackedVector2Array(0, 0, 800, 0, 800, 650, 0, 650)
+
+[node name="Barrier1" type="StaticBody2D" parent="World"]
+position = Vector2(900, 325)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/Barrier1"]
+shape = SubResource("BarrierShape")
+
+[node name="Visual" type="Polygon2D" parent="World/Barrier1"]
+color = Color(0.35, 0.2, 0.15, 0.85)
+polygon = PackedVector2Array(-10, -325, 10, -325, 10, 325, -10, 325)
+
+[node name="Barrier2" type="StaticBody2D" parent="World"]
+position = Vector2(1700, 325)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/Barrier2"]
+shape = SubResource("BarrierShape")
+
+[node name="Visual" type="Polygon2D" parent="World/Barrier2"]
+color = Color(0.35, 0.2, 0.15, 0.85)
+polygon = PackedVector2Array(-10, -325, 10, -325, 10, 325, -10, 325)
+
+[node name="TopWall" type="StaticBody2D" parent="World"]
+position = Vector2(1250, -10)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/TopWall"]
+shape = SubResource("TopBottomWallShape")
+
+[node name="BottomWall" type="StaticBody2D" parent="World"]
+position = Vector2(1250, 660)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/BottomWall"]
+shape = SubResource("TopBottomWallShape")
+
+[node name="LeftWall" type="StaticBody2D" parent="World"]
+position = Vector2(-10, 325)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/LeftWall"]
+shape = SubResource("SideWallShape")
+
+[node name="RightWall" type="StaticBody2D" parent="World"]
+position = Vector2(2510, 325)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/RightWall"]
+shape = SubResource("SideWallShape")
+
+[node name="Den" parent="World" instance=ExtResource("DenScene")]
+position = Vector2(150, 325)
+
+[node name="FruitBush1" parent="World" instance=ExtResource("FruitBushScene")]
+position = Vector2(450, 150)
+
+[node name="FruitBush2" parent="World" instance=ExtResource("FruitBushScene")]
+position = Vector2(1200, 325)
+
+[node name="FruitBush3" parent="World" instance=ExtResource("FruitBushScene")]
+position = Vector2(2000, 325)
+
+[node name="Zone1Enemies" type="Node2D" parent="World"]
+
+[node name="Ant1" parent="World/Zone1Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(300, 150)
+data = ExtResource("AntData")
+
+[node name="Ant2" parent="World/Zone1Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(500, 450)
+data = ExtResource("AntData")
+
+[node name="Ant3" parent="World/Zone1Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(650, 100)
+data = ExtResource("AntData")
+
+[node name="Ant4" parent="World/Zone1Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(400, 550)
+data = ExtResource("AntData")
+
+[node name="Rival1" parent="World/Zone1Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(700, 200)
+data = ExtResource("RivalData")
+
+[node name="Zone2Enemies" type="Node2D" parent="World"]
+visible = false
+process_mode = 4
+
+[node name="Bird1" parent="World/Zone2Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(1100, 150)
+data = ExtResource("BirdData")
+
+[node name="Bird2" parent="World/Zone2Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(1500, 500)
+data = ExtResource("BirdData")
+
+[node name="Ant5" parent="World/Zone2Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(1300, 300)
+data = ExtResource("AntData")
+
+[node name="Zone3Enemies" type="Node2D" parent="World"]
+visible = false
+process_mode = 4
+
+[node name="Crab1" parent="World/Zone3Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(1850, 200)
+data = ExtResource("CrabData")
+
+[node name="Crab2" parent="World/Zone3Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(2200, 500)
+data = ExtResource("CrabData")
+
+[node name="Ant6" parent="World/Zone3Enemies" instance=ExtResource("EnemyScene")]
+position = Vector2(2000, 350)
+data = ExtResource("AntData")
+
+[node name="Player" parent="." instance=ExtResource("LizardScene")]
+position = Vector2(150, 420)
+
+[node name="HUD" parent="." instance=ExtResource("HudScene")]

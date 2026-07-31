@@ -1,0 +1,39 @@
+extends CanvasLayer
+
+@onready var satiety_bar: ProgressBar = $Control/SatietyBar
+@onready var level_label: Label = $Control/LevelLabel
+@onready var message_label: Label = $Control/MessageLabel
+
+func _ready() -> void:
+	GameManager.satiety_changed.connect(_on_satiety_changed)
+	GameManager.leveled_up.connect(_on_leveled_up)
+	GameManager.player_caught.connect(_on_player_caught)
+	_on_satiety_changed(GameManager.satiety, GameManager.get_satiety_threshold())
+	_update_level_label()
+
+func _on_satiety_changed(value: float, max_value: float) -> void:
+	if max_value <= 0.0:
+		satiety_bar.max_value = 1.0
+		satiety_bar.value = 1.0
+	else:
+		satiety_bar.max_value = max_value
+		satiety_bar.value = value
+
+func _on_leveled_up(_new_level: int) -> void:
+	_update_level_label()
+	if GameManager.run_complete:
+		_show_message("Vertical Slice geschafft! Hoechstes Level erreicht.")
+	else:
+		_show_message("Level Up!")
+
+func _on_player_caught() -> void:
+	_show_message("Erwischt! Zurueck zum Bau.")
+
+func _update_level_label() -> void:
+	level_label.text = "Level %d" % GameManager.growth_level
+
+func _show_message(text: String) -> void:
+	message_label.text = text
+	message_label.visible = true
+	await get_tree().create_timer(2.5).timeout
+	message_label.visible = false
