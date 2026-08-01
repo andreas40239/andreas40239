@@ -21,3 +21,7 @@ enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL }
 ## Only used when category == RIVAL: the player can eat this animal once
 ## its own growth_level is higher than rival_level.
 @export var rival_level: int = 1
+## Only used when category == PREDATOR: once the player has spikes
+## (growth_level >= GameManager.SPIKES_LEVEL) and has outgrown this value,
+## this predator gets fended off instead of catching the player.
+@export var threat_level: int = 1

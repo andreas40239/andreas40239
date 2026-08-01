@@ -1,36 +1,69 @@
 extends Node
 
-## Vertical-slice progression: 3 growth levels, no day/night cycle.
-## Growth stage data is kept here as a small inline table for now; if the
-## full game later needs 10+ stages this can move to Resource/JSON files
-## like the enemy data already does.
+## Vertical-slice progression: 15 growth levels, no day/night cycle.
+## Growth stage values (scale/speed/color) are computed from formulas
+## rather than a hand-written table, since hand-authoring 15 entries
+## doesn't scale well; the map's half-extent is derived the same way so
+## world.gd and the enemy spawner can share one source of truth.
 
 signal leveled_up(new_level: int)
 signal satiety_changed(value: float, max_value: float)
 signal player_caught
 
-const MAX_LEVEL := 3
+const MAX_LEVEL := 15
+const SPIKES_LEVEL := 5
+const TREX_LEVEL := 10
 
-const SATIETY_THRESHOLDS := {
-	1: 100.0,
-	2: 150.0,
-}
+const BASE_SATIETY := 90.0
+const SATIETY_GROWTH := 35.0
 
-const GROWTH_STAGES := {
-	1: {"scale": 1.0, "color": Color(0.35, 0.65, 0.35), "speed": 220.0},
-	2: {"scale": 1.35, "color": Color(0.3, 0.55, 0.75), "speed": 250.0},
-	3: {"scale": 1.75, "color": Color(0.75, 0.4, 0.25), "speed": 280.0},
-}
+const BASE_HALF_WIDTH := 450.0
+const BASE_HALF_HEIGHT := 325.0
+const WIDTH_GROWTH_PER_LEVEL := 130.0
+const HEIGHT_GROWTH_PER_LEVEL := 95.0
+
+const COLOR_ANCHORS := [
+	[1, Color(0.35, 0.65, 0.35)],
+	[5, Color(0.55, 0.45, 0.2)],
+	[10, Color(0.45, 0.55, 0.4)],
+	[15, Color(0.32, 0.38, 0.34)],
+]
 
 var growth_level: int = 1
 var satiety: float = 0.0
 var run_complete: bool = false
 
 func get_satiety_threshold() -> float:
-	return SATIETY_THRESHOLDS.get(growth_level, 0.0)
+	if growth_level >= MAX_LEVEL:
+		return 0.0
+	return BASE_SATIETY + (growth_level - 1) * SATIETY_GROWTH
 
 func get_current_stage() -> Dictionary:
-	return GROWTH_STAGES[growth_level]
+	return get_stage_for_level(growth_level)
+
+func get_stage_for_level(level: int) -> Dictionary:
+	return {
+		"scale": 1.0 + (level - 1) * 0.11,
+		"speed": 210.0 + (level - 1) * 9.0,
+		"color": _stage_color(level),
+		"has_spikes": level >= SPIKES_LEVEL,
+		"is_trex": level >= TREX_LEVEL,
+	}
+
+func _stage_color(level: int) -> Color:
+	for i in range(COLOR_ANCHORS.size() - 1):
+		var a: Array = COLOR_ANCHORS[i]
+		var b: Array = COLOR_ANCHORS[i + 1]
+		if level >= a[0] and level <= b[0]:
+			var t := float(level - int(a[0])) / float(int(b[0]) - int(a[0]))
+			return (a[1] as Color).lerp(b[1], t)
+	return COLOR_ANCHORS[COLOR_ANCHORS.size() - 1][1]
+
+func get_map_half_extent() -> Vector2:
+	return Vector2(
+		BASE_HALF_WIDTH + (growth_level - 1) * WIDTH_GROWTH_PER_LEVEL,
+		BASE_HALF_HEIGHT + (growth_level - 1) * HEIGHT_GROWTH_PER_LEVEL
+	)
 
 func add_satiety(amount: float) -> void:
 	var threshold := get_satiety_threshold()

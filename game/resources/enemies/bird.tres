@@ -16,3 +16,4 @@ detection_radius = 220.0
 attack_range = 30.0
 satiety_value = 0.0
 rival_level = 0
+threat_level = 2

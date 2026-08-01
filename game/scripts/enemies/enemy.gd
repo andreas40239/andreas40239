@@ -158,12 +158,20 @@ func _on_hit_area_body_entered(body: Node) -> void:
 		EnemyData.Category.RIVAL:
 			if GameManager.can_eat_rival(data.rival_level):
 				_get_eaten(body)
+			elif body.can_fend_off(data.rival_level):
+				_get_fended_off(body)
 			else:
 				body.get_caught()
 		EnemyData.Category.PREDATOR:
-			body.get_caught()
+			if body.can_fend_off(data.threat_level):
+				_get_fended_off(body)
+			else:
+				body.get_caught()
 
 func _get_eaten(player_body: Node) -> void:
 	state = State.DEAD
 	player_body.eat(data.satiety_value)
 	queue_free()
+
+func _get_fended_off(_player_body: Node) -> void:
+	state = State.FLEE

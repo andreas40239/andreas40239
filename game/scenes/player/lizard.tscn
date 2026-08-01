@@ -18,10 +18,10 @@ shape = SubResource("PlayerShape")
 [node name="Camera2D" type="Camera2D" parent="."]
 enabled = true
 position_smoothing_enabled = true
-limit_left = 0
-limit_top = -140
-limit_right = 900
-limit_bottom = 790
+limit_left = -450
+limit_top = -325
+limit_right = 450
+limit_bottom = 325
 
 [node name="TouchIndicator" type="CanvasLayer" parent="."]
 layer = 5

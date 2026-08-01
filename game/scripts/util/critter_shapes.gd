@@ -35,7 +35,13 @@ static func _ellipse(radius: float, squash: float = 1.0, sides: int = 16) -> Pac
 		pts.append(Vector2(cos(a) * radius, sin(a) * radius * squash))
 	return pts
 
-static func build_lizard(parent: Node2D, body_color: Color) -> void:
+static func _add_spikes(parent: Node2D, color: Color, y_start: float, y_end: float, count: int) -> void:
+	for i in count:
+		var t := float(i) / float(max(count - 1, 1))
+		var y: float = lerp(y_start, y_end, t)
+		_poly(parent, PackedVector2Array([Vector2(-3.5, 3), Vector2(3.5, 3), Vector2(0, -7)]), color, Vector2(0, y), 2)
+
+static func build_lizard(parent: Node2D, body_color: Color, has_spikes: bool = false) -> void:
 	clear(parent)
 	var dark := body_color.darkened(0.15)
 	# tail
@@ -53,6 +59,33 @@ static func build_lizard(parent: Node2D, body_color: Color) -> void:
 	for side in [-1.0, 1.0]:
 		_poly(parent, _ellipse(2.2), Color.WHITE, head_pos + Vector2(side * 3.5, -1.5), 2)
 		_poly(parent, _ellipse(1.0), Color(0.08, 0.08, 0.08), head_pos + Vector2(side * 3.5, -1.5), 3)
+	if has_spikes:
+		_add_spikes(parent, dark, -14.0, 14.0, 5)
+
+static func build_trex(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.15)
+	# tail (thicker, longer than the small lizard's)
+	_poly(parent, PackedVector2Array([Vector2(-8, 12), Vector2(8, 12), Vector2(0, 38)]), body_color, Vector2.ZERO, -1)
+	# legs
+	for side in [-1.0, 1.0]:
+		_poly(parent, PackedVector2Array([Vector2(0, -4), Vector2(side * 16, -8), Vector2(side * 12, 6)]), dark, Vector2(side * 6, 4), -1)
+		_poly(parent, PackedVector2Array([Vector2(0, -4), Vector2(side * 16, 2), Vector2(side * 12, 10)]), dark, Vector2(side * 6, 14), -1)
+	# tiny arms
+	for side in [-1.0, 1.0]:
+		_line(parent, PackedVector2Array([Vector2(side * 8, -14), Vector2(side * 14, -10)]), dark, 2.2)
+	# body
+	_poly(parent, _ellipse(16, 0.75), body_color)
+	# head with snout
+	var head_pos := Vector2(0, -24)
+	_poly(parent, _ellipse(11, 0.85), body_color, head_pos, 1)
+	_poly(parent, PackedVector2Array([Vector2(-5, -6), Vector2(5, -6), Vector2(0, -16)]), body_color, head_pos, 1)
+	# eyes
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(2.4), Color.WHITE, head_pos + Vector2(side * 5, -2), 2)
+		_poly(parent, _ellipse(1.1), Color(0.05, 0.05, 0.05), head_pos + Vector2(side * 5, -2), 3)
+	# dorsal spikes
+	_add_spikes(parent, dark, -20.0, 20.0, 6)
 
 static func build_ant(parent: Node2D, body_color: Color) -> void:
 	clear(parent)

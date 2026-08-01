@@ -17,6 +17,7 @@ var touch_index: int = -1
 var touch_origin: Vector2 = Vector2.ZERO
 var touch_vector: Vector2 = Vector2.ZERO
 var invulnerable: bool = false
+var in_den: bool = false
 var speed_boost_multiplier: float = 1.0
 var speed_boost_timer: float = 0.0
 var den_position: Vector2 = Vector2.ZERO
@@ -34,7 +35,10 @@ func _ready() -> void:
 func _apply_growth_visual() -> void:
 	var stage: Dictionary = GameManager.get_current_stage()
 	visual.scale = Vector2.ONE * float(stage["scale"])
-	CritterShapes.build_lizard(visual, stage["color"])
+	if stage["is_trex"]:
+		CritterShapes.build_trex(visual, stage["color"])
+	else:
+		CritterShapes.build_lizard(visual, stage["color"], stage["has_spikes"])
 
 func _on_leveled_up(_new_level: int) -> void:
 	_apply_growth_visual()
@@ -97,14 +101,19 @@ func _physics_process(delta: float) -> void:
 func eat(amount: float) -> void:
 	GameManager.add_satiety(amount)
 	ate.emit(amount)
+	AudioManager.play_eat()
 
 func apply_fruit_boost(satiety_amount: float, boost_multiplier: float, boost_duration: float) -> void:
 	GameManager.add_satiety(satiety_amount)
 	speed_boost_multiplier = boost_multiplier
 	speed_boost_timer = boost_duration
 
+func can_fend_off(threat_level: int) -> bool:
+	var stage: Dictionary = GameManager.get_current_stage()
+	return bool(stage["has_spikes"]) and GameManager.growth_level > threat_level
+
 func get_caught() -> void:
-	if invulnerable:
+	if invulnerable or in_den:
 		return
 	caught.emit()
 	GameManager.notify_player_caught()
@@ -122,3 +131,6 @@ func _respawn_at_den() -> void:
 
 func set_den_position(pos: Vector2) -> void:
 	den_position = pos
+
+func set_in_den(value: bool) -> void:
+	in_den = value
