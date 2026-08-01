@@ -10,9 +10,12 @@ var SaveManager: Node
 
 var ENEMY_SCENE: PackedScene
 var ANT_DATA: Resource
+var BIG_ANT_DATA: Resource
 var RIVAL_DATA: Resource
 var BIRD_DATA: Resource
 var CRAB_DATA: Resource
+var OVIRAPTOR_DATA: Resource
+var HELICOPTER_DATA: Resource
 
 func _initialize() -> void:
 	GameManager = get_root().get_node("GameManager")
@@ -24,9 +27,12 @@ func _initialize() -> void:
 	# bound, which fails with "Identifier not found: GameManager".
 	ENEMY_SCENE = load("res://scenes/enemies/enemy.tscn")
 	ANT_DATA = load("res://resources/enemies/ant.tres")
+	BIG_ANT_DATA = load("res://resources/enemies/big_ant.tres")
 	RIVAL_DATA = load("res://resources/enemies/rival_lizard.tres")
 	BIRD_DATA = load("res://resources/enemies/bird.tres")
 	CRAB_DATA = load("res://resources/enemies/crab.tres")
+	OVIRAPTOR_DATA = load("res://resources/enemies/oviraptor.tres")
+	HELICOPTER_DATA = load("res://resources/enemies/helicopter.tres")
 
 	var main_scene: PackedScene = load("res://scenes/world/main.tscn")
 	var main := main_scene.instantiate()
@@ -49,16 +55,30 @@ func _initialize() -> void:
 	print("spawned=", spawner.get_child_count(), " ants=", ant_count)
 	assert(ant_count > 0, "spawner should include ants")
 
-	print("== den safety ==")
+	# The rest of this suite plants specific enemies at specific positions
+	# and asserts precisely what happens to them/the player - stop the
+	# spawner and clear its ambient wildlife first, or a stray real ant/bird
+	# wandering into a hand-placed encounter could flakily contribute
+	# damage/eating that the test didn't cause and isn't asserting about.
+	spawner.set_process(false)
+	for child in spawner.get_children():
+		child.queue_free()
+	await process_frame
+
+	print("== den safety blocks the damage-tick path too ==")
 	den._on_body_entered(player)
 	assert(player.in_den == true, "player should be marked safe inside the den")
 	var bird := ENEMY_SCENE.instantiate()
 	bird.data = BIRD_DATA
 	world.add_child(bird)
+	await process_frame
+	await physics_frame
 	bird.global_position = player.global_position
-	var pos_before: Vector2 = player.global_position
 	bird._on_hit_area_body_entered(player)
-	assert(player.global_position == pos_before, "player should be untouched while in the den")
+	var health_before_den_test: float = player.health
+	for i in 3:
+		await physics_frame
+	assert(player.health == health_before_den_test, "player should take no damage while in the den")
 	assert(player.invulnerable == false, "den safety should not trigger the caught/respawn path")
 	bird.queue_free()
 	den._on_body_exited(player)
@@ -81,7 +101,7 @@ func _initialize() -> void:
 	# the reaction we're actually testing.
 	player.set_in_den(true)
 	await physics_frame
-	assert(bird3.state == 4, "bird should give up on a player safe in the den (State.RETURN)")
+	assert(bird3.state == 5, "bird should give up on a player safe in the den (State.RETURN)")
 	bird3.queue_free()
 	player.set_in_den(false)
 
@@ -96,10 +116,10 @@ func _initialize() -> void:
 	player.global_position = Vector2(650, 0)  # far away, chase target still valid
 	for i in 3:
 		await physics_frame
-	assert(bird4.state == 4, "a chaser that ends up near the den should retreat, not camp there")
+	assert(bird4.state == 5, "a chaser that ends up near the den should retreat, not camp there")
 	bird4.queue_free()
 
-	print("== eat via physics overlap ==")
+	print("== eat via physics overlap (small prey, instant) ==")
 	var ant := ENEMY_SCENE.instantiate()
 	ant.data = ANT_DATA
 	world.add_child(ant)
@@ -116,6 +136,70 @@ func _initialize() -> void:
 	assert(player.speed_boost_multiplier == 1.6)
 	print("OK: satiety=", GameManager.satiety, " boost=", player.speed_boost_multiplier)
 
+	print("== level 4: big ants must be fought (~2s) before they can be eaten ==")
+	GameManager.growth_level = 4
+	player._on_leveled_up(4)
+	var big_ant := ENEMY_SCENE.instantiate()
+	big_ant.data = BIG_ANT_DATA
+	world.add_child(big_ant)
+	await process_frame
+	await physics_frame
+	player.global_position = big_ant.global_position + Vector2(700, 700)  # clear of the den
+	big_ant.global_position = player.global_position
+	# The player started this test overlapping the den (it spawns there by
+	# design) - give the den's real body_exited signal (which lags a frame
+	# or two, same as any Area2D) a moment to actually clear in_den before
+	# taking the health snapshot below, or a stray tick of den regen from
+	# the stale flag would throw off the "harmless" assertion.
+	for i in 5:
+		await physics_frame
+	big_ant._on_hit_area_body_entered(player)
+	var satiety_before_fight: float = GameManager.satiety
+	var health_before_fight: float = player.health
+	var fight_seconds := 0.0
+	while is_instance_valid(big_ant) and fight_seconds < 5.0:
+		await physics_frame
+		fight_seconds += 1.0 / 60.0
+	assert(not is_instance_valid(big_ant), "big ant should eventually be defeated")
+	assert(fight_seconds > 1.5 and fight_seconds < 2.5, "the fight should take about 2 seconds at level 4")
+	assert(GameManager.satiety - satiety_before_fight == BIG_ANT_DATA.satiety_value, "defeating it should grant its satiety reward")
+	assert(player.health == health_before_fight, "the plain big ant should be harmless (damage_per_tick=0)")
+	print("OK: fight took ~", fight_seconds, "s")
+
+	print("== level 1 (no spikes, not yet edible): a dangerous predator deals repeated damage ==")
+	GameManager.growth_level = 1
+	player._on_leveled_up(1)
+	player.health = player.max_health
+	var crab := ENEMY_SCENE.instantiate()
+	crab.data = CRAB_DATA
+	world.add_child(crab)
+	await process_frame
+	await physics_frame
+	var far_pos: Vector2 = Vector2(1600, 1600)
+	player.global_position = far_pos
+	crab.global_position = far_pos
+	crab._on_hit_area_body_entered(player)
+	var health_before_crab: float = player.health
+	for i in 90:  # 1.5s: enough for a couple of damage ticks (0.5s cooldown)
+		await physics_frame
+	assert(player.health < health_before_crab, "sustained contact with a dangerous predator should chip health")
+	assert(is_instance_valid(crab), "the crab shouldn't be defeated - the player isn't strong enough to eat it yet")
+
+	print("== health reaching zero respawns the player at the den and fully heals ==")
+	player.take_damage(player.health)
+	await process_frame
+	assert(player.global_position == player.den_position, "zero health should send the player back to the den")
+	assert(player.health == player.max_health, "respawning should fully heal")
+	crab.queue_free()
+
+	print("== the den also recharges health over time ==")
+	player.health = player.max_health * 0.4
+	den._on_body_entered(player)
+	for i in 240:  # 4s, comfortably more than health_regen_seconds (3s default)
+		await physics_frame
+	assert(player.health >= player.max_health * 0.99, "staying in the den should recharge health to full")
+	den._on_body_exited(player)
+
 	print("== leveling to 5 (spikes) grows the map in all directions ==")
 	var half_before: Vector2 = GameManager.get_map_half_extent()
 	for target in range(2, 6):
@@ -127,51 +211,134 @@ func _initialize() -> void:
 	assert(int(camera.limit_right) == int(half_after.x), "camera limit should track map growth")
 	assert(GameManager.get_current_stage()["has_spikes"] == true, "level 5 should have spikes")
 	print("OK: level=", GameManager.growth_level, " half_extent=", half_after)
+	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
 
-	print("== spikes fend off an old threat instead of getting caught ==")
+	print("== spikes fend off an old threat instead of dealing damage ==")
+	# The leveling loop above called den._on_body_entered() repeatedly
+	# without ever moving the player away from (0, 0), so it's still
+	# genuinely sitting in the den - move it out first, or den regen would
+	# raise health during this test and break the "no change" assertion
+	# below for an unrelated reason.
+	player.global_position = Vector2(-1600, 1600)
+	for i in 5:
+		await physics_frame
 	var bird2 := ENEMY_SCENE.instantiate()
 	bird2.data = BIRD_DATA
 	world.add_child(bird2)
+	await process_frame
+	await physics_frame
 	var pos_before2: Vector2 = player.global_position
 	bird2.global_position = pos_before2
 	bird2._on_hit_area_body_entered(player)
-	assert(player.global_position == pos_before2, "spiked player should not be caught by an old threat")
+	var health_before_fendoff: float = player.health
+	for i in 3:
+		await physics_frame
+	assert(player.health == health_before_fendoff, "spiked player should take no damage from an old threat")
 	assert(bird2.state == 1, "fended-off predator should flee (State.FLEE)")
 	bird2.queue_free()
 
 	print("== rival becomes edible once player outgrows it ==")
 	assert(GameManager.can_eat_rival(RIVAL_DATA.rival_level) == true)
 
+	print("== level 7: gulls become fightable/edible ==")
+	for target in range(6, 8):
+		GameManager.satiety = GameManager.get_satiety_threshold()
+		den._on_body_entered(player)
+	assert(GameManager.growth_level == 7)
+	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
+	var bird5 := ENEMY_SCENE.instantiate()
+	bird5.data = BIRD_DATA
+	world.add_child(bird5)
+	await process_frame
+	await physics_frame
+	player.global_position = Vector2(1700, -1700)
+	bird5.global_position = player.global_position
+	bird5._on_hit_area_body_entered(player)
+	var satiety_before_bird: float = GameManager.satiety
+	for i in 400:
+		await physics_frame
+		if not is_instance_valid(bird5):
+			break
+	assert(not is_instance_valid(bird5), "gull should eventually be defeated once fightable")
+	assert(GameManager.satiety - satiety_before_bird == BIRD_DATA.satiety_value, "defeating it should grant its satiety reward")
+
 	print("== leveling to 10 turns the player into a T-Rex ==")
-	for target in range(6, 11):
+	for target in range(8, 11):
 		GameManager.satiety = GameManager.get_satiety_threshold()
 		den._on_body_entered(player)
 		assert(GameManager.growth_level == target)
 	assert(GameManager.get_current_stage()["is_trex"] == true, "level 10 should be a T-Rex")
 	print("OK: level=", GameManager.growth_level)
+	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
 
-	print("== predator catch (no spikes yet) still respawns player at the den ==")
-	GameManager.growth_level = 1
-	GameManager.satiety = 0.0
-	den._on_body_exited(player)
-	var far_pos: Vector2 = den.global_position + Vector2(900, 900)
-	player.global_position = far_pos
-	var crab := ENEMY_SCENE.instantiate()
-	crab.data = CRAB_DATA
-	world.add_child(crab)
-	crab.global_position = far_pos
-	crab._on_hit_area_body_entered(player)
+	print("== level 17: Oviraptors are fast, deal damage, and can never be eaten ==")
+	GameManager.growth_level = 17
+	player._on_leveled_up(17)
+	player.health = player.max_health
+	var ovi := ENEMY_SCENE.instantiate()
+	ovi.data = OVIRAPTOR_DATA
+	ovi.global_position = Vector2(1900, 0)
+	world.add_child(ovi)
 	await process_frame
-	assert(player.global_position == player.den_position, "player should respawn at the den when caught")
-	crab.queue_free()
+	await physics_frame
+	player.global_position = ovi.global_position
+	ovi._on_detection_body_entered(player)
+	var health_before_ovi: float = player.health
+	for i in 90:
+		await physics_frame
+	assert(player.health < health_before_ovi, "the Oviraptor should deal damage on contact")
+	assert(is_instance_valid(ovi) and ovi.state != 6, "the Oviraptor should never be defeated (State.DEAD == 6)")
+	ovi.queue_free()
+
+	print("== level 20: the player becomes Godzilla and its fire breath instantly destroys anything ==")
+	GameManager.growth_level = 20
+	player._on_leveled_up(20)
+	assert(GameManager.get_current_stage()["is_godzilla"] == true)
+	var ovi2 := ENEMY_SCENE.instantiate()
+	ovi2.data = OVIRAPTOR_DATA
+	ovi2.global_position = Vector2(2100, 100)
+	world.add_child(ovi2)
+	await process_frame
+	await physics_frame
+	player.global_position = Vector2(2100 - 150, 100)
+	player.last_move_direction = Vector2(1, 0)
+	var satiety_before_fire: float = GameManager.satiety
+	player._fire_cooldown = 0.0
+	for i in 10:
+		await physics_frame
+		if not is_instance_valid(ovi2):
+			break
+	assert(not is_instance_valid(ovi2), "fire breath should incinerate even an unbeatable Oviraptor")
+	assert(GameManager.satiety > satiety_before_fire, "incinerating something should grant satiety")
+
+	print("== level 21: helicopters keep their distance and shoot ==")
+	GameManager.growth_level = 21
+	player._on_leveled_up(21)
+	player.health = player.max_health
+	player.global_position = Vector2(2300, 0)
+	var heli := ENEMY_SCENE.instantiate()
+	heli.data = HELICOPTER_DATA
+	heli.global_position = player.global_position + Vector2(200, 0)
+	world.add_child(heli)
+	await process_frame
+	await physics_frame
+	heli._on_detection_body_entered(player)
+	assert(heli.state == 4, "ranged predators should use ORBIT, not CHASE (State.ORBIT == 4)")
+	var health_before_heli: float = player.health
+	for i in 200:
+		await physics_frame
+	assert(player.health < health_before_heli, "the helicopter should have shot the player at least once")
+	var final_dist: float = heli.global_position.distance_to(player.global_position)
+	assert(final_dist > 30.0, "the helicopter should keep some distance rather than closing to melee range")
+	heli.queue_free()
 
 	print("== save / load ==")
-	GameManager.growth_level = 10
+	GameManager.growth_level = 15
 	SaveManager.save_game()
 	GameManager.growth_level = 1
 	GameManager.satiety = 0.0
 	SaveManager.load_game()
-	assert(GameManager.growth_level == 10)
+	assert(GameManager.growth_level == 15)
 	print("OK: reloaded growth_level=", GameManager.growth_level)
 
 	print("ALL SMOKE TESTS PASSED")

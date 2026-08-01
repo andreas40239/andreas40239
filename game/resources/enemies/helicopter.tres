@@ -1,0 +1,27 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_helicopter"]
+
+[resource]
+script = ExtResource("1_helicopter")
+species_id = "helicopter"
+display_name = "Hubschrauber"
+category = 2
+shape = 5
+color = Color(0.42, 0.46, 0.4, 1)
+base_scale = 1.1
+move_speed = 210.0
+wander_radius = 260.0
+detection_radius = 340.0
+attack_range = 40.0
+satiety_value = 0.0
+rival_level = 0
+threat_level = 99
+has_health = false
+max_health = 0.0
+damage_per_tick = 25.0
+edible_level = 0
+unbeatable = true
+ranged = true
+preferred_range = 70.0
+shoot_interval = 1.6

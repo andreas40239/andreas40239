@@ -8,10 +8,17 @@ class_name Lizard
 
 signal caught
 signal ate(amount: float)
+signal health_changed(value: float, max_value: float)
 
 @export var touch_deadzone: float = 8.0
 @export var touch_max_radius: float = 90.0
 @export var caught_invulnerability_time: float = 1.0
+@export var health_regen_seconds: float = 3.0  # full heal in this long while safe in the den
+
+const FIRE_BREATH_INTERVAL := 4.0
+const FIRE_RANGE := 260.0
+const FIRE_HALF_ANGLE_DEG := 35.0
+const FIRE_REWARD := 15.0
 
 var touch_index: int = -1
 var touch_origin: Vector2 = Vector2.ZERO
@@ -21,6 +28,10 @@ var in_den: bool = false
 var speed_boost_multiplier: float = 1.0
 var speed_boost_timer: float = 0.0
 var den_position: Vector2 = Vector2.ZERO
+var health: float = 0.0
+var max_health: float = 0.0
+var last_move_direction: Vector2 = Vector2.DOWN
+var _fire_cooldown: float = 0.0
 
 @onready var visual: Node2D = $Visual
 @onready var touch_base: Polygon2D = $TouchIndicator/Base
@@ -30,17 +41,24 @@ func _ready() -> void:
 	add_to_group("player")
 	den_position = global_position
 	GameManager.leveled_up.connect(_on_leveled_up)
+	max_health = GameManager.get_max_health()
+	health = max_health
 	_apply_growth_visual()
 
 func _apply_growth_visual() -> void:
 	var stage: Dictionary = GameManager.get_current_stage()
 	visual.scale = Vector2.ONE * float(stage["scale"])
-	if stage["is_trex"]:
+	if stage["is_godzilla"]:
+		CritterShapes.build_godzilla(visual, stage["color"])
+	elif stage["is_trex"]:
 		CritterShapes.build_trex(visual, stage["color"])
 	else:
 		CritterShapes.build_lizard(visual, stage["color"], stage["has_spikes"])
 
 func _on_leveled_up(_new_level: int) -> void:
+	max_health = GameManager.get_max_health()
+	health = min(health, max_health)
+	health_changed.emit(health, max_health)
 	_apply_growth_visual()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -92,11 +110,23 @@ func _physics_process(delta: float) -> void:
 		input_vector = _get_keyboard_vector()
 	if input_vector.length() > 1.0:
 		input_vector = input_vector.normalized()
+	if input_vector.length() > 0.05:
+		last_move_direction = input_vector.normalized()
 
 	var stage: Dictionary = GameManager.get_current_stage()
 	var speed: float = float(stage["speed"]) * speed_boost_multiplier
 	velocity = input_vector * speed
 	move_and_slide()
+
+	if in_den and health < max_health and max_health > 0.0:
+		health = min(max_health, health + (max_health / health_regen_seconds) * delta)
+		health_changed.emit(health, max_health)
+
+	if bool(stage["is_godzilla"]):
+		_fire_cooldown -= delta
+		if _fire_cooldown <= 0.0:
+			_fire_cooldown = FIRE_BREATH_INTERVAL
+			_breathe_fire()
 
 func eat(amount: float) -> void:
 	GameManager.add_satiety(amount)
@@ -112,6 +142,14 @@ func can_fend_off(threat_level: int) -> bool:
 	var stage: Dictionary = GameManager.get_current_stage()
 	return bool(stage["has_spikes"]) and GameManager.growth_level > threat_level
 
+func take_damage(amount: float) -> void:
+	if invulnerable or in_den or amount <= 0.0:
+		return
+	health = max(0.0, health - amount)
+	health_changed.emit(health, max_health)
+	if health <= 0.0:
+		get_caught()
+
 func get_caught() -> void:
 	if invulnerable or in_den:
 		return
@@ -126,6 +164,8 @@ func _respawn_at_den() -> void:
 	touch_index = -1
 	touch_vector = Vector2.ZERO
 	_update_touch_indicator(false)
+	health = max_health
+	health_changed.emit(health, max_health)
 	await get_tree().create_timer(caught_invulnerability_time).timeout
 	invulnerable = false
 
@@ -134,3 +174,29 @@ func set_den_position(pos: Vector2) -> void:
 
 func set_in_den(value: bool) -> void:
 	in_den = value
+
+func _breathe_fire() -> void:
+	_show_fire_visual()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy):
+			continue
+		var to_enemy: Vector2 = enemy.global_position - global_position
+		var dist := to_enemy.length()
+		if dist > FIRE_RANGE or dist < 1.0:
+			continue
+		var angle := rad_to_deg(abs(last_move_direction.angle_to(to_enemy.normalized())))
+		if angle <= FIRE_HALF_ANGLE_DEG and enemy.has_method("get_incinerated"):
+			enemy.get_incinerated()
+			GameManager.add_satiety(FIRE_REWARD)
+
+func _show_fire_visual() -> void:
+	var half_w := FIRE_RANGE * tan(deg_to_rad(FIRE_HALF_ANGLE_DEG))
+	var cone := Polygon2D.new()
+	cone.polygon = PackedVector2Array([Vector2.ZERO, Vector2(FIRE_RANGE, -half_w), Vector2(FIRE_RANGE, half_w)])
+	cone.color = Color(1.0, 0.45, 0.1, 0.75)
+	cone.rotation = last_move_direction.angle()
+	cone.z_index = 5
+	add_child(cone)
+	await get_tree().create_timer(0.35).timeout
+	if is_instance_valid(cone):
+		cone.queue_free()

@@ -7,22 +7,32 @@ class_name EnemySpawner
 ## the per-species weight is how "mehr Ameisen" (more ants) is expressed.
 
 const ANT_DATA := preload("res://resources/enemies/ant.tres")
+const BIG_ANT_DATA := preload("res://resources/enemies/big_ant.tres")
 const RIVAL_DATA := preload("res://resources/enemies/rival_lizard.tres")
 const BIRD_DATA := preload("res://resources/enemies/bird.tres")
 const CRAB_DATA := preload("res://resources/enemies/crab.tres")
+const RED_ANT_DATA := preload("res://resources/enemies/red_ant.tres")
+const BLACK_CRAB_DATA := preload("res://resources/enemies/black_crab.tres")
+const OVIRAPTOR_DATA := preload("res://resources/enemies/oviraptor.tres")
+const HELICOPTER_DATA := preload("res://resources/enemies/helicopter.tres")
 
 const SPECIES_POOL := [
 	{"data": ANT_DATA, "min_level": 1, "weight": 6.0},
+	{"data": BIG_ANT_DATA, "min_level": 4, "weight": 2.5},
 	{"data": RIVAL_DATA, "min_level": 1, "weight": 1.5},
 	{"data": BIRD_DATA, "min_level": 2, "weight": 2.0},
 	{"data": CRAB_DATA, "min_level": 3, "weight": 1.5},
+	{"data": RED_ANT_DATA, "min_level": 11, "weight": 2.0},
+	{"data": BLACK_CRAB_DATA, "min_level": 14, "weight": 1.2},
+	{"data": OVIRAPTOR_DATA, "min_level": 17, "weight": 1.0},
+	{"data": HELICOPTER_DATA, "min_level": 21, "weight": 0.8},
 ]
 
 @export var enemy_scene: PackedScene
-@export var max_active: int = 26
-@export var spawn_interval: float = 1.6
+@export var max_active: int = 34
+@export var spawn_interval: float = 1.4
 @export var safe_radius: float = 260.0
-@export var initial_burst: int = 12
+@export var initial_burst: int = 14
 
 var _timer: float = 0.0
 

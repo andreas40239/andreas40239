@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+@onready var health_bar: ProgressBar = $Control/HealthBar
 @onready var satiety_bar: ProgressBar = $Control/SatietyBar
 @onready var level_label: Label = $Control/LevelLabel
 @onready var message_label: Label = $Control/MessageLabel
@@ -10,6 +11,15 @@ func _ready() -> void:
 	GameManager.player_caught.connect(_on_player_caught)
 	_on_satiety_changed(GameManager.satiety, GameManager.get_satiety_threshold())
 	_update_level_label()
+
+	var player := get_tree().get_first_node_in_group("player")
+	if player:
+		player.health_changed.connect(_on_health_changed)
+		_on_health_changed(player.health, player.max_health)
+
+func _on_health_changed(value: float, max_value: float) -> void:
+	health_bar.max_value = max(max_value, 1.0)
+	health_bar.value = value
 
 func _on_satiety_changed(value: float, max_value: float) -> void:
 	if max_value <= 0.0:

@@ -87,6 +87,63 @@ static func build_trex(parent: Node2D, body_color: Color) -> void:
 	# dorsal spikes
 	_add_spikes(parent, dark, -20.0, 20.0, 6)
 
+static func build_godzilla(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.18)
+	# thick tail
+	_poly(parent, PackedVector2Array([Vector2(-10, 14), Vector2(10, 14), Vector2(0, 46)]), body_color, Vector2.ZERO, -1)
+	# bulky legs
+	for side in [-1.0, 1.0]:
+		_poly(parent, PackedVector2Array([Vector2(0, -5), Vector2(side * 19, -9), Vector2(side * 14, 7)]), dark, Vector2(side * 7, 5), -1)
+		_poly(parent, PackedVector2Array([Vector2(0, -5), Vector2(side * 19, 3), Vector2(side * 14, 12)]), dark, Vector2(side * 7, 16), -1)
+	# small arms
+	for side in [-1.0, 1.0]:
+		_line(parent, PackedVector2Array([Vector2(side * 9, -16), Vector2(side * 16, -11)]), dark, 2.6)
+	# body
+	_poly(parent, _ellipse(19, 0.75), body_color)
+	# head with snout
+	var head_pos := Vector2(0, -27)
+	_poly(parent, _ellipse(12, 0.85), body_color, head_pos, 1)
+	_poly(parent, PackedVector2Array([Vector2(-6, -6), Vector2(6, -6), Vector2(0, -18)]), body_color, head_pos, 1)
+	# eyes
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(2.6), Color.WHITE, head_pos + Vector2(side * 5.5, -2), 2)
+		_poly(parent, _ellipse(1.2), Color(0.05, 0.05, 0.05), head_pos + Vector2(side * 5.5, -2), 3)
+	# dramatic dorsal plates
+	_add_spikes(parent, dark, -26.0, 32.0, 8)
+
+static func build_oviraptor(parent: Node2D, body_color: Color, head_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.15)
+	# tail
+	_poly(parent, PackedVector2Array([Vector2(-5, 10), Vector2(5, 10), Vector2(0, 26)]), body_color, Vector2.ZERO, -1)
+	# legs
+	for side in [-1.0, 1.0]:
+		_poly(parent, PackedVector2Array([Vector2(0, -3), Vector2(side * 12, -5), Vector2(side * 9, 4)]), dark, Vector2(side * 5, -2), -1)
+		_poly(parent, PackedVector2Array([Vector2(0, -3), Vector2(side * 12, 1), Vector2(side * 9, 7)]), dark, Vector2(side * 5, 7), -1)
+	# small arms
+	for side in [-1.0, 1.0]:
+		_line(parent, PackedVector2Array([Vector2(side * 6, -12), Vector2(side * 11, -8)]), dark, 1.8)
+	# body
+	_poly(parent, _ellipse(11, 0.7), body_color)
+	# head (distinct color) with a small crest
+	var head_pos := Vector2(0, -19)
+	_poly(parent, _ellipse(7, 0.85), head_color, head_pos, 1)
+	_poly(parent, PackedVector2Array([Vector2(-3, -6), Vector2(3, -6), Vector2(0, -13)]), head_color.darkened(0.2), head_pos, 1)
+	# eyes
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(1.6), Color(0.05, 0.05, 0.05), head_pos + Vector2(side * 3, -1), 2)
+
+static func build_helicopter(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.2)
+	_poly(parent, PackedVector2Array([Vector2(-3, 18), Vector2(3, 18), Vector2(3, 22), Vector2(-3, 22)]), dark, Vector2.ZERO, -1)  # tail boom
+	_line(parent, PackedVector2Array([Vector2(-7, 20), Vector2(7, 20)]), Color(0.15, 0.15, 0.15), 1.4)  # tail rotor
+	_poly(parent, _ellipse(13, 0.6), body_color)  # body
+	_poly(parent, _ellipse(6, 0.8), Color(0.65, 0.85, 0.95, 0.85), Vector2(0, -3), 1)  # cockpit
+	_line(parent, PackedVector2Array([Vector2(-26, 0), Vector2(26, 0)]), Color(0.1, 0.1, 0.1), 2.2)  # main rotor
+	_line(parent, PackedVector2Array([Vector2(0, -26), Vector2(0, 26)]), Color(0.1, 0.1, 0.1), 2.2)  # main rotor (cross)
+
 static func build_ant(parent: Node2D, body_color: Color) -> void:
 	clear(parent)
 	var leg_color := body_color.darkened(0.2)

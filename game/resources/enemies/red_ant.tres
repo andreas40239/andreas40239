@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_red_ant"]
+
+[resource]
+script = ExtResource("1_red_ant")
+species_id = "red_ant"
+display_name = "Rote Ameise"
+category = 2
+shape = 0
+color = Color(0.72, 0.14, 0.09, 1)
+base_scale = 0.9
+move_speed = 80.0
+wander_radius = 110.0
+detection_radius = 150.0
+attack_range = 26.0
+satiety_value = 70.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 220.0
+damage_per_tick = 18.0
+edible_level = 11

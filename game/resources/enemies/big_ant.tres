@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_big_ant"]
+
+[resource]
+script = ExtResource("1_big_ant")
+species_id = "big_ant"
+display_name = "Grosse Ameise"
+category = 2
+shape = 0
+color = Color(0.24, 0.16, 0.09, 1)
+base_scale = 0.7
+move_speed = 65.0
+wander_radius = 100.0
+detection_radius = 130.0
+attack_range = 24.0
+satiety_value = 30.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 100.0
+damage_per_tick = 0.0
+edible_level = 4

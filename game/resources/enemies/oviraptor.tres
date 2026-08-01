@@ -1,0 +1,25 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_oviraptor"]
+
+[resource]
+script = ExtResource("1_oviraptor")
+species_id = "oviraptor"
+display_name = "Oviraptor"
+category = 2
+shape = 4
+color = Color(0.25, 0.55, 0.25, 1)
+accent_color = Color(0.75, 0.15, 0.1, 1)
+base_scale = 1.0
+move_speed = 320.0
+wander_radius = 220.0
+detection_radius = 260.0
+attack_range = 32.0
+satiety_value = 0.0
+rival_level = 0
+threat_level = 99
+has_health = false
+max_health = 0.0
+damage_per_tick = 20.0
+edible_level = 0
+unbeatable = true

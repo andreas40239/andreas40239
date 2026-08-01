@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_black_crab"]
+
+[resource]
+script = ExtResource("1_black_crab")
+species_id = "black_crab"
+display_name = "Schwarze Krabbe"
+category = 2
+shape = 3
+color = Color(0.12, 0.12, 0.14, 1)
+base_scale = 1.4
+move_speed = 100.0
+wander_radius = 100.0
+detection_radius = 150.0
+attack_range = 32.0
+satiety_value = 110.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 480.0
+damage_per_tick = 35.0
+edible_level = 14

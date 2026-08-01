@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Generates the game's placeholder audio (SFX, music, ocean ambience) as
 16-bit mono PCM WAV files, using only the Python standard library (no
-numpy) so it can be re-run without extra dependencies. Chiptune-style
-square/triangle wave synthesis for the 8-bit Gameboy aesthetic requested
-for the vertical slice.
+numpy) so it can be re-run without extra dependencies. SFX are short
+square/triangle-wave blips; the music is polyphonic (sustained pad chords
++ bass + lead layered together) using a softer sine/triangle blend and a
+light echo, for a smoother, more modern sound than plain chiptune square
+waves.
 
 Usage: python3 tools/generate_audio.py
 Writes into assets/audio/ next to this script's parent directory.
@@ -32,6 +34,16 @@ def triangle(phase: float, duty: float = 0.5) -> float:
     return 4.0 * abs(p - 0.5) - 1.0
 
 
+def sine(phase: float, duty: float = 0.5) -> float:
+    return math.sin(2.0 * math.pi * phase)
+
+
+def soft(phase: float, duty: float = 0.5) -> float:
+    """Sine/triangle blend: warmer and less buzzy than a bare square wave,
+    used for the modern-style pad/lead instead of chiptune-style square."""
+    return 0.6 * math.sin(2.0 * math.pi * phase) + 0.4 * triangle(phase)
+
+
 def env_pluck(t: float, dur: float, attack: float = 0.008, release: float = 0.05) -> float:
     if t < attack:
         return t / attack
@@ -46,7 +58,8 @@ class Buffer:
         self.n = int(seconds * SR)
         self.data = [0.0] * self.n
 
-    def add_note(self, start: float, dur: float, freq_fn, wave_fn, amp: float = 0.3, duty: float = 0.5):
+    def add_note(self, start: float, dur: float, freq_fn, wave_fn, amp: float = 0.3, duty: float = 0.5,
+                 attack: float = 0.008, release: float = 0.05):
         i0 = int(start * SR)
         n = int(dur * SR)
         for i in range(n):
@@ -55,7 +68,7 @@ class Buffer:
                 continue
             t = i / SR
             freq = freq_fn(t) if callable(freq_fn) else freq_fn
-            self.data[idx] += wave_fn(t * freq, duty) * amp * env_pluck(t, dur)
+            self.data[idx] += wave_fn(t * freq, duty) * amp * env_pluck(t, dur, attack, release)
 
     def add_sweep(self, start: float, dur: float, freq_start: float, freq_end: float, wave_fn, amp: float = 0.3):
         i0 = int(start * SR)
@@ -99,6 +112,22 @@ class Buffer:
         print("wrote", path, "(%.2fs)" % (len(ints) / SR))
 
 
+def apply_reverb(buf: "Buffer", delay_s: float = 0.09, decay: float = 0.32, taps: int = 3):
+    """Simple multi-tap echo (a cheap stand-in for a real reverb) to give
+    the music some depth/space instead of a dry chiptune sound."""
+    delay_samples = int(delay_s * SR)
+    n = len(buf.data)
+    out = list(buf.data)
+    for tap in range(1, taps + 1):
+        d = delay_samples * tap
+        if d >= n:
+            break
+        g = decay ** tap
+        for i in range(n - d):
+            out[i + d] += buf.data[i] * g
+    buf.data = out
+
+
 def make_eat():
     buf = Buffer(0.22)
     buf.add_note(0.00, 0.07, midi_to_freq(79), square, amp=0.35)  # G5
@@ -126,44 +155,58 @@ def make_level_up():
     buf.write(os.path.join(OUT_DIR, "level_up.wav"))
 
 
+# Richer 7th-chord voicings (root for the bass line one octave below the
+# lowest pad tone) for a smoother, more "modern" harmony than plain triads.
 CHORDS = [
-    {"root": 48, "arp": [72, 76, 79, 76]},   # C
-    {"root": 45, "arp": [69, 72, 76, 72]},   # Am
-    {"root": 53, "arp": [65, 69, 72, 69]},   # F
-    {"root": 55, "arp": [67, 71, 74, 71]},   # G
+    {"root": 48, "tones": [60, 64, 67, 71]},   # Cmaj7
+    {"root": 45, "tones": [57, 60, 64, 67]},   # Am7
+    {"root": 41, "tones": [53, 57, 60, 64]},   # Fmaj7
+    {"root": 43, "tones": [55, 59, 62, 65]},   # G7
 ]
 
 
 def make_music():
-    # Section A: calm, 2s per chord, arpeggio in quarter notes.
-    # Section B: faster, 1s per chord, arpeggio doubled up (eighth notes).
-    a_bars = 2  # repeats of the 4-chord progression
+    # Polyphonic: a sustained pad (all chord tones at once, not arpeggiated)
+    # plus a bassline plus a lead line, layered together - a real harmonic
+    # bed instead of a single monophonic voice. Soft sine/triangle blend
+    # instead of square waves for a smoother, less "8-bit" tone, with a
+    # light echo/reverb for space. Section A stays calm (sparse lead over
+    # slow-moving pad chords); Section B speeds up (busier running lead)
+    # while the pad/bass keep the same steady harmonic bed.
+    a_bars = 2
     b_bars = 2
-    a_chord_len = 2.0
-    b_chord_len = 1.0
+    a_chord_len = 2.4
+    b_chord_len = 1.2
     total = a_bars * len(CHORDS) * a_chord_len + b_bars * len(CHORDS) * b_chord_len
-    buf = Buffer(total + 0.4)
+    buf = Buffer(total + 0.6)
 
     t = 0.0
     for _bar in range(a_bars):
         for chord in CHORDS:
-            note_len = a_chord_len / len(chord["arp"])
-            for i, m in enumerate(chord["arp"]):
-                buf.add_note(t + i * note_len, note_len * 0.92, midi_to_freq(m), square, amp=0.22, duty=0.5)
-            buf.add_note(t, a_chord_len * 0.96, midi_to_freq(chord["root"]), triangle, amp=0.22)
+            for tone in chord["tones"]:
+                buf.add_note(t, a_chord_len * 0.97, midi_to_freq(tone), soft, amp=0.11, attack=0.15, release=0.35)
+            buf.add_note(t, a_chord_len * 0.97, midi_to_freq(chord["root"]), sine, amp=0.24, attack=0.05, release=0.2)
+            lead_notes = [chord["tones"][0] + 12, chord["tones"][2] + 12]
+            half = a_chord_len / 2.0
+            for i, m in enumerate(lead_notes):
+                buf.add_note(t + i * half, half * 0.85, midi_to_freq(m), soft, amp=0.16, attack=0.02, release=0.12)
             t += a_chord_len
 
     for _bar in range(b_bars):
         for chord in CHORDS:
-            arp2 = chord["arp"] + chord["arp"]
-            note_len = b_chord_len / len(arp2)
-            for i, m in enumerate(arp2):
-                buf.add_note(t + i * note_len, note_len * 0.85, midi_to_freq(m + 12), square, amp=0.24, duty=0.35)
-            half = b_chord_len / 2.0
-            buf.add_note(t, half * 0.9, midi_to_freq(chord["root"]), triangle, amp=0.24)
-            buf.add_note(t + half, half * 0.9, midi_to_freq(chord["root"]), triangle, amp=0.24)
+            for tone in chord["tones"]:
+                buf.add_note(t, b_chord_len * 0.97, midi_to_freq(tone), soft, amp=0.10, attack=0.06, release=0.18)
+            buf.add_note(t, b_chord_len * 0.97, midi_to_freq(chord["root"]), sine, amp=0.24, attack=0.02, release=0.12)
+            run = [
+                chord["tones"][0], chord["tones"][2], chord["tones"][3], chord["tones"][2] + 12,
+                chord["tones"][1] + 12, chord["tones"][0] + 12,
+            ]
+            note_len = b_chord_len / len(run)
+            for i, m in enumerate(run):
+                buf.add_note(t + i * note_len, note_len * 0.8, midi_to_freq(m + 12), soft, amp=0.14, attack=0.005, release=0.05)
             t += b_chord_len
 
+    apply_reverb(buf, delay_s=0.09, decay=0.32, taps=3)
     buf.write(os.path.join(OUT_DIR, "music_loop.wav"))
 
 
