@@ -13,14 +13,25 @@ script = ExtResource("1")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("PlayerShape")
 
-[node name="Visual" type="Polygon2D" parent="."]
-color = Color(0.35, 0.65, 0.35, 1)
-polygon = PackedVector2Array(-10, -22, 10, -22, 14, 0, 22, 10, 10, 14, 0, 26, -10, 14, -22, 10, -14, 0)
+[node name="Visual" type="Node2D" parent="."]
 
 [node name="Camera2D" type="Camera2D" parent="."]
 enabled = true
 position_smoothing_enabled = true
 limit_left = 0
-limit_top = 0
+limit_top = -140
 limit_right = 900
-limit_bottom = 650
+limit_bottom = 790
+
+[node name="TouchIndicator" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="Base" type="Polygon2D" parent="TouchIndicator"]
+visible = false
+color = Color(1, 1, 1, 0.25)
+polygon = PackedVector2Array(-45, 0, -31.8, -31.8, 0, -45, 31.8, -31.8, 45, 0, 31.8, 31.8, 0, 45, -31.8, 31.8)
+
+[node name="Knob" type="Polygon2D" parent="TouchIndicator"]
+visible = false
+color = Color(1, 1, 1, 0.55)
+polygon = PackedVector2Array(-18, 0, -12.7, -12.7, 0, -18, 12.7, -12.7, 18, 0, 12.7, 12.7, 0, 18, -12.7, 12.7)

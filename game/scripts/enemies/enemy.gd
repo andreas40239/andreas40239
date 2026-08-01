@@ -14,7 +14,7 @@ var home_position: Vector2
 var target_position: Vector2
 var player: Node2D = null
 
-@onready var visual: Polygon2D = $Visual
+@onready var visual: Node2D = $Visual
 @onready var body_shape: CollisionShape2D = $CollisionShape2D
 @onready var detection_area: Area2D = $DetectionArea
 @onready var detection_shape: CollisionShape2D = $DetectionArea/CollisionShape2D
@@ -32,24 +32,16 @@ func _ready() -> void:
 	hit_area.body_entered.connect(_on_hit_area_body_entered)
 
 func _apply_visual() -> void:
-	visual.color = data.color
 	visual.scale = Vector2.ONE * data.base_scale
 	match data.shape:
 		EnemyData.Shape.BLOB:
-			visual.polygon = _make_polygon(8, 20.0, 1.0)
+			CritterShapes.build_ant(visual, data.color)
 		EnemyData.Shape.DIAMOND:
-			visual.polygon = PackedVector2Array([Vector2(0, -24), Vector2(18, 0), Vector2(0, 24), Vector2(-18, 0)])
+			CritterShapes.build_lizard(visual, data.color)
 		EnemyData.Shape.TRIANGLE:
-			visual.polygon = PackedVector2Array([Vector2(0, -22), Vector2(-30, 18), Vector2(30, 18)])
+			CritterShapes.build_bird(visual, data.color)
 		EnemyData.Shape.OVAL:
-			visual.polygon = _make_polygon(10, 22.0, 0.6)
-
-func _make_polygon(sides: int, radius: float, squash: float) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	for i in sides:
-		var angle := TAU * i / sides
-		pts.append(Vector2(cos(angle) * radius, sin(angle) * radius * squash))
-	return pts
+			CritterShapes.build_crab(visual, data.color)
 
 func _apply_collision_shapes() -> void:
 	# Resources declared inline in the .tscn are shared across all instances

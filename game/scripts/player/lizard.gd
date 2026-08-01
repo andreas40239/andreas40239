@@ -21,7 +21,9 @@ var speed_boost_multiplier: float = 1.0
 var speed_boost_timer: float = 0.0
 var den_position: Vector2 = Vector2.ZERO
 
-@onready var visual: Polygon2D = $Visual
+@onready var visual: Node2D = $Visual
+@onready var touch_base: Polygon2D = $TouchIndicator/Base
+@onready var touch_knob: Polygon2D = $TouchIndicator/Knob
 
 func _ready() -> void:
 	add_to_group("player")
@@ -32,7 +34,7 @@ func _ready() -> void:
 func _apply_growth_visual() -> void:
 	var stage: Dictionary = GameManager.get_current_stage()
 	visual.scale = Vector2.ONE * float(stage["scale"])
-	visual.color = stage["color"]
+	CritterShapes.build_lizard(visual, stage["color"])
 
 func _on_leveled_up(_new_level: int) -> void:
 	_apply_growth_visual()
@@ -43,15 +45,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			touch_index = event.index
 			touch_origin = event.position
 			touch_vector = Vector2.ZERO
+			_update_touch_indicator(true)
 		elif event.index == touch_index:
 			touch_index = -1
 			touch_vector = Vector2.ZERO
+			_update_touch_indicator(false)
 	elif event is InputEventScreenDrag and event.index == touch_index:
 		var offset: Vector2 = event.position - touch_origin
 		if offset.length() < touch_deadzone:
 			touch_vector = Vector2.ZERO
 		else:
 			touch_vector = (offset / touch_max_radius).limit_length(1.0)
+		_update_touch_indicator(true)
+
+func _update_touch_indicator(active: bool) -> void:
+	touch_base.visible = active
+	touch_knob.visible = active
+	if active:
+		touch_base.position = touch_origin
+		touch_knob.position = touch_origin + touch_vector * touch_max_radius
 
 func _get_keyboard_vector() -> Vector2:
 	var vec := Vector2.ZERO
@@ -104,6 +116,7 @@ func _respawn_at_den() -> void:
 	velocity = Vector2.ZERO
 	touch_index = -1
 	touch_vector = Vector2.ZERO
+	_update_touch_indicator(false)
 	await get_tree().create_timer(caught_invulnerability_time).timeout
 	invulnerable = false
 

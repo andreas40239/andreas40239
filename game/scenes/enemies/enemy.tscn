@@ -19,8 +19,7 @@ script = ExtResource("1")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("BodyShape")
 
-[node name="Visual" type="Polygon2D" parent="."]
-polygon = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+[node name="Visual" type="Node2D" parent="."]
 
 [node name="DetectionArea" type="Area2D" parent="."]
 collision_layer = 0
