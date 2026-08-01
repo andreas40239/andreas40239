@@ -64,6 +64,41 @@ func _initialize() -> void:
 	den._on_body_exited(player)
 	assert(player.in_den == false, "leaving the den should clear the safe flag")
 
+	print("== chasing predators give up instead of camping at the den ==")
+	var bird3 := ENEMY_SCENE.instantiate()
+	bird3.data = BIRD_DATA
+	world.add_child(bird3)
+	await process_frame  # let _ready() (home_position, signal hookups) settle first
+	await physics_frame
+	bird3.global_position = Vector2(400, 0)
+	player.global_position = Vector2(420, 0)
+	bird3._on_detection_body_entered(player)
+	assert(bird3.state == 2, "bird should start chasing (State.CHASE)")
+	# Note: set_in_den() directly rather than den._on_body_entered(), and
+	# check within a single physics tick. The player is nowhere near the
+	# den here, so the den's *real* Area2D would otherwise emit its own
+	# (a-frame-late) body_exited and overwrite this before we can observe
+	# the reaction we're actually testing.
+	player.set_in_den(true)
+	await physics_frame
+	assert(bird3.state == 4, "bird should give up on a player safe in the den (State.RETURN)")
+	bird3.queue_free()
+	player.set_in_den(false)
+
+	var bird4 := ENEMY_SCENE.instantiate()
+	bird4.data = BIRD_DATA
+	world.add_child(bird4)
+	await process_frame
+	await physics_frame
+	bird4.global_position = Vector2(100, 0)  # inside DEN_SAFE_MARGIN (160)
+	bird4.state = 2  # force CHASE, as if it had wandered too close
+	bird4.player = player
+	player.global_position = Vector2(650, 0)  # far away, chase target still valid
+	for i in 3:
+		await physics_frame
+	assert(bird4.state == 4, "a chaser that ends up near the den should retreat, not camp there")
+	bird4.queue_free()
+
 	print("== eat via physics overlap ==")
 	var ant := ENEMY_SCENE.instantiate()
 	ant.data = ANT_DATA

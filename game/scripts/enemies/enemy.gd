@@ -7,6 +7,13 @@ class_name Enemy
 
 enum State { PATROL, FLEE, CHASE, ATTACK, RETURN, DEAD }
 
+## The den sits at the world origin (see main.tscn). Chasers give up and
+## head home once they'd have to enter this radius around it, instead of
+## camping at the entrance where a player leaving the den would walk
+## straight back into their attack range.
+const DEN_POSITION := Vector2.ZERO
+const DEN_SAFE_MARGIN := 160.0
+
 @export var data: EnemyData
 
 var state: State = State.PATROL
@@ -69,6 +76,13 @@ func _pick_new_patrol_target() -> void:
 func _physics_process(_delta: float) -> void:
 	if state == State.DEAD:
 		return
+	# Checked every tick (not just from within _process_chase/_process_attack):
+	# the detection Area2D's body_entered signal can arrive a frame late and
+	# re-set state to CHASE right after we'd already bailed to RETURN, which
+	# without this would make the animal flicker back and forth right at the
+	# den's doorstep instead of actually leaving.
+	if (state == State.CHASE or state == State.ATTACK) and _should_give_up_near_den():
+		state = State.RETURN
 	match state:
 		State.PATROL:
 			_process_patrol()
@@ -119,6 +133,13 @@ func _process_attack() -> void:
 		return
 	if global_position.distance_to(player.global_position) > data.attack_range * 1.5:
 		state = State.CHASE
+
+func _should_give_up_near_den() -> bool:
+	if player == null or not is_instance_valid(player):
+		return false
+	if bool(player.get("in_den")):
+		return true
+	return global_position.distance_to(DEN_POSITION) < DEN_SAFE_MARGIN
 
 func _process_return() -> void:
 	_move_toward(home_position, data.move_speed * 0.7)
