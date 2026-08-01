@@ -1,7 +1,6 @@
 .godot/
 .import/
 export.cfg
-export_presets.cfg
 *.translation
-android/build/
+build/
 *.tmp
