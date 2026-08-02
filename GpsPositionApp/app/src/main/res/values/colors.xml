@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="background">#1C1D21</color>
+    <color name="surface">#2A2B30</color>
+    <color name="surface_stroke">#3A3B42</color>
+
+    <color name="text_primary">#F5F5F7</color>
+    <color name="text_secondary">#9A9CA6</color>
+    <color name="text_muted">#6E7078</color>
+
+    <color name="accent_red">#FF4B3E</color>
+    <color name="accent_green">#34D399</color>
+    <color name="accent_amber">#FFB020</color>
+
     <color name="purple_500">#6200EE</color>
     <color name="purple_700">#3700B3</color>
     <color name="teal_200">#03DAC5</color>
-    <color name="background">#FFFFFF</color>
-    <color name="on_background">#000000</color>
 </resources>
