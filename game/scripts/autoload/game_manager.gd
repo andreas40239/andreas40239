@@ -33,7 +33,7 @@ const COLOR_ANCHORS := [
 	[5, Color(0.55, 0.45, 0.2)],
 	[10, Color(0.45, 0.55, 0.4)],
 	[15, Color(0.32, 0.38, 0.34)],
-	[20, Color(0.22, 0.32, 0.22)],
+	[20, Color(0.09, 0.14, 0.32)],
 ]
 
 var growth_level: int = 1

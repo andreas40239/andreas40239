@@ -101,16 +101,16 @@ static func build_godzilla(parent: Node2D, body_color: Color) -> void:
 		_line(parent, PackedVector2Array([Vector2(side * 9, -16), Vector2(side * 16, -11)]), dark, 2.6)
 	# body
 	_poly(parent, _ellipse(19, 0.75), body_color)
-	# head with snout
-	var head_pos := Vector2(0, -27)
-	_poly(parent, _ellipse(12, 0.85), body_color, head_pos, 1)
-	_poly(parent, PackedVector2Array([Vector2(-6, -6), Vector2(6, -6), Vector2(0, -18)]), body_color, head_pos, 1)
+	# head with snout (bigger than the T-Rex's)
+	var head_pos := Vector2(0, -31)
+	_poly(parent, _ellipse(16, 0.88), body_color, head_pos, 1)
+	_poly(parent, PackedVector2Array([Vector2(-8, -7), Vector2(8, -7), Vector2(0, -23)]), body_color, head_pos, 1)
 	# eyes
 	for side in [-1.0, 1.0]:
-		_poly(parent, _ellipse(2.6), Color.WHITE, head_pos + Vector2(side * 5.5, -2), 2)
-		_poly(parent, _ellipse(1.2), Color(0.05, 0.05, 0.05), head_pos + Vector2(side * 5.5, -2), 3)
-	# dramatic dorsal plates
-	_add_spikes(parent, dark, -26.0, 32.0, 8)
+		_poly(parent, _ellipse(3.2), Color.WHITE, head_pos + Vector2(side * 7, -2), 2)
+		_poly(parent, _ellipse(1.5), Color(0.05, 0.05, 0.05), head_pos + Vector2(side * 7, -2), 3)
+	# dramatic dorsal plates - denser and covering more of the back/head
+	_add_spikes(parent, dark, -34.0, 34.0, 12)
 
 static func build_oviraptor(parent: Node2D, body_color: Color, head_color: Color) -> void:
 	clear(parent)

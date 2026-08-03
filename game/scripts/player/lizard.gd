@@ -16,8 +16,8 @@ signal health_changed(value: float, max_value: float)
 @export var health_regen_seconds: float = 3.0  # full heal in this long while safe in the den
 
 const FIRE_BREATH_INTERVAL := 4.0
-const FIRE_RANGE := 260.0
-const FIRE_HALF_ANGLE_DEG := 35.0
+const FIRE_RANGE := 310.0
+const FIRE_HALF_ANGLE_DEG := 38.0
 const FIRE_REWARD := 15.0
 
 var touch_index: int = -1
