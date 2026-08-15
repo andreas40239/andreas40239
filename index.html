@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>LED Concert Banner</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000000;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  #bannerText {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    will-change: transform;
+    padding: 0 4vw;
+  }
+
+  /* Static / center mode */
+  #stage.mode-static #bannerText {
+    position: static;
+    transform: none;
+    max-width: 92vw;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: break-word;
+  }
+
+  /* Blink mode */
+  #stage.mode-blink #bannerText {
+    position: static;
+    transform: none;
+    max-width: 92vw;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: break-word;
+  }
+  #stage.mode-blink.blink-off #bannerText {
+    opacity: 0;
+  }
+
+  /* Marquee mode uses left/absolute positioning set via JS transform */
+
+  /* Gear toggle button */
+  #gearBtn {
+    position: fixed;
+    bottom: 14px;
+    right: 14px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: rgba(30,30,30,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #eee;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 50;
+    backdrop-filter: blur(6px);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  #gearBtn:active { transform: scale(0.9); }
+
+  #panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 78vh;
+    background: rgba(15,15,15,0.92);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,0.12);
+    color: #eee;
+    z-index: 40;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.28s ease;
+  }
+  #panel.open { transform: translateY(0); }
+
+  .panelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .panelHeader h2 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 600;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .closeX {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    font-size: 16px;
+    outline: none;
+  }
+  input[type="text"]:focus {
+    border-color: rgba(255,255,255,0.4);
+  }
+
+  .row {
+    display: flex;
+    gap: 10px;
+  }
+  .row .field { flex: 1; }
+
+  input[type="color"] {
+    width: 100%;
+    height: 42px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: #39ff14;
+    height: 24px;
+  }
+
+  .sliderVal {
+    float: right;
+    color: #666;
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .modeButtons {
+    display: flex;
+    gap: 8px;
+  }
+  .modeBtn {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .modeBtn.active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+    font-weight: 600;
+  }
+
+  .presets {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .presetBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 11px;
+    cursor: pointer;
+    width: 68px;
+  }
+  .presetSwatch {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .presetBtn:active .presetSwatch {
+    transform: scale(0.92);
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="stage" class="mode-static">
+  <div id="bannerText">HELLO!</div>
+</div>
+
+<button id="gearBtn" aria-label="Einstellungen">⚙️</button>
+
+<div id="panel">
+  <div class="panelHeader">
+    <h2>Einstellungen</h2>
+    <button class="closeX" id="closePanel" aria-label="Schließen">✕</button>
+  </div>
+
+  <div class="field">
+    <label for="textInput">Text</label>
+    <input type="text" id="textInput" maxlength="120" value="HELLO!" placeholder="Text, Emoji oder Satz...">
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="textColor">Textfarbe</label>
+      <input type="color" id="textColor" value="#39ff14">
+    </div>
+    <div class="field">
+      <label for="bgColor">Hintergrund</label>
+      <input type="color" id="bgColor" value="#000000">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="fontSize">Schriftgröße <span class="sliderVal" id="fontSizeVal">15vw</span></label>
+    <input type="range" id="fontSize" min="4" max="30" value="15" step="1">
+  </div>
+
+  <div class="field">
+    <label for="speed">Animationsgeschwindigkeit <span class="sliderVal" id="speedVal">Statisch</span></label>
+    <input type="range" id="speed" min="0" max="10" value="0" step="1">
+  </div>
+
+  <div class="field">
+    <label>Modus</label>
+    <div class="modeButtons">
+      <button class="modeBtn active" data-mode="static">Statisch</button>
+      <button class="modeBtn" data-mode="blink">Blinken</button>
+      <button class="modeBtn" data-mode="marquee">Laufschrift</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Presets</label>
+    <div class="presets" id="presets"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var stage = document.getElementById('stage');
+  var bannerText = document.getElementById('bannerText');
+  var gearBtn = document.getElementById('gearBtn');
+  var panel = document.getElementById('panel');
+  var closePanel = document.getElementById('closePanel');
+
+  var textInput = document.getElementById('textInput');
+  var textColor = document.getElementById('textColor');
+  var bgColor = document.getElementById('bgColor');
+  var fontSize = document.getElementById('fontSize');
+  var fontSizeVal = document.getElementById('fontSizeVal');
+  var speed = document.getElementById('speed');
+  var speedVal = document.getElementById('speedVal');
+  var modeButtons = document.querySelectorAll('.modeBtn');
+  var presetsContainer = document.getElementById('presets');
+
+  var state = {
+    text: 'HELLO!',
+    textColor: '#39ff14',
+    bgColor: '#000000',
+    fontSizeVw: 15,
+    speed: 0,
+    mode: 'static'
+  };
+
+  var presets = [
+    { name: 'Neon Cyber', text: '#39ff14', bg: '#000000' },
+    { name: 'Hot Neon', text: '#ff2fd4', bg: '#000000' },
+    { name: 'Classic LED', text: '#ff0000', bg: '#000000' },
+    { name: 'Invertiert', text: '#000000', bg: '#ffffff' },
+    { name: 'Ice Blue', text: '#00e5ff', bg: '#000000' },
+    { name: 'Gold Stage', text: '#ffd700', bg: '#000000' }
+  ];
+
+  function buildPresets() {
+    presets.forEach(function (p) {
+      var btn = document.createElement('button');
+      btn.className = 'presetBtn';
+      btn.type = 'button';
+
+      var swatch = document.createElement('span');
+      swatch.className = 'presetSwatch';
+      swatch.style.background = p.bg;
+      swatch.style.color = p.text;
+      swatch.style.boxShadow = 'inset 0 0 8px ' + p.text;
+      swatch.textContent = 'A';
+
+      var label = document.createElement('span');
+      label.textContent = p.name;
+
+      btn.appendChild(swatch);
+      btn.appendChild(label);
+
+      btn.addEventListener('click', function () {
+        state.textColor = p.text;
+        state.bgColor = p.bg;
+        textColor.value = p.text;
+        bgColor.value = p.bg;
+        applyStyles();
+      });
+
+      presetsContainer.appendChild(btn);
+    });
+  }
+
+  // --- Marquee animation state ---
+  var marqueeX = null;
+  var marqueeRAF = null;
+  var lastTs = null;
+
+  // --- Blink animation state ---
+  var blinkInterval = null;
+
+  function speedToPxPerSec(s) {
+    // 0 handled separately (static/no movement)
+    // map 1..10 to a pleasant pixel speed range
+    return 40 + s * 55; // 95 .. 590 px/s
+  }
+
+  function speedToBlinkMs(s) {
+    if (s <= 0) return null;
+    // higher speed => faster blink; map 1..10 to 900ms..120ms
+    var minMs = 120, maxMs = 900;
+    var t = (s - 1) / 9; // 0..1
+    return Math.round(maxMs - t * (maxMs - minMs));
+  }
+
+  function stopMarquee() {
+    if (marqueeRAF) {
+      cancelAnimationFrame(marqueeRAF);
+      marqueeRAF = null;
+    }
+    lastTs = null;
+  }
+
+  function stopBlink() {
+    if (blinkInterval) {
+      clearInterval(blinkInterval);
+      blinkInterval = null;
+    }
+    stage.classList.remove('blink-off');
+  }
+
+  function startBlink() {
+    stopBlink();
+    var ms = speedToBlinkMs(state.speed);
+    if (ms === null) {
+      // speed 0 in blink mode: just show text solid
+      return;
+    }
+    blinkInterval = setInterval(function () {
+      stage.classList.toggle('blink-off');
+    }, ms);
+  }
+
+  function startMarquee() {
+    stopMarquee();
+    var stageWidth = stage.clientWidth;
+    marqueeX = stageWidth;
+    bannerText.style.transform = 'translateY(-50%) translateX(' + marqueeX + 'px)';
+
+    function step(ts) {
+      if (state.mode !== 'marquee') return;
+      if (lastTs === null) lastTs = ts;
+      var dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+
+      if (state.speed > 0) {
+        var pxPerSec = speedToPxPerSec(state.speed);
+        marqueeX -= pxPerSec * dt;
+        var textWidth = bannerText.offsetWidth;
+        if (marqueeX < -textWidth) {
+          marqueeX = stage.clientWidth;
+        }
+        bannerText.style.transform = 'translateY(-50%) translateX(' + marqueeX + 'px)';
+      }
+      marqueeRAF = requestAnimationFrame(step);
+    }
+    marqueeRAF = requestAnimationFrame(step);
+  }
+
+  function applyMode() {
+    stage.classList.remove('mode-static', 'mode-blink', 'mode-marquee');
+    stopMarquee();
+    stopBlink();
+    bannerText.style.transform = '';
+
+    if (state.mode === 'static') {
+      stage.classList.add('mode-static');
+    } else if (state.mode === 'blink') {
+      stage.classList.add('mode-blink');
+      startBlink();
+    } else if (state.mode === 'marquee') {
+      stage.classList.add('mode-marquee');
+      startMarquee();
+    }
+
+    modeButtons.forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === state.mode);
+    });
+  }
+
+  function computeGlow(color) {
+    return [
+      '0 0 ' + '0.05em ' + color,
+      '0 0 0.2em ' + color,
+      '0 0 0.45em ' + color,
+      '0 0 0.9em ' + color,
+      '0 0 1.6em ' + color
+    ].join(', ');
+  }
+
+  function applyStyles() {
+    document.body.style.background = state.bgColor;
+    stage.style.background = state.bgColor;
+    bannerText.textContent = state.text || ' ';
+    bannerText.style.color = state.textColor;
+    bannerText.style.textShadow = computeGlow(state.textColor);
+    bannerText.style.fontSize = state.fontSizeVw + 'vw';
+  }
+
+  function updateSliderLabels() {
+    fontSizeVal.textContent = state.fontSizeVw + 'vw';
+    speedVal.textContent = state.speed === 0 ? 'Statisch' : state.speed + ' / 10';
+  }
+
+  // --- Event bindings ---
+  textInput.addEventListener('input', function () {
+    state.text = textInput.value;
+    applyStyles();
+    if (state.mode === 'marquee') startMarquee();
+  });
+
+  textColor.addEventListener('input', function () {
+    state.textColor = textColor.value;
+    applyStyles();
+  });
+
+  bgColor.addEventListener('input', function () {
+    state.bgColor = bgColor.value;
+    applyStyles();
+  });
+
+  fontSize.addEventListener('input', function () {
+    state.fontSizeVw = parseInt(fontSize.value, 10);
+    updateSliderLabels();
+    applyStyles();
+    if (state.mode === 'marquee') startMarquee();
+  });
+
+  speed.addEventListener('input', function () {
+    state.speed = parseInt(speed.value, 10);
+    updateSliderLabels();
+    if (state.mode === 'blink') startBlink();
+  });
+
+  modeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.mode = btn.getAttribute('data-mode');
+      applyMode();
+    });
+  });
+
+  gearBtn.addEventListener('click', function () {
+    panel.classList.toggle('open');
+  });
+
+  closePanel.addEventListener('click', function () {
+    panel.classList.remove('open');
+  });
+
+  stage.addEventListener('click', function () {
+    if (panel.classList.contains('open')) {
+      panel.classList.remove('open');
+    }
+  });
+
+  panel.addEventListener('click', function (e) {
+    e.stopPropagation();
+  });
+
+  window.addEventListener('resize', function () {
+    if (state.mode === 'marquee') startMarquee();
+  });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(function () {
+      if (state.mode === 'marquee') startMarquee();
+    }, 250);
+  });
+
+  // --- Init ---
+  buildPresets();
+  applyStyles();
+  updateSliderLabels();
+  applyMode();
+})();
+</script>
+
+</body>
+</html>
