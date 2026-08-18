@@ -17,6 +17,20 @@ var CRAB_DATA: Resource
 var OVIRAPTOR_DATA: Resource
 var HELICOPTER_DATA: Resource
 
+## GameManager.add_satiety() always emits level_up_ready when the
+## threshold is hit, and the real popup independently reacts to it by
+## showing itself and pausing the tree. When a test wants to skip clicking
+## the popup and call GameManager.choose_upgrade() directly (to level up
+## repeatedly without going through the UI each time), it must also close
+## the popup and unpause here, or the game stays paused - which silently
+## stops every regular node's _physics_process (they default to
+## PROCESS_MODE_PAUSABLE), producing very confusing "nothing is moving"
+## failures far downstream, not at the point the pause got stuck.
+func _bypass_choose(level_up_popup: CanvasLayer, upgrade: String) -> void:
+	GameManager.choose_upgrade(upgrade)
+	level_up_popup.visible = false
+	paused = false
+
 func _initialize() -> void:
 	GameManager = get_root().get_node("GameManager")
 	SaveManager = get_root().get_node("SaveManager")
@@ -45,6 +59,7 @@ func _initialize() -> void:
 	var spawner = main.get_node("World/EnemySpawner")
 	var camera = player.get_node("Camera2D")
 	var world = main.get_node("World")
+	var level_up_popup = main.get_node("LevelUpPopup")
 
 	print("== spawner produced enemies (incl. ants) ==")
 	assert(spawner.get_child_count() > 0, "spawner should have spawned enemies on _ready")
@@ -200,25 +215,39 @@ func _initialize() -> void:
 	assert(player.health >= player.max_health * 0.99, "staying in the den should recharge health to full")
 	den._on_body_exited(player)
 
+	print("== leveling no longer requires visiting the den: satiety alone triggers the popup ==")
+	player.global_position = Vector2(1500, 1500)  # far from the den - this is the point of the test
+	for i in 5:
+		await physics_frame
+	assert(player.global_position.distance_to(Vector2.ZERO) > 300.0, "player should be far from the den for this check")
+	var level_before_popup_test: int = GameManager.growth_level
+	assert(level_up_popup.visible == false and not paused)
+	player.eat(GameManager.get_satiety_threshold())
+	await process_frame
+	assert(GameManager.pending_level_up == true, "reaching the satiety threshold should flag a pending level-up immediately")
+	assert(GameManager.growth_level == level_before_popup_test, "the level shouldn't advance until a power is chosen")
+	assert(level_up_popup.visible == true, "the real popup should have shown itself, with fireworks, via the level_up_ready signal")
+	assert(paused == true, "the popup should pause the game while the player decides")
+	level_up_popup.defense_button.emit_signal("pressed")
+	await process_frame
+	assert(GameManager.growth_level == level_before_popup_test + 1, "pressing a power's button should be what applies the level-up")
+	assert(GameManager.defense_level == 1)
+	assert(GameManager.pending_level_up == false)
+	assert(level_up_popup.visible == false and not paused, "choosing should close the popup and resume the game")
+
 	print("== leveling to 5 (spikes) grows the map in all directions ==")
 	var half_before: Vector2 = GameManager.get_map_half_extent()
-	for target in range(2, 6):
-		GameManager.satiety = GameManager.get_satiety_threshold()
-		den._on_body_entered(player)
+	for target in range(GameManager.growth_level + 1, 6):
+		GameManager.add_satiety(GameManager.get_satiety_threshold())
+		_bypass_choose(level_up_popup, "defense")
 		assert(GameManager.growth_level == target)
 	var half_after: Vector2 = GameManager.get_map_half_extent()
 	assert(half_after.x > half_before.x and half_after.y > half_before.y, "map should grow in both axes")
 	assert(int(camera.limit_right) == int(half_after.x), "camera limit should track map growth")
 	assert(GameManager.get_current_stage()["has_spikes"] == true, "level 5 should have spikes")
-	print("OK: level=", GameManager.growth_level, " half_extent=", half_after)
-	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
+	print("OK: level=", GameManager.growth_level, " half_extent=", half_after, " defense_level=", GameManager.defense_level)
 
 	print("== spikes fend off an old threat instead of dealing damage ==")
-	# The leveling loop above called den._on_body_entered() repeatedly
-	# without ever moving the player away from (0, 0), so it's still
-	# genuinely sitting in the den - move it out first, or den regen would
-	# raise health during this test and break the "no change" assertion
-	# below for an unrelated reason.
 	player.global_position = Vector2(-1600, 1600)
 	for i in 5:
 		await physics_frame
@@ -231,7 +260,13 @@ func _initialize() -> void:
 	bird2.global_position = pos_before2
 	bird2._on_hit_area_body_entered(player)
 	var health_before_fendoff: float = player.health
-	for i in 3:
+	# A couple of extra ticks of margin: the real DetectionArea overlapping
+	# at the same instant can independently (and correctly) fire its own
+	# body_entered a tick later and briefly relabel the movement state back
+	# to CHASE before _resolve_contact (which runs every tick regardless of
+	# that label while player_touching is true, so this never affects
+	# velocity or damage) reasserts FLEE.
+	for i in 8:
 		await physics_frame
 	assert(player.health == health_before_fendoff, "spiked player should take no damage from an old threat")
 	assert(bird2.state == 1, "fended-off predator should flee (State.FLEE)")
@@ -241,11 +276,12 @@ func _initialize() -> void:
 	assert(GameManager.can_eat_rival(RIVAL_DATA.rival_level) == true)
 
 	print("== level 7: gulls become fightable/edible ==")
-	for target in range(6, 8):
-		GameManager.satiety = GameManager.get_satiety_threshold()
-		den._on_body_entered(player)
+	var attack_level_before: int = GameManager.attack_level
+	for target in range(GameManager.growth_level + 1, 8):
+		GameManager.add_satiety(GameManager.get_satiety_threshold())
+		_bypass_choose(level_up_popup, "attack")
 	assert(GameManager.growth_level == 7)
-	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
+	assert(GameManager.attack_level > attack_level_before, "choosing 'attack' should have raised attack_level")
 	var bird5 := ENEMY_SCENE.instantiate()
 	bird5.data = BIRD_DATA
 	world.add_child(bird5)
@@ -264,12 +300,11 @@ func _initialize() -> void:
 
 	print("== leveling to 10 turns the player into a T-Rex ==")
 	for target in range(8, 11):
-		GameManager.satiety = GameManager.get_satiety_threshold()
-		den._on_body_entered(player)
+		GameManager.add_satiety(GameManager.get_satiety_threshold())
+		_bypass_choose(level_up_popup, "attack")
 		assert(GameManager.growth_level == target)
 	assert(GameManager.get_current_stage()["is_trex"] == true, "level 10 should be a T-Rex")
 	print("OK: level=", GameManager.growth_level)
-	player.set_in_den(false)  # this loop faked den entry repeatedly without a matching exit
 
 	print("== level 17: Oviraptors are fast, deal damage, and can never be eaten ==")
 	GameManager.growth_level = 17

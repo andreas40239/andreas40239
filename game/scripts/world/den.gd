@@ -1,9 +1,9 @@
 extends Area2D
 
-## The lizard's burrow. Entering it with enough satiety triggers a
-## level-up (per the design doc: satiety threshold reached AND return
-## to the den). It also remembers itself as the respawn point, and the
-## player is safe from all attackers while inside.
+## The lizard's burrow. It's the respawn point, a safe zone (no damage
+## while inside), and recharges health over time. Leveling up no longer
+## requires visiting it - see GameManager.level_up_ready / choose_upgrade,
+## triggered automatically once satiety reaches its threshold.
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
@@ -14,8 +14,6 @@ func _on_body_entered(body: Node) -> void:
 		return
 	body.set_den_position(global_position)
 	body.set_in_den(true)
-	if GameManager.can_level_up():
-		GameManager.level_up()
 
 func _on_body_exited(body: Node) -> void:
 	if body.is_in_group("player"):

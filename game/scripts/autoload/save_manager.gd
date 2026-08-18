@@ -7,6 +7,8 @@ func save_game() -> void:
 		"growth_level": GameManager.growth_level,
 		"satiety": GameManager.satiety,
 		"run_complete": GameManager.run_complete,
+		"defense_level": GameManager.defense_level,
+		"attack_level": GameManager.attack_level,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -27,3 +29,5 @@ func load_game() -> void:
 	GameManager.growth_level = parsed.get("growth_level", 1)
 	GameManager.satiety = parsed.get("satiety", 0.0)
 	GameManager.run_complete = parsed.get("run_complete", false)
+	GameManager.defense_level = parsed.get("defense_level", 0)
+	GameManager.attack_level = parsed.get("attack_level", 0)

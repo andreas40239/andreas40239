@@ -9,6 +9,10 @@ extends Node
 signal leveled_up(new_level: int)
 signal satiety_changed(value: float, max_value: float)
 signal player_caught
+## Fired the instant satiety hits its threshold - the level-up popup
+## listens for this to show the upgrade choice (with fireworks), instead
+## of leveling up requiring a trip back to the den.
+signal level_up_ready
 
 const MAX_LEVEL := 21
 const SPIKES_LEVEL := 5
@@ -28,6 +32,12 @@ const HEALTH_GROWTH_PER_LEVEL := 8.0
 const BASE_BITE_DPS := 40.0
 const BITE_DPS_PER_LEVEL := 2.5
 
+## Player-chosen upgrades (see level_up_ready / choose_upgrade), on top of
+## the automatic per-level formulas above.
+const ATTACK_BONUS_PER_LEVEL := 8.0
+const DEFENSE_REDUCTION_PER_LEVEL := 0.9  # multiplicative per point
+const DEFENSE_MULTIPLIER_FLOOR := 0.25
+
 const COLOR_ANCHORS := [
 	[1, Color(0.35, 0.65, 0.35)],
 	[5, Color(0.55, 0.45, 0.2)],
@@ -39,6 +49,9 @@ const COLOR_ANCHORS := [
 var growth_level: int = 1
 var satiety: float = 0.0
 var run_complete: bool = false
+var defense_level: int = 0
+var attack_level: int = 0
+var pending_level_up: bool = false
 
 func get_satiety_threshold() -> float:
 	if growth_level >= MAX_LEVEL:
@@ -62,7 +75,10 @@ func get_max_health() -> float:
 	return BASE_MAX_HEALTH + (growth_level - 1) * HEALTH_GROWTH_PER_LEVEL
 
 func get_bite_dps() -> float:
-	return BASE_BITE_DPS + growth_level * BITE_DPS_PER_LEVEL
+	return BASE_BITE_DPS + growth_level * BITE_DPS_PER_LEVEL + attack_level * ATTACK_BONUS_PER_LEVEL
+
+func get_defense_multiplier() -> float:
+	return max(DEFENSE_MULTIPLIER_FLOOR, pow(DEFENSE_REDUCTION_PER_LEVEL, defense_level))
 
 func _stage_color(level: int) -> Color:
 	for i in range(COLOR_ANCHORS.size() - 1):
@@ -85,14 +101,25 @@ func add_satiety(amount: float) -> void:
 		return
 	satiety = clamp(satiety + amount, 0.0, threshold)
 	satiety_changed.emit(satiety, threshold)
+	if can_level_up() and not pending_level_up:
+		pending_level_up = true
+		level_up_ready.emit()
 
 func can_level_up() -> bool:
 	var threshold := get_satiety_threshold()
 	return threshold > 0.0 and satiety >= threshold and growth_level < MAX_LEVEL
 
-func level_up() -> void:
-	if not can_level_up():
+## Called by the level-up popup once the player picks which power to
+## upgrade. Replaces the old "must return to the den" level_up() trigger.
+func choose_upgrade(upgrade: String) -> void:
+	if not pending_level_up:
 		return
+	match upgrade:
+		"defense":
+			defense_level += 1
+		"attack":
+			attack_level += 1
+	pending_level_up = false
 	growth_level += 1
 	satiety = 0.0
 	if growth_level >= MAX_LEVEL:

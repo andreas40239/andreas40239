@@ -145,7 +145,8 @@ func can_fend_off(threat_level: int) -> bool:
 func take_damage(amount: float) -> void:
 	if invulnerable or in_den or amount <= 0.0:
 		return
-	health = max(0.0, health - amount)
+	var reduced := amount * GameManager.get_defense_multiplier()
+	health = max(0.0, health - reduced)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
 		get_caught()

@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/main.gd" id="MainScript"]
 [ext_resource type="PackedScene" path="res://scenes/player/lizard.tscn" id="LizardScene"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fruit_bush.tscn" id="FruitBushScene"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/enemy.tscn" id="EnemyScene"]
 [ext_resource type="Script" path="res://scripts/world/enemy_spawner.gd" id="EnemySpawnerScript"]
+[ext_resource type="PackedScene" path="res://scenes/ui/level_up_popup.tscn" id="LevelUpPopupScene"]
 
 [sub_resource type="RectangleShape2D" id="PlaceholderWallShape"]
 size = Vector2(10, 10)
@@ -80,3 +81,5 @@ enemy_scene = ExtResource("EnemyScene")
 position = Vector2(0, 0)
 
 [node name="HUD" parent="." instance=ExtResource("HudScene")]
+
+[node name="LevelUpPopup" parent="." instance=ExtResource("LevelUpPopupScene")]
