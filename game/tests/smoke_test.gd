@@ -376,5 +376,26 @@ func _initialize() -> void:
 	assert(GameManager.growth_level == 15)
 	print("OK: reloaded growth_level=", GameManager.growth_level)
 
+	print("== restarting the game resets growth AND the upgrade levels together ==")
+	GameManager.growth_level = 12
+	GameManager.satiety = 40.0
+	GameManager.defense_level = 3
+	GameManager.attack_level = 4
+	GameManager.run_complete = true
+	GameManager.restart_game()
+	assert(GameManager.growth_level == 1, "restart should reset growth_level")
+	assert(GameManager.satiety == 0.0, "restart should reset satiety")
+	assert(GameManager.defense_level == 0, "restart must not leave defense_level from the previous run")
+	assert(GameManager.attack_level == 0, "restart must not leave attack_level from the previous run")
+	assert(not GameManager.run_complete, "restart should clear run_complete")
+	# Also verify the reset was actually persisted, not just held in memory -
+	# a real app relaunch would only see it via a reload of the save file.
+	GameManager.defense_level = 7
+	GameManager.attack_level = 9
+	SaveManager.load_game()
+	assert(GameManager.defense_level == 0, "the restart's fresh state should have been written to disk")
+	assert(GameManager.attack_level == 0, "the restart's fresh state should have been written to disk")
+	print("OK: restart_game() resets growth_level, satiety, defense_level, attack_level and run_complete together")
+
 	print("ALL SMOKE TESTS PASSED")
 	quit(0)

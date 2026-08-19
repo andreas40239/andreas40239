@@ -16,6 +16,12 @@ func save_game() -> void:
 		file.close()
 
 func load_game() -> void:
+	# Always start from a clean slate before applying whatever the save file
+	# has, so any field a future save format forgets to write still ends up
+	# at its proper default instead of carrying over stale in-memory state
+	# from a previous run (this is what let defense_level/attack_level
+	# survive a restart while growth_level correctly went back to 1).
+	GameManager.reset_progress()
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)

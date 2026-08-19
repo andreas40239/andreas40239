@@ -18,6 +18,7 @@ const DEN_POSITION := Vector2.ZERO
 const DEN_SAFE_MARGIN := 160.0
 
 const MELEE_TICK_INTERVAL := 0.5
+const BITE_VISUAL_INTERVAL := 0.35  # throttles the attack pulse so it reads as a rhythmic bite, not a strobe
 
 @export var data: EnemyData
 
@@ -29,6 +30,7 @@ var player_touching: bool = false
 var current_health: float = 0.0
 var _damage_cooldown: float = 0.0
 var _shoot_cooldown: float = 0.0
+var _bite_visual_cooldown: float = 0.0
 
 @onready var visual: Node2D = $Visual
 @onready var body_shape: CollisionShape2D = $CollisionShape2D
@@ -255,8 +257,28 @@ func _tick_damage(delta: float) -> void:
 func _tick_fight(delta: float) -> void:
 	current_health -= GameManager.get_bite_dps() * delta
 	_tick_damage(delta)
+	_bite_visual_cooldown -= delta
+	if _bite_visual_cooldown <= 0.0:
+		_bite_visual_cooldown = BITE_VISUAL_INTERVAL
+		_flash_bite_hit()
+		if is_instance_valid(player) and player.has_method("play_attack_pulse"):
+			player.play_attack_pulse()
 	if current_health <= 0.0:
 		_get_eaten()
+
+## Visible feedback for a bite landing: the animal flashes and pulses, and
+## a small spark bursts at the contact point, so a fight reads as
+## something actually happening instead of silently draining a health bar.
+func _flash_bite_hit() -> void:
+	if not is_instance_valid(visual):
+		return
+	visual.modulate = Color(1.7, 1.35, 1.3)
+	visual.scale = Vector2.ONE * data.base_scale * 1.1
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(visual, "modulate", Color.WHITE, 0.22)
+	tw.tween_property(visual, "scale", Vector2.ONE * data.base_scale, 0.16)
+	CritterShapes.spawn_impact_spark(get_parent(), global_position)
 
 func _get_eaten() -> void:
 	if state == State.DEAD:

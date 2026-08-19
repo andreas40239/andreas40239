@@ -133,3 +133,26 @@ func can_eat_rival(rival_level: int) -> bool:
 
 func notify_player_caught() -> void:
 	player_caught.emit()
+
+## Single source of truth for "fresh game" state - resets every progression
+## field together (growth, satiety, both upgrade tracks, completion flag) so
+## a restart can never leave one of them stale, as opposed to earlier code
+## that only reset growth_level/satiety and let defense_level/attack_level
+## survive a new run.
+func reset_progress() -> void:
+	growth_level = 1
+	satiety = 0.0
+	run_complete = false
+	defense_level = 0
+	attack_level = 0
+	pending_level_up = false
+
+## Starts a brand new run: resets all progress, persists that fresh state
+## immediately (so a force-closed app also comes back at level 1), and
+## announces it so the HUD/popup refresh. The caller is responsible for
+## reloading the scene to rebuild the player/enemies from scratch.
+func restart_game() -> void:
+	reset_progress()
+	SaveManager.save_game()
+	leveled_up.emit(growth_level)
+	satiety_changed.emit(satiety, get_satiety_threshold())

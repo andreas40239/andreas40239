@@ -128,6 +128,17 @@ func _physics_process(delta: float) -> void:
 			_fire_cooldown = FIRE_BREATH_INTERVAL
 			_breathe_fire()
 
+## Quick lunge-and-snap pulse so the player can see the bite land, called
+## periodically by an enemy's fight resolution (not every physics tick,
+## which would just look like a flat strobe).
+func play_attack_pulse() -> void:
+	if not is_instance_valid(visual):
+		return
+	var base_scale: float = float(GameManager.get_current_stage()["scale"])
+	visual.scale = Vector2.ONE * base_scale * 1.2
+	var tw := create_tween()
+	tw.tween_property(visual, "scale", Vector2.ONE * base_scale, 0.14)
+
 func eat(amount: float) -> void:
 	GameManager.add_satiety(amount)
 	ate.emit(amount)
@@ -191,13 +202,48 @@ func _breathe_fire() -> void:
 			GameManager.add_satiety(FIRE_REWARD)
 
 func _show_fire_visual() -> void:
-	var half_w := FIRE_RANGE * tan(deg_to_rad(FIRE_HALF_ANGLE_DEG))
-	var cone := Polygon2D.new()
-	cone.polygon = PackedVector2Array([Vector2.ZERO, Vector2(FIRE_RANGE, -half_w), Vector2(FIRE_RANGE, half_w)])
-	cone.color = Color(1.0, 0.45, 0.1, 0.75)
+	var cone := Node2D.new()
 	cone.rotation = last_move_direction.angle()
 	cone.z_index = 5
 	add_child(cone)
-	await get_tree().create_timer(0.35).timeout
+
+	var half_w := FIRE_RANGE * tan(deg_to_rad(FIRE_HALF_ANGLE_DEG))
+	# Layered flame (outer haze / mid flame / bright core) instead of a
+	# single flat triangle, so the breath reads as fire rather than a beam.
+	var outer := Polygon2D.new()
+	outer.polygon = PackedVector2Array([Vector2.ZERO, Vector2(FIRE_RANGE, -half_w), Vector2(FIRE_RANGE, half_w)])
+	outer.color = Color(1.0, 0.35, 0.05, 0.55)
+	cone.add_child(outer)
+
+	var mid_w := half_w * 0.62
+	var mid := Polygon2D.new()
+	mid.polygon = PackedVector2Array([Vector2.ZERO, Vector2(FIRE_RANGE * 0.82, -mid_w), Vector2(FIRE_RANGE * 0.82, mid_w)])
+	mid.color = Color(1.0, 0.6, 0.1, 0.72)
+	cone.add_child(mid)
+
+	var core_w := half_w * 0.3
+	var core := Polygon2D.new()
+	core.polygon = PackedVector2Array([Vector2.ZERO, Vector2(FIRE_RANGE * 0.5, -core_w), Vector2(FIRE_RANGE * 0.5, core_w)])
+	core.color = Color(1.0, 0.92, 0.55, 0.9)
+	cone.add_child(core)
+
+	var embers := CPUParticles2D.new()
+	embers.emitting = true
+	embers.amount = 26
+	embers.lifetime = 0.4
+	embers.one_shot = true
+	embers.explosiveness = 0.25
+	embers.direction = Vector2.RIGHT
+	embers.spread = FIRE_HALF_ANGLE_DEG
+	embers.initial_velocity_min = FIRE_RANGE * 1.5
+	embers.initial_velocity_max = FIRE_RANGE * 2.1
+	embers.scale_amount_min = 1.5
+	embers.scale_amount_max = 3.2
+	embers.color = Color(1.0, 0.7, 0.15, 0.9)
+	cone.add_child(embers)
+
+	var tw := create_tween()
+	tw.tween_property(cone, "modulate:a", 0.0, 0.4).from(1.0)
+	await get_tree().create_timer(0.45).timeout
 	if is_instance_valid(cone):
 		cone.queue_free()

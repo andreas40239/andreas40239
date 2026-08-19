@@ -32,6 +32,24 @@ test the core mechanics before building the full game:
   (attack: `GameManager.attack_level`, adds to `get_bite_dps()`). Picking
   one is what actually applies the level-up
   (`GameManager.choose_upgrade()`); both stats persist in the save file.
+- **Attack feedback**: fighting a `has_health` enemy now pulses the player
+  and flashes/pulses the animal on every bite (throttled to ~3/s so it
+  reads as a rhythmic chomp, not a strobe), plus a small spark burst at the
+  contact point (`Enemy._flash_bite_hit()` / `Lizard.play_attack_pulse()` /
+  `CritterShapes.spawn_impact_spark()`), so combat is visibly happening
+  instead of just draining an HP bar. Godzilla's fire breath got the same
+  treatment: a layered outer/mid/core flame plus an ember particle burst
+  that fades out, instead of a single flat static triangle.
+- **Restarting the game**: once the vertical slice is complete
+  (`GameManager.run_complete`), the HUD shows a "Neu starten" button.
+  Pressing it calls `GameManager.restart_game()`, which resets growth
+  level, satiety, `run_complete`, and both upgrade tracks
+  (`defense_level`/`attack_level`) together via `reset_progress()`, then
+  immediately persists that fresh state and reloads the scene.
+  `SaveManager.load_game()` also calls `reset_progress()` before applying
+  the save file, so no field can ever be left over from a previous run
+  (this was a real bug: `defense_level`/`attack_level` used to survive a
+  restart even though `growth_level` correctly went back to 1).
 - **9 animal species**, spawned dynamically and weighted by
   `EnemySpawner` (so ants dominate numerically):
   - Ameise / Fremde Eidechse / Möwe / Krabbe: as before, but Möwe and
@@ -62,7 +80,11 @@ test the core mechanics before building the full game:
   core progression).
 - Placeholder art: small multi-part vector critters (`CritterShapes`) built
   from Polygon2D/Line2D primitives, top-down 2D instead of the target
-  pseudo-isometric look.
+  pseudo-isometric look. Every species has extra surface detail (belly
+  patches, teeth/claws/toes, feather tufts, mottled shell texture, rotor
+  hazard stripes, etc.) on top of its base silhouette. The den (earthen
+  mound + entrance hole) and fruit bushes (leaf clusters + berries) are
+  built the same procedural way instead of flat colored rectangles.
 - Placeholder audio (`tools/generate_audio.py`, stdlib-only synthesis):
   chiptune SFX for eat/caught/level-up; a polyphonic, modern-style music
   loop (sustained pad chords + bass + lead layered together, soft
@@ -131,7 +153,10 @@ with the fend-off rule, the rival-lizard edibility rule, leveling to 7
 (gulls become fightable) and to 10 (T-Rex), the Oviraptor being
 damaging-but-unbeatable at level 17, the Godzilla fire breath at level 20
 (instantly destroying an Oviraptor for a satiety reward), the
-helicopter's ranged behavior at level 21, and save/load.
+helicopter's ranged behavior at level 21, save/load, and that
+`GameManager.restart_game()` resets growth level, satiety, `run_complete`
+*and* both upgrade tracks together (and that the reset is actually
+persisted to disk, not just held in memory).
 
 Note: several of these tests plant an enemy at a specific position and
 assert exactly what happens - the spawner's ambient wildlife is disabled
