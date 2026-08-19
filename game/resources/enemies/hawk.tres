@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_hawk"]
+
+[resource]
+script = ExtResource("1_hawk")
+species_id = "hawk"
+display_name = "Raubvogel"
+category = 2
+shape = 2
+color = Color(0.42, 0.26, 0.14, 1)
+base_scale = 1.3
+move_speed = 230.0
+wander_radius = 210.0
+detection_radius = 240.0
+attack_range = 32.0
+satiety_value = 85.0
+rival_level = 0
+threat_level = 2
+has_health = true
+max_health = 230.0
+damage_per_tick = 16.0
+edible_level = 10

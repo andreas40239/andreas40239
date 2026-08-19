@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_wasp"]
+
+[resource]
+script = ExtResource("1_wasp")
+species_id = "wasp"
+display_name = "Wespe"
+category = 2
+shape = 8
+color = Color(0.95, 0.78, 0.15, 1)
+base_scale = 0.45
+move_speed = 230.0
+wander_radius = 180.0
+detection_radius = 200.0
+attack_range = 22.0
+satiety_value = 40.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 70.0
+damage_per_tick = 10.0
+edible_level = 8

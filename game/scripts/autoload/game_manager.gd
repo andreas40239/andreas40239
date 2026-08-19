@@ -95,6 +95,16 @@ func get_map_half_extent() -> Vector2:
 		BASE_HALF_HEIGHT + (growth_level - 1) * HEIGHT_GROWTH_PER_LEVEL
 	)
 
+## The largest the map ever gets (at MAX_LEVEL) - used by things that are
+## laid out once up front across the whole possible play area (ground
+## detail, the river, rock clusters) rather than being resized on every
+## level-up, so they don't reshuffle under the player as the map grows.
+func get_max_map_half_extent() -> Vector2:
+	return Vector2(
+		BASE_HALF_WIDTH + (MAX_LEVEL - 1) * WIDTH_GROWTH_PER_LEVEL,
+		BASE_HALF_HEIGHT + (MAX_LEVEL - 1) * HEIGHT_GROWTH_PER_LEVEL
+	)
+
 func add_satiety(amount: float) -> void:
 	var threshold := get_satiety_threshold()
 	if threshold <= 0.0:

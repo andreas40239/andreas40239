@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_giant_frog"]
+
+[resource]
+script = ExtResource("1_giant_frog")
+species_id = "giant_frog"
+display_name = "Riesenfrosch"
+category = 2
+shape = 7
+color = Color(0.2, 0.4, 0.18, 1)
+base_scale = 1.2
+move_speed = 160.0
+wander_radius = 140.0
+detection_radius = 170.0
+attack_range = 30.0
+satiety_value = 120.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 300.0
+damage_per_tick = 28.0
+edible_level = 16

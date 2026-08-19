@@ -397,5 +397,35 @@ func _initialize() -> void:
 	assert(GameManager.attack_level == 0, "the restart's fresh state should have been written to disk")
 	print("OK: restart_game() resets growth_level, satiety, defense_level, attack_level and run_complete together")
 
+	print("== the river blocks movement instead of being walkable ==")
+	player.global_position = Vector2(540, 0)
+	for i in 15:
+		player.velocity = Vector2(400, 0)
+		player.move_and_slide()
+		await physics_frame
+	assert(player.global_position.x < 590.0, "the river's collision should stop the player instead of being walkable")
+	player.global_position = Vector2(0, 0)
+
+	print("== creatures turn to face their movement direction ==")
+	player.visual.rotation = 0.0
+	player.velocity = Vector2(300, 0)
+	player._face_movement_direction(1.0)
+	var expected_angle: float = player.velocity.angle() + PI / 2.0
+	assert(abs(wrapf(player.visual.rotation - expected_angle, -PI, PI)) < 0.05, "player visual should rotate to face its movement direction")
+
+	print("== new species (spider/frog/wasp) build valid visuals ==")
+	var new_species_data := [
+		load("res://resources/enemies/spider.tres"),
+		load("res://resources/enemies/frog.tres"),
+		load("res://resources/enemies/wasp.tres"),
+	]
+	for species in new_species_data:
+		var e := ENEMY_SCENE.instantiate()
+		e.data = species
+		world.add_child(e)
+		await process_frame
+		assert(e.visual.get_child_count() > 0, "new species should build a non-empty visual: " + str(species.species_id))
+		e.queue_free()
+
 	print("ALL SMOKE TESTS PASSED")
 	quit(0)

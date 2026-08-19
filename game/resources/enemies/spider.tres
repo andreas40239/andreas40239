@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_spider"]
+
+[resource]
+script = ExtResource("1_spider")
+species_id = "spider"
+display_name = "Spinne"
+category = 2
+shape = 6
+color = Color(0.2, 0.16, 0.14, 1)
+base_scale = 0.6
+move_speed = 130.0
+wander_radius = 110.0
+detection_radius = 150.0
+attack_range = 24.0
+satiety_value = 35.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 90.0
+damage_per_tick = 8.0
+edible_level = 5

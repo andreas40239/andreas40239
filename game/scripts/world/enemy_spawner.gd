@@ -11,20 +11,37 @@ const BIG_ANT_DATA := preload("res://resources/enemies/big_ant.tres")
 const RIVAL_DATA := preload("res://resources/enemies/rival_lizard.tres")
 const BIRD_DATA := preload("res://resources/enemies/bird.tres")
 const CRAB_DATA := preload("res://resources/enemies/crab.tres")
+const SPIDER_DATA := preload("res://resources/enemies/spider.tres")
+const FROG_DATA := preload("res://resources/enemies/frog.tres")
+const WASP_DATA := preload("res://resources/enemies/wasp.tres")
+const HAWK_DATA := preload("res://resources/enemies/hawk.tres")
 const RED_ANT_DATA := preload("res://resources/enemies/red_ant.tres")
 const BLACK_CRAB_DATA := preload("res://resources/enemies/black_crab.tres")
+const GIANT_SPIDER_DATA := preload("res://resources/enemies/giant_spider.tres")
 const OVIRAPTOR_DATA := preload("res://resources/enemies/oviraptor.tres")
+const GIANT_FROG_DATA := preload("res://resources/enemies/giant_frog.tres")
+const HORNET_DATA := preload("res://resources/enemies/hornet.tres")
 const HELICOPTER_DATA := preload("res://resources/enemies/helicopter.tres")
 
+## A new species roughly every other level, so the map keeps feeling
+## fresh instead of a long stretch (there used to be a 7-level gap
+## between big ants at 4 and red ants at 11) with nothing new to meet.
 const SPECIES_POOL := [
 	{"data": ANT_DATA, "min_level": 1, "weight": 6.0},
-	{"data": BIG_ANT_DATA, "min_level": 4, "weight": 2.5},
 	{"data": RIVAL_DATA, "min_level": 1, "weight": 1.5},
 	{"data": BIRD_DATA, "min_level": 2, "weight": 2.0},
 	{"data": CRAB_DATA, "min_level": 3, "weight": 1.5},
+	{"data": BIG_ANT_DATA, "min_level": 4, "weight": 2.5},
+	{"data": SPIDER_DATA, "min_level": 5, "weight": 1.8},
+	{"data": FROG_DATA, "min_level": 6, "weight": 1.8},
+	{"data": WASP_DATA, "min_level": 8, "weight": 1.6},
+	{"data": HAWK_DATA, "min_level": 10, "weight": 1.4},
 	{"data": RED_ANT_DATA, "min_level": 11, "weight": 2.0},
+	{"data": GIANT_SPIDER_DATA, "min_level": 13, "weight": 1.2},
 	{"data": BLACK_CRAB_DATA, "min_level": 14, "weight": 1.2},
+	{"data": GIANT_FROG_DATA, "min_level": 16, "weight": 1.1},
 	{"data": OVIRAPTOR_DATA, "min_level": 17, "weight": 1.0},
+	{"data": HORNET_DATA, "min_level": 19, "weight": 1.0},
 	{"data": HELICOPTER_DATA, "min_level": 21, "weight": 0.8},
 ]
 

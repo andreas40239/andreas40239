@@ -1,0 +1,18 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_frog"]
+
+[resource]
+script = ExtResource("1_frog")
+species_id = "frog"
+display_name = "Frosch"
+category = 0
+shape = 7
+color = Color(0.32, 0.55, 0.28, 1)
+base_scale = 0.5
+move_speed = 140.0
+wander_radius = 130.0
+detection_radius = 150.0
+attack_range = 20.0
+satiety_value = 22.0
+rival_level = 0

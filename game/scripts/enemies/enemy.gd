@@ -66,6 +66,12 @@ func _apply_visual() -> void:
 			CritterShapes.build_oviraptor(visual, data.color, data.accent_color)
 		EnemyData.Shape.HELICOPTER:
 			CritterShapes.build_helicopter(visual, data.color)
+		EnemyData.Shape.SPIDER:
+			CritterShapes.build_spider(visual, data.color)
+		EnemyData.Shape.FROG:
+			CritterShapes.build_frog(visual, data.color)
+		EnemyData.Shape.WASP:
+			CritterShapes.build_wasp(visual, data.color)
 
 func _apply_collision_shapes() -> void:
 	# Resources declared inline in the .tscn are shared across all instances
@@ -118,6 +124,7 @@ func _physics_process(delta: float) -> void:
 				_process_orbit(delta)
 			State.RETURN:
 				_process_return()
+	_face_movement_direction(delta)
 	move_and_slide()
 
 func _process_patrol() -> void:
@@ -191,6 +198,16 @@ func _process_return() -> void:
 	if global_position.distance_to(home_position) < 10.0:
 		state = State.PATROL
 		_pick_new_patrol_target()
+
+const TURN_SPEED := 12.0
+
+## Same head-faces-movement behaviour as the player, applied to every
+## animal - stays put (doesn't snap back) while stationary, e.g. mid-fight.
+func _face_movement_direction(delta: float) -> void:
+	if velocity.length() < 5.0 or not is_instance_valid(visual):
+		return
+	var target_angle := velocity.angle() + PI / 2.0
+	visual.rotation = lerp_angle(visual.rotation, target_angle, clamp(delta * TURN_SPEED, 0.0, 1.0))
 
 func _move_toward(target: Vector2, speed: float) -> void:
 	var dir := target - global_position

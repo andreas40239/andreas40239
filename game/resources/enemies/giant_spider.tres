@@ -1,0 +1,23 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_giant_spider"]
+
+[resource]
+script = ExtResource("1_giant_spider")
+species_id = "giant_spider"
+display_name = "Riesenspinne"
+category = 2
+shape = 6
+color = Color(0.1, 0.08, 0.07, 1)
+base_scale = 1.1
+move_speed = 150.0
+wander_radius = 120.0
+detection_radius = 170.0
+attack_range = 28.0
+satiety_value = 95.0
+rival_level = 0
+threat_level = 1
+has_health = true
+max_health = 260.0
+damage_per_tick = 22.0
+edible_level = 13

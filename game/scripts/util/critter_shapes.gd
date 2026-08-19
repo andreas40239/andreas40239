@@ -261,6 +261,51 @@ static func build_bird(parent: Node2D, body_color: Color) -> void:
 	_poly(parent, _ellipse(1.3), Color(0.1, 0.1, 0.1), Vector2(3, -12), 2)
 	_poly(parent, _ellipse(0.4), Color(1, 1, 1, 0.8), Vector2(3.4, -12.4), 3)  # eye glint
 
+static func build_spider(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var leg_color := body_color.darkened(0.25)
+	for i in 4:
+		var ly := -6.0 + i * 4.0
+		for side in [-1.0, 1.0]:
+			_line(parent, PackedVector2Array([Vector2(side * 3, ly), Vector2(side * 15, ly - 5.0 + i * 2.5), Vector2(side * 20, ly - 2.0 + i * 2.5)]), leg_color, 1.4)
+	_poly(parent, _ellipse(7.5, 0.85), body_color, Vector2(0, 4))  # abdomen
+	_poly(parent, _ellipse(1.6, 0.6), body_color.lightened(0.25), Vector2(0, 2), 0)  # abdomen marking
+	_poly(parent, _ellipse(4.5), body_color.lightened(0.1), Vector2(0, -5), 1)  # cephalothorax
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(1.1), Color(0.05, 0.05, 0.05), Vector2(side * 2.2, -6.5), 2)  # eyes
+		_line(parent, PackedVector2Array([Vector2(side * 1.5, -3), Vector2(side * 2.5, -1)]), Color(0.05, 0.05, 0.05), 1.0)  # fangs
+
+static func build_frog(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.2)
+	var belly := body_color.lightened(0.35)
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(5.0, 0.7), dark, Vector2(side * 9, 5))  # folded hind legs
+	for side in [-1.0, 1.0]:
+		_line(parent, PackedVector2Array([Vector2(side * 6, -4), Vector2(side * 11, -1)]), dark, 1.6)  # front legs
+	_poly(parent, _ellipse(10, 0.75), body_color)  # body
+	_poly(parent, _ellipse(6, 0.45), belly, Vector2(0, 4), 0)  # pale belly
+	for spot in [Vector2(-4, -3), Vector2(5, 1), Vector2(-2, 4)]:
+		_poly(parent, _ellipse(1.4, 0.7), dark, spot, 0)  # skin spots
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(3.0), body_color.lightened(0.1), Vector2(side * 4, -8), 1)  # bulging eyes
+		_poly(parent, _ellipse(1.4), Color(0.05, 0.05, 0.05), Vector2(side * 4, -8), 2)
+	_line(parent, PackedVector2Array([Vector2(-4, -2), Vector2(4, -2)]), dark, 1.0)  # mouth
+
+static func build_wasp(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var stripe := Color(0.1, 0.1, 0.1)
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(7, 0.45), Color(0.9, 0.95, 1.0, 0.5), Vector2(side * 6, -3))  # wings
+	_poly(parent, _ellipse(6, 0.55), body_color, Vector2(0, 6))  # abdomen
+	for i in 2:
+		_line(parent, PackedVector2Array([Vector2(-4, 3 + i * 3), Vector2(4, 3 + i * 3)]), stripe, 1.2)  # stripes
+	_poly(parent, _ellipse(4, 0.7), body_color, Vector2(0, -2))  # thorax
+	_poly(parent, _ellipse(2.5), stripe, Vector2(0, -8))  # head
+	for side in [-1.0, 1.0]:
+		_poly(parent, _ellipse(0.5), Color(1, 1, 1, 0.8), Vector2(side * 1.2, -8.5), 2)  # eye glints
+	_line(parent, PackedVector2Array([Vector2(0, 11), Vector2(0, 14)]), stripe, 1.2)  # stinger
+
 static func build_crab(parent: Node2D, body_color: Color) -> void:
 	clear(parent)
 	var leg_color := body_color.darkened(0.25)

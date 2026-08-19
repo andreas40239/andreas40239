@@ -116,6 +116,7 @@ func _physics_process(delta: float) -> void:
 	var stage: Dictionary = GameManager.get_current_stage()
 	var speed: float = float(stage["speed"]) * speed_boost_multiplier
 	velocity = input_vector * speed
+	_face_movement_direction(delta)
 	move_and_slide()
 
 	if in_den and health < max_health and max_health > 0.0:
@@ -138,6 +139,18 @@ func play_attack_pulse() -> void:
 	visual.scale = Vector2.ONE * base_scale * 1.2
 	var tw := create_tween()
 	tw.tween_property(visual, "scale", Vector2.ONE * base_scale, 0.14)
+
+const TURN_SPEED := 12.0  # rad/s-ish lerp rate for smoothly facing movement
+
+## Rotates the visual (not the physics body, so collision shapes stay
+## axis-aligned) to face the current movement direction - the sprite's
+## unrotated pose already has its head pointing "up" (-Y), so facing
+## velocity means rotating by velocity.angle() + 90deg.
+func _face_movement_direction(delta: float) -> void:
+	if velocity.length() < 5.0:
+		return
+	var target_angle := velocity.angle() + PI / 2.0
+	visual.rotation = lerp_angle(visual.rotation, target_angle, clamp(delta * TURN_SPEED, 0.0, 1.0))
 
 func eat(amount: float) -> void:
 	GameManager.add_satiety(amount)

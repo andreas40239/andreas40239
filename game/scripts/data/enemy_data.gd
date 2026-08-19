@@ -5,7 +5,7 @@ class_name EnemyData
 ## as a new .tres resource without touching enemy.gd.
 
 enum Category { PREY, RIVAL, PREDATOR }
-enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL, OVIRAPTOR, HELICOPTER }
+enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL, OVIRAPTOR, HELICOPTER, SPIDER, FROG, WASP }
 
 @export var species_id: String = ""
 @export var display_name: String = ""
