@@ -1,0 +1,58 @@
+:root {
+  --bg: #fff8ee;
+  --text: #3a2e2c;
+  --card-bg: #ffffff;
+  --orange: #ff9f45;
+  --orange-dark: #e8802a;
+  --teal: #4ec5c1;
+  --teal-dark: #33a6a2;
+  --pink: #ff6f91;
+  --pink-dark: #e14b72;
+  --yellow: #ffd93d;
+  --green: #8ac926;
+  --shadow: rgba(58, 46, 44, 0.18);
+
+  font: 20px/1.4 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 12px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* High-contrast / dark mode for outdoor and low-light use */
+.app--high-contrast {
+  --bg: #14151a;
+  --text: #ffffff;
+  --card-bg: #23242c;
+  --shadow: rgba(0, 0, 0, 0.6);
+}
+
+.app--high-contrast,
+.app--high-contrast .screen {
+  background: var(--bg);
+  color: var(--text);
+}
