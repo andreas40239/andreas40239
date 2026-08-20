@@ -51,6 +51,13 @@ const SPECIES_POOL := [
 @export var safe_radius: float = 260.0
 @export var initial_burst: int = 14
 
+## Higher levels mean a much bigger map (GameManager.get_map_half_extent
+## grows every level), so a fixed active-enemy cap would spread thinner
+## and thinner the higher the player gets - exactly the "muss sie sehr
+## lange suchen" complaint. Extra active slots per level keep density from
+## collapsing as the map keeps growing.
+const EXTRA_ACTIVE_PER_LEVEL := 2
+
 var _timer: float = 0.0
 
 func _ready() -> void:
@@ -61,16 +68,21 @@ func _process(delta: float) -> void:
 	_timer -= delta
 	if _timer <= 0.0:
 		_timer = spawn_interval
-		if get_child_count() < max_active:
+		if get_child_count() < _current_max_active():
 			_spawn_one()
+
+func _current_max_active() -> int:
+	return max_active + GameManager.growth_level * EXTRA_ACTIVE_PER_LEVEL
 
 func _spawn_one() -> void:
 	var candidates: Array = []
 	var total_weight := 0.0
 	for entry in SPECIES_POOL:
-		if GameManager.growth_level >= entry["min_level"]:
-			candidates.append(entry)
-			total_weight += entry["weight"]
+		var min_level: int = entry["min_level"]
+		if GameManager.growth_level >= min_level:
+			var w: float = entry["weight"] * _relevance_factor(min_level)
+			candidates.append({"data": entry["data"], "weight": w})
+			total_weight += w
 	if candidates.is_empty():
 		return
 	var roll := randf() * total_weight
@@ -86,12 +98,26 @@ func _spawn_one() -> void:
 	enemy.position = _random_position()
 	add_child(enemy)
 
+## Species unlocked long ago fade out of the spawn pool as the player
+## keeps leveling, instead of staying at full weight forever - otherwise
+## common early filler (e.g. plain ants, still weight 6 at level 21) keeps
+## crowding out the higher-tier species the player actually needs to hunt
+## for satiety at their current level.
+func _relevance_factor(min_level: int) -> float:
+	var gap: int = GameManager.growth_level - min_level
+	if gap <= 3:
+		return 1.0
+	return max(0.15, 1.0 - float(gap - 3) * 0.08)
+
 func _random_position() -> Vector2:
 	var half: Vector2 = GameManager.get_map_half_extent()
+	# Animals can't cross the river any more than the player can, so never
+	# spawn one on the far side where it would be permanently out of reach.
+	var max_x: float = min(half.x - 60.0, River.spawn_boundary_x())
 	var pos := Vector2.ZERO
 	for i in 12:
 		pos = Vector2(
-			randf_range(-half.x + 60.0, half.x - 60.0),
+			randf_range(-half.x + 60.0, max_x),
 			randf_range(-half.y + 60.0, half.y - 60.0)
 		)
 		if pos.length() >= safe_radius:

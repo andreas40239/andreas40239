@@ -60,6 +60,12 @@ func _initialize() -> void:
 	var camera = player.get_node("Camera2D")
 	var world = main.get_node("World")
 	var level_up_popup = main.get_node("LevelUpPopup")
+	# Fetched from the live scene (not the River class_name) - referencing a
+	# global class_name identifier here forces this entrypoint script's own
+	# special compile phase to eagerly compile river.gd before autoload
+	# globals like GameManager are bound, the same "Identifier not found:
+	# GameManager" trap documented above for preloaded consts.
+	var river = main.get_node("World/River")
 
 	print("== spawner produced enemies (incl. ants) ==")
 	assert(spawner.get_child_count() > 0, "spawner should have spawned enemies on _ready")
@@ -69,6 +75,23 @@ func _initialize() -> void:
 			ant_count += 1
 	print("spawned=", spawner.get_child_count(), " ants=", ant_count)
 	assert(ant_count > 0, "spawner should include ants")
+	for child in spawner.get_children():
+		assert(child.global_position.x <= river.spawn_boundary_x(), "spawned enemies should never land past the river, which blocks them too")
+
+	print("== spawns stay on the player's side of the river even at a high level ==")
+	GameManager.growth_level = 21
+	for i in 40:
+		spawner._spawn_one()
+	for child in spawner.get_children():
+		assert(child.global_position.x <= river.spawn_boundary_x(), "even at max level, no enemy should spawn past the river")
+	for child in spawner.get_children():
+		child.queue_free()
+	await process_frame
+
+	print("== low-tier species fade out of the spawn weighting once far outleveled ==")
+	assert(spawner._relevance_factor(1) < 1.0, "a species unlocked at level 1 should have reduced weight by level 21")
+	assert(spawner._relevance_factor(19) == 1.0, "a species unlocked just below the current level should keep full weight")
+	GameManager.growth_level = 1
 
 	# The rest of this suite plants specific enemies at specific positions
 	# and asserts precisely what happens to them/the player - stop the

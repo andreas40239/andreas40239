@@ -95,6 +95,16 @@ test the core mechanics before building the full game:
   `GroundDetail`/`River`/`RockField` are laid out once across
   `GameManager.get_max_map_half_extent()` with fixed seeds/positions so
   nothing reshuffles as the map grows - it's just revealed further out.
+  Animals never spawn past the river (`EnemySpawner._random_position()`
+  clamps to `River.spawn_boundary_x()`), since they can't cross it any
+  more than the player can - they'd otherwise be stranded out of reach.
+- **Enemy density scales with the map**, so higher levels don't mean a
+  long search for something to eat: `EnemySpawner`'s active-enemy cap
+  grows with `GameManager.growth_level` (the map itself keeps growing
+  every level), and each species' spawn weight fades out the further the
+  player has outleveled it (`_relevance_factor()`) so early filler like
+  plain ants doesn't keep crowding out the higher-tier species relevant
+  at the player's current level.
 - **Every creature (player included) turns to face its movement
   direction** (`Lizard._face_movement_direction()` /
   `Enemy._face_movement_direction()`, both rotating just the `Visual`
@@ -186,8 +196,10 @@ helicopter's ranged behavior at level 21, save/load, that
 *and* both upgrade tracks together (and that the reset is actually
 persisted to disk, not just held in memory), that the river actually
 blocks movement instead of being walkable, that a creature's visual
-rotates to face its movement direction, and that the new species
-(spider/frog/wasp) each build a non-empty visual.
+rotates to face its movement direction, that the new species
+(spider/frog/wasp) each build a non-empty visual, that the spawner never
+places an enemy past the river (even at max level), and that a species'
+spawn weight fades out once far outleveled.
 
 Note: several of these tests plant an enemy at a specific position and
 assert exactly what happens - the spawner's ambient wildlife is disabled

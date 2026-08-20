@@ -1,4 +1,5 @@
 extends Node2D
+class_name River
 
 ## A winding river crossing the map that the player (and every animal)
 ## must walk around - a chain of rotated rectangle StaticBody2D segments
@@ -14,6 +15,10 @@ const SEGMENT_STEP := 300.0
 const WAVE_AMPLITUDE := 90.0
 const WAVE_PERIOD := 480.0
 
+## Extra buffer beyond the river's widest possible wobble+shore, so
+## nothing spawns right at the water's edge.
+const SPAWN_CLEARANCE := 40.0
+
 var _points: PackedVector2Array = PackedVector2Array()
 
 func _ready() -> void:
@@ -24,6 +29,12 @@ func _ready() -> void:
 
 func get_points() -> PackedVector2Array:
 	return _points
+
+## The furthest east an animal can spawn and still be guaranteed to be on
+## the den's side of the river - animals can't cross it any more than the
+## player can, so spawning them past it would strand them out of reach.
+static func spawn_boundary_x() -> float:
+	return RIVER_X - WAVE_AMPLITUDE - WIDTH * 0.5 - SHORE_MARGIN - SPAWN_CLEARANCE
 
 func _build_points(max_y: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
