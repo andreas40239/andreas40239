@@ -5,7 +5,7 @@ class_name EnemyData
 ## as a new .tres resource without touching enemy.gd.
 
 enum Category { PREY, RIVAL, PREDATOR }
-enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL, OVIRAPTOR, HELICOPTER, SPIDER, FROG, WASP }
+enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL, OVIRAPTOR, HELICOPTER, SPIDER, FROG, WASP, TANK }
 
 @export var species_id: String = ""
 @export var display_name: String = ""
@@ -47,3 +47,16 @@ enum Shape { BLOB, DIAMOND, TRIANGLE, OVAL, OVIRAPTOR, HELICOPTER, SPIDER, FROG,
 @export var ranged: bool = false
 @export var preferred_range: float = 0.0
 @export var shoot_interval: float = 1.5
+
+## Which "era" this species belongs to - defaults to 1 (an early-game
+## animal). Once the player is Godzilla (growth_level >= GameManager.
+## GODZILLA_LEVEL), they take no damage from any source whose tier_level
+## is below GODZILLA_LEVEL; only species explicitly set at tier_level 20+
+## (the boss-tier Panzer/Hubschrauber) can still hurt them.
+@export var tier_level: int = 1
+
+## When > 0, a ranged hit from this species deals this fraction of the
+## player's current max_health instead of damage_per_tick - for high-tier
+## threats whose danger should scale with the player rather than stay a
+## fixed number that becomes trivial once max_health has grown a lot.
+@export var damage_percent_of_max_health: float = 0.0

@@ -8,14 +8,39 @@ is at this folder's root) and run the main scene (`scenes/world/main.tscn`).
 Full design: `docs/design-document.md`. This slice implements a subset, to
 test the core mechanics before building the full game:
 
-- **21 growth levels**, satiety thresholds/speed/size/max-health scale
+- **23 growth levels**, satiety thresholds/speed/size/max-health scale
   with formulas (`GameManager`) rather than a hand-authored table.
   - Level 5: spikes appear, letting the player fend off predators/rivals
     it has outgrown instead of taking damage from them.
   - Level 10: looks like a small T-Rex.
   - Level 20: transforms into Godzilla and periodically breathes fire in
     a forward cone, instantly destroying anything caught in it (even
-    otherwise-unbeatable enemies) for a satiety reward.
+    otherwise-unbeatable enemies) for a satiety reward. The breath always
+    aims from `Lizard.get_facing_direction()` - the direction the sprite
+    is actually rendered facing (derived from the same rotation
+    `_face_movement_direction()` applies) - rather than the raw,
+    unsmoothed joystick input, so it can never visibly disagree with
+    which way the lizard is drawn facing.
+  - Also at level 20: Godzilla takes no damage at all from any enemy
+    whose `EnemyData.tier_level` is below `GameManager.GODZILLA_LEVEL`
+    (every species from before Godzilla, tier_level defaults to 1) - but
+    two boss-tier species appear right alongside the transformation and
+    still hurt it: Panzer (tank, `tier_level = 20`, lobs bombs for 40% of
+    current max_health per hit) and a much faster Hubschrauber (rockets,
+    20% of max_health per hit). Both are ranged/unbeatable like the
+    original helicopter, and their damage scales with the player's
+    current max_health (`EnemyData.damage_percent_of_max_health`) rather
+    than a fixed number that would become trivial once Godzilla's
+    max_health has grown a lot.
+  - Level 22: unlocks the lightning ability (`Lizard.trigger_lightning()`)
+    - a HUD button ("Blitz") that, once charged to 100% (takes 20s per
+      charge, `LIGHTNING_CHARGE_SECONDS`), instantly destroys every enemy
+      within `LIGHTNING_RANGE` (standing in for "the visible area") for a
+      bigger satiety reward each than the fire breath, then resets to 0%
+      charge. `MAX_LEVEL` is 23 (one above the lightning unlock) on
+      purpose, so satiety/XP still counts for something at level 22
+      instead of the lightning being available only at a cap where
+      leveling up no longer does anything.
 - **Health system**: the player has HP (`Lizard.health`/`max_health`,
   `GameManager.get_max_health()`). Contact with a dangerous animal chips
   health on a cooldown rather than an instant "catch"; reaching 0 sends
@@ -50,11 +75,11 @@ test the core mechanics before building the full game:
   the save file, so no field can ever be left over from a previous run
   (this was a real bug: `defense_level`/`attack_level` used to survive a
   restart even though `growth_level` correctly went back to 1).
-- **16 animal species**, spawned dynamically and weighted by
+- **17 animal species**, spawned dynamically and weighted by
   `EnemySpawner` (so ants dominate numerically), unlocking roughly every
   other level (`SPECIES_POOL`'s `min_level`s: 1,1,2,3,4,5,6,8,10,11,13,14,
-  16,17,19,21) instead of the multi-level dead zones the pacing used to
-  have (e.g. nothing new from level 4 to 11):
+  16,17,19,20,20) instead of the multi-level dead zones the pacing used
+  to have (e.g. nothing new from level 4 to 11):
   - Ameise / Fremde Eidechse / Möwe / Krabbe: as before, but Möwe and
     Krabbe now require a sustained fight once the player reaches their
     `edible_level` (7 / 9) - the player deals `GameManager.get_bite_dps()`
@@ -77,10 +102,12 @@ test the core mechanics before building the full game:
     pattern as the red ant/black crab reskins.
   - Oviraptor (level 17+): fast, deals damage, `unbeatable = true` - can
     never be fended off or eaten by normal means (only Godzilla's fire
-    breath kills it).
-  - Hubschrauber (level 21+): `ranged = true`, keeps `preferred_range`
-    (70px) and fires periodic ranged damage instead of melee contact;
-    also unbeatable outside of fire breath.
+    breath or lightning kills it).
+  - Panzer / Hubschrauber (level 20+, alongside the Godzilla
+    transformation): the two boss-tier species that still hurt Godzilla
+    despite its tier 1-19 immunity - see above. Both `ranged = true`,
+    `unbeatable = true`, keep their `preferred_range` and deal
+    `damage_percent_of_max_health` instead of a fixed amount.
 - **One continuously growing map**, expanding left/right/up/down around
   the den on every level-up (not just sideways) — see
   `GameManager.get_map_half_extent()` / `world main.gd`.
@@ -112,7 +139,7 @@ test the core mechanics before building the full game:
   the same way regardless of where it's walking.
 - The den is a safe zone: the player takes no damage while inside it.
 - **No day/night cycle**, no endless mode, no story-mode meta-progression
-  beyond the 21 levels — deferred to the full build.
+  beyond the 23 levels — deferred to the full build.
 - Local save (`user://savegame.json`) persists growth level/satiety
   (health resets to full each session; it's session combat state, not
   core progression).
@@ -154,8 +181,8 @@ test the core mechanics before building the full game:
 - `scripts/world/enemy_spawner.gd` — spawns enemies dynamically within the
   current map bounds instead of hand-placed per-zone nodes.
 - `scripts/player/lizard.gd` — movement, eating, health, growth visuals
-  (incl. spikes/T-Rex/Godzilla), fire breath, den safety, fend-off,
-  respawn.
+  (incl. spikes/T-Rex/Godzilla), fire breath, the lightning ability, den
+  safety, fend-off, respawn.
 - `scripts/util/critter_shapes.gd` — shared vector-shape builders for the
   player and enemies.
 - `scripts/world/` — `Den` (respawn point, safe zone + health recharge -
@@ -190,8 +217,12 @@ button pauses/unpauses and is what applies the level - see
 with the fend-off rule, the rival-lizard edibility rule, leveling to 7
 (gulls become fightable) and to 10 (T-Rex), the Oviraptor being
 damaging-but-unbeatable at level 17, the Godzilla fire breath at level 20
-(instantly destroying an Oviraptor for a satiety reward), the
-helicopter's ranged behavior at level 21, save/load, that
+(instantly destroying an Oviraptor for a satiety reward, aimed from
+`get_facing_direction()`), Godzilla's immunity to tier 1-19 damage, the
+Panzer/Hubschrauber boss-tier enemies still hurting Godzilla for exactly
+their percent-of-max-health damage, the level-22 lightning ability
+(usable only once fully charged, wiping out everything nearby for
+satiety, then resetting its own charge), save/load, that
 `GameManager.restart_game()` resets growth level, satiety, `run_complete`
 *and* both upgrade tracks together (and that the reset is actually
 persisted to disk, not just held in memory), that the river actually
@@ -200,6 +231,14 @@ rotates to face its movement direction, that the new species
 (spider/frog/wasp) each build a non-empty visual, that the spawner never
 places an enemy past the river (even at max level), and that a species'
 spawn weight fades out once far outleveled.
+
+Note: the Godzilla-stage tests deliberately suppress the periodic
+automatic fire breath (`player._fire_cooldown = 999.0`) once its own test
+is done - `is_godzilla` stays true for the rest of the suite, so left
+alone it would fire again on its own ~4s later (`FIRE_BREATH_INTERVAL`)
+and incinerate whatever a later test plants nearby out from under it, a
+real failure mode hit during development (a "previously freed" crash on
+the helicopter/tank test enemies).
 
 Note: several of these tests plant an enemy at a specific position and
 assert exactly what happens - the spawner's ambient wildlife is disabled

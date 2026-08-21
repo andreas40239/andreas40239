@@ -9,6 +9,7 @@ class_name Lizard
 signal caught
 signal ate(amount: float)
 signal health_changed(value: float, max_value: float)
+signal lightning_charge_changed(value: float, max_value: float)
 
 @export var touch_deadzone: float = 8.0
 @export var touch_max_radius: float = 90.0
@@ -19,6 +20,14 @@ const FIRE_BREATH_INTERVAL := 4.0
 const FIRE_RANGE := 310.0
 const FIRE_HALF_ANGLE_DEG := 38.0
 const FIRE_REWARD := 15.0
+
+## Endgame ultimate: once fully charged, wipes out every enemy currently
+## on screen for a bigger satiety reward than the fire breath's per-target
+## one, on a long charge-up rather than a cooldown.
+const LIGHTNING_LEVEL := 22
+const LIGHTNING_CHARGE_SECONDS := 20.0
+const LIGHTNING_REWARD := 20.0
+const LIGHTNING_RANGE := 900.0  # generously covers the visible area at normal zoom
 
 var touch_index: int = -1
 var touch_origin: Vector2 = Vector2.ZERO
@@ -31,6 +40,7 @@ var den_position: Vector2 = Vector2.ZERO
 var health: float = 0.0
 var max_health: float = 0.0
 var last_move_direction: Vector2 = Vector2.DOWN
+var lightning_charge: float = 0.0
 var _fire_cooldown: float = 0.0
 
 @onready var visual: Node2D = $Visual
@@ -129,6 +139,10 @@ func _physics_process(delta: float) -> void:
 			_fire_cooldown = FIRE_BREATH_INTERVAL
 			_breathe_fire()
 
+	if GameManager.growth_level >= LIGHTNING_LEVEL and lightning_charge < 100.0:
+		lightning_charge = min(100.0, lightning_charge + (100.0 / LIGHTNING_CHARGE_SECONDS) * delta)
+		lightning_charge_changed.emit(lightning_charge, 100.0)
+
 ## Quick lunge-and-snap pulse so the player can see the bite land, called
 ## periodically by an enemy's fight resolution (not every physics tick,
 ## which would just look like a flat strobe).
@@ -152,6 +166,18 @@ func _face_movement_direction(delta: float) -> void:
 	var target_angle := velocity.angle() + PI / 2.0
 	visual.rotation = lerp_angle(visual.rotation, target_angle, clamp(delta * TURN_SPEED, 0.0, 1.0))
 
+## The direction the sprite is actually rendered facing right now (derived
+## from the same rotation _face_movement_direction() applies), rather than
+## the raw, unsmoothed input direction. Anything aimed from the player
+## (fire breath, lightning) should use this: aiming from last_move_direction
+## instead could visibly disagree with which way the lizard is drawn facing
+## for a beat after a quick joystick flick, which read as the breath firing
+## in "the wrong direction".
+func get_facing_direction() -> Vector2:
+	if not is_instance_valid(visual):
+		return last_move_direction
+	return Vector2.UP.rotated(visual.rotation)
+
 func eat(amount: float) -> void:
 	GameManager.add_satiety(amount)
 	ate.emit(amount)
@@ -166,8 +192,17 @@ func can_fend_off(threat_level: int) -> bool:
 	var stage: Dictionary = GameManager.get_current_stage()
 	return bool(stage["has_spikes"]) and GameManager.growth_level > threat_level
 
-func take_damage(amount: float) -> void:
+## source_tier identifies which "era" of enemy dealt this damage - once
+## Godzilla (see GameManager.GODZILLA_LEVEL), the player is immune to
+## anything below that tier (the animals that used to be dangerous), but
+## still vulnerable to the boss-tier threats that appear alongside the
+## transformation (tanks/attack helicopters). Defaults to a tier that's
+## always above GODZILLA_LEVEL, so damage from a source that doesn't pass
+## one explicitly is never silently ignored.
+func take_damage(amount: float, source_tier: int = 999) -> void:
 	if invulnerable or in_den or amount <= 0.0:
+		return
+	if bool(GameManager.get_current_stage()["is_godzilla"]) and source_tier < GameManager.GODZILLA_LEVEL:
 		return
 	var reduced := amount * GameManager.get_defense_multiplier()
 	health = max(0.0, health - reduced)
@@ -202,6 +237,7 @@ func set_in_den(value: bool) -> void:
 
 func _breathe_fire() -> void:
 	_show_fire_visual()
+	var facing := get_facing_direction()
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(enemy):
 			continue
@@ -209,14 +245,14 @@ func _breathe_fire() -> void:
 		var dist := to_enemy.length()
 		if dist > FIRE_RANGE or dist < 1.0:
 			continue
-		var angle := rad_to_deg(abs(last_move_direction.angle_to(to_enemy.normalized())))
+		var angle := rad_to_deg(abs(facing.angle_to(to_enemy.normalized())))
 		if angle <= FIRE_HALF_ANGLE_DEG and enemy.has_method("get_incinerated"):
 			enemy.get_incinerated()
 			GameManager.add_satiety(FIRE_REWARD)
 
 func _show_fire_visual() -> void:
 	var cone := Node2D.new()
-	cone.rotation = last_move_direction.angle()
+	cone.rotation = get_facing_direction().angle()
 	cone.z_index = 5
 	add_child(cone)
 
@@ -260,3 +296,62 @@ func _show_fire_visual() -> void:
 	await get_tree().create_timer(0.45).timeout
 	if is_instance_valid(cone):
 		cone.queue_free()
+
+func can_use_lightning() -> bool:
+	return GameManager.growth_level >= LIGHTNING_LEVEL and lightning_charge >= 100.0
+
+## The endgame ultimate: instantly destroys every enemy currently within
+## LIGHTNING_RANGE (standing in for "the visible area", since the exact
+## viewport depends on camera zoom) for a bigger satiety reward each than
+## the fire breath, then resets the charge back to 0.
+func trigger_lightning() -> void:
+	if not can_use_lightning():
+		return
+	lightning_charge = 0.0
+	lightning_charge_changed.emit(lightning_charge, 100.0)
+	_show_lightning_visual()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy):
+			continue
+		if global_position.distance_to(enemy.global_position) > LIGHTNING_RANGE:
+			continue
+		if enemy.has_method("get_incinerated"):
+			enemy.get_incinerated()
+			GameManager.add_satiety(LIGHTNING_REWARD)
+
+func _show_lightning_visual() -> void:
+	var container := Node2D.new()
+	container.z_index = 6
+	add_child(container)
+
+	var flash := Polygon2D.new()
+	flash.polygon = PackedVector2Array([Vector2(-2000, -2000), Vector2(2000, -2000), Vector2(2000, 2000), Vector2(-2000, 2000)])
+	flash.color = Color(0.7, 0.85, 1.0, 0.35)
+	flash.z_index = 5
+	container.add_child(flash)
+
+	var bolt_count := 14
+	for i in bolt_count:
+		var angle := randf_range(0.0, TAU)
+		var length := randf_range(LIGHTNING_RANGE * 0.5, LIGHTNING_RANGE)
+		var dir := Vector2.RIGHT.rotated(angle)
+		var pts := PackedVector2Array([Vector2.ZERO])
+		var steps := 5
+		for s in range(1, steps + 1):
+			var t := float(s) / float(steps)
+			var base := dir * length * t
+			var jitter := Vector2(randf_range(-18.0, 18.0), randf_range(-18.0, 18.0)) * (1.0 - t * 0.6)
+			pts.append(base + jitter)
+		var bolt := Line2D.new()
+		bolt.points = pts
+		bolt.width = 3.0
+		bolt.default_color = Color(0.55, 0.75, 1.0, 0.95)
+		bolt.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		bolt.end_cap_mode = Line2D.LINE_CAP_ROUND
+		container.add_child(bolt)
+
+	var tw := create_tween()
+	tw.tween_property(container, "modulate:a", 0.0, 0.35).from(1.0)
+	await get_tree().create_timer(0.4).timeout
+	if is_instance_valid(container):
+		container.queue_free()

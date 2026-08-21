@@ -72,6 +72,8 @@ func _apply_visual() -> void:
 			CritterShapes.build_frog(visual, data.color)
 		EnemyData.Shape.WASP:
 			CritterShapes.build_wasp(visual, data.color)
+		EnemyData.Shape.TANK:
+			CritterShapes.build_tank(visual, data.color)
 
 func _apply_collision_shapes() -> void:
 	# Resources declared inline in the .tscn are shared across all instances
@@ -269,7 +271,7 @@ func _tick_damage(delta: float) -> void:
 	_damage_cooldown -= delta
 	if _damage_cooldown <= 0.0:
 		_damage_cooldown = MELEE_TICK_INTERVAL
-		player.take_damage(data.damage_per_tick)
+		player.take_damage(data.damage_per_tick, data.tier_level)
 
 func _tick_fight(delta: float) -> void:
 	current_health -= GameManager.get_bite_dps() * delta
@@ -310,8 +312,11 @@ func _get_fended_off() -> void:
 func _fire_shot() -> void:
 	if player == null or not is_instance_valid(player):
 		return
-	if data.damage_per_tick > 0.0:
-		player.take_damage(data.damage_per_tick)
+	var dmg: float = data.damage_per_tick
+	if data.damage_percent_of_max_health > 0.0:
+		dmg = float(player.max_health) * data.damage_percent_of_max_health
+	if dmg > 0.0:
+		player.take_damage(dmg, data.tier_level)
 	_show_tracer()
 
 func _show_tracer() -> void:

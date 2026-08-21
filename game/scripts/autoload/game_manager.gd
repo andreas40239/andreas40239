@@ -14,7 +14,13 @@ signal player_caught
 ## of leveling up requiring a trip back to the den.
 signal level_up_ready
 
-const MAX_LEVEL := 21
+## One level above LIGHTNING_LEVEL (Lizard.LIGHTNING_LEVEL == 22) on
+## purpose: reaching 22 unlocks the lightning ability while satiety still
+## counts for something (get_satiety_threshold() returns 0 - no more XP -
+## once growth_level >= MAX_LEVEL), so lightning kills still feel
+## rewarding instead of being available only at a cap where XP no longer
+## matters.
+const MAX_LEVEL := 23
 const SPIKES_LEVEL := 5
 const TREX_LEVEL := 10
 const GODZILLA_LEVEL := 20

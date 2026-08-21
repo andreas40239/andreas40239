@@ -1,0 +1,29 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_tank"]
+
+[resource]
+script = ExtResource("1_tank")
+species_id = "tank"
+display_name = "Panzer"
+category = 2
+shape = 9
+color = Color(0.32, 0.36, 0.22, 1)
+base_scale = 1.0
+move_speed = 70.0
+wander_radius = 160.0
+detection_radius = 260.0
+attack_range = 40.0
+satiety_value = 0.0
+rival_level = 0
+threat_level = 99
+has_health = false
+max_health = 0.0
+damage_per_tick = 0.0
+edible_level = 0
+unbeatable = true
+ranged = true
+preferred_range = 220.0
+shoot_interval = 2.6
+tier_level = 20
+damage_percent_of_max_health = 0.4

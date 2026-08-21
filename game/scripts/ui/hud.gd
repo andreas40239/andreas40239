@@ -5,20 +5,27 @@ extends CanvasLayer
 @onready var level_label: Label = $Control/LevelLabel
 @onready var message_label: Label = $Control/MessageLabel
 @onready var restart_button: Button = $Control/RestartButton
+@onready var lightning_button: Button = $Control/LightningButton
+
+var _player: Node = null
 
 func _ready() -> void:
 	GameManager.satiety_changed.connect(_on_satiety_changed)
 	GameManager.leveled_up.connect(_on_leveled_up)
 	GameManager.player_caught.connect(_on_player_caught)
 	restart_button.pressed.connect(_on_restart_pressed)
+	lightning_button.pressed.connect(_on_lightning_pressed)
 	_on_satiety_changed(GameManager.satiety, GameManager.get_satiety_threshold())
 	_update_level_label()
 	restart_button.visible = GameManager.run_complete
+	_update_lightning_visibility()
 
-	var player := get_tree().get_first_node_in_group("player")
-	if player:
-		player.health_changed.connect(_on_health_changed)
-		_on_health_changed(player.health, player.max_health)
+	_player = get_tree().get_first_node_in_group("player")
+	if _player:
+		_player.health_changed.connect(_on_health_changed)
+		_on_health_changed(_player.health, _player.max_health)
+		_player.lightning_charge_changed.connect(_on_lightning_charge_changed)
+		_on_lightning_charge_changed(_player.lightning_charge, 100.0)
 
 func _on_health_changed(value: float, max_value: float) -> void:
 	health_bar.max_value = max(max_value, 1.0)
@@ -35,6 +42,7 @@ func _on_satiety_changed(value: float, max_value: float) -> void:
 func _on_leveled_up(_new_level: int) -> void:
 	_update_level_label()
 	restart_button.visible = GameManager.run_complete
+	_update_lightning_visibility()
 	# The level-up popup (fireworks + upgrade choice) already announces
 	# this dramatically; only the final-level message is still worth a
 	# separate HUD toast.
@@ -48,6 +56,18 @@ func _on_restart_pressed() -> void:
 	restart_button.visible = false
 	GameManager.restart_game()
 	get_tree().reload_current_scene()
+
+func _update_lightning_visibility() -> void:
+	lightning_button.visible = GameManager.growth_level >= Lizard.LIGHTNING_LEVEL
+
+func _on_lightning_charge_changed(value: float, max_value: float) -> void:
+	var ready_to_fire: bool = value >= max_value
+	lightning_button.disabled = not ready_to_fire
+	lightning_button.text = "Blitz" if ready_to_fire else "Blitz (%d%%)" % int(value)
+
+func _on_lightning_pressed() -> void:
+	if is_instance_valid(_player):
+		_player.trigger_lightning()
 
 func _update_level_label() -> void:
 	level_label.text = "Level %d" % GameManager.growth_level

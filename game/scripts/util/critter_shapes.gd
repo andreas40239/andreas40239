@@ -306,6 +306,21 @@ static func build_wasp(parent: Node2D, body_color: Color) -> void:
 		_poly(parent, _ellipse(0.5), Color(1, 1, 1, 0.8), Vector2(side * 1.2, -8.5), 2)  # eye glints
 	_line(parent, PackedVector2Array([Vector2(0, 11), Vector2(0, 14)]), stripe, 1.2)  # stinger
 
+static func build_tank(parent: Node2D, body_color: Color) -> void:
+	clear(parent)
+	var dark := body_color.darkened(0.25)
+	var track := Color(0.15, 0.15, 0.15)
+	for side in [-1.0, 1.0]:
+		_poly(parent, PackedVector2Array([Vector2(-4, -16), Vector2(4, -16), Vector2(4, 16), Vector2(-4, 16)]), track, Vector2(side * 13, 0), -1)
+	# hull
+	_poly(parent, PackedVector2Array([Vector2(-11, -18), Vector2(11, -18), Vector2(13, 14), Vector2(-13, 14)]), body_color)
+	_poly(parent, PackedVector2Array([Vector2(-9, -14), Vector2(9, -14), Vector2(10, 10), Vector2(-10, 10)]), dark, Vector2.ZERO, 0)
+	# turret + barrel (points "forward", same head-up convention as the critters)
+	_poly(parent, _ellipse(8, 0.85), body_color.lightened(0.08), Vector2(0, -2), 1)
+	_poly(parent, PackedVector2Array([Vector2(-1.6, 0), Vector2(1.6, 0), Vector2(1.6, -22), Vector2(-1.6, -22)]), dark, Vector2(0, -6), 2)
+	_poly(parent, _ellipse(2.2), dark, Vector2(4, 2), 2)  # hatch
+	_line(parent, PackedVector2Array([Vector2(-6, -4), Vector2(-9, -16)]), Color(0.1, 0.1, 0.1), 1.0)  # antenna
+
 static func build_crab(parent: Node2D, body_color: Color) -> void:
 	clear(parent)
 	var leg_color := body_color.darkened(0.25)

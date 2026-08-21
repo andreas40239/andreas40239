@@ -16,6 +16,7 @@ var BIRD_DATA: Resource
 var CRAB_DATA: Resource
 var OVIRAPTOR_DATA: Resource
 var HELICOPTER_DATA: Resource
+var TANK_DATA: Resource
 
 ## GameManager.add_satiety() always emits level_up_ready when the
 ## threshold is hit, and the real popup independently reacts to it by
@@ -47,6 +48,7 @@ func _initialize() -> void:
 	CRAB_DATA = load("res://resources/enemies/crab.tres")
 	OVIRAPTOR_DATA = load("res://resources/enemies/oviraptor.tres")
 	HELICOPTER_DATA = load("res://resources/enemies/helicopter.tres")
+	TANK_DATA = load("res://resources/enemies/tank.tres")
 
 	var main_scene: PackedScene = load("res://scenes/world/main.tscn")
 	var main := main_scene.instantiate()
@@ -359,7 +361,11 @@ func _initialize() -> void:
 	await process_frame
 	await physics_frame
 	player.global_position = Vector2(2100 - 150, 100)
-	player.last_move_direction = Vector2(1, 0)
+	# Face right via the same rotation the sprite is actually rendered with
+	# (not the raw, instantaneous input direction) - the fire breath now
+	# aims from get_facing_direction(), so this is what actually steers it.
+	player.velocity = Vector2(300, 0)
+	player._face_movement_direction(1.0)
 	var satiety_before_fire: float = GameManager.satiety
 	player._fire_cooldown = 0.0
 	for i in 10:
@@ -368,12 +374,52 @@ func _initialize() -> void:
 			break
 	assert(not is_instance_valid(ovi2), "fire breath should incinerate even an unbeatable Oviraptor")
 	assert(GameManager.satiety > satiety_before_fire, "incinerating something should grant satiety")
+	# Being Godzilla stays true for the rest of the suite, so the periodic
+	# auto fire-breath would otherwise fire again on its own ~4s later
+	# (FIRE_BREATH_INTERVAL) and incinerate whatever the later tests plant
+	# nearby out from under them. Keep it suppressed until deliberately
+	# tested again.
+	player._fire_cooldown = 999.0
 
-	print("== level 21: helicopters keep their distance and shoot ==")
-	GameManager.growth_level = 21
-	player._on_leveled_up(21)
+	print("== Godzilla is immune to damage from tier 1-19 (pre-Godzilla) enemies ==")
+	player.health = player.max_health
+	# Godzilla's bite dps will make short work of this bird, granting
+	# satiety - keep clear of the level-up threshold so that doesn't
+	# trigger the real popup (which pauses the tree) mid-test.
+	GameManager.satiety = 0.0
+	var old_tier_threat := ENEMY_SCENE.instantiate()
+	old_tier_threat.data = BIRD_DATA  # tier_level defaults to 1 - an "old" animal
+	world.add_child(old_tier_threat)
+	await process_frame
+	await physics_frame
+	old_tier_threat.global_position = player.global_position
+	old_tier_threat._on_hit_area_body_entered(player)
+	var godzilla_health_before: float = player.health
+	for i in 45:
+		await physics_frame
+	assert(player.health == godzilla_health_before, "Godzilla should take no damage at all from a tier-1 animal like a gull")
+	old_tier_threat.queue_free()
+
+	print("== level 20: Panzer and Hubschrauber are boss-tier and still hurt Godzilla ==")
 	player.health = player.max_health
 	player.global_position = Vector2(2300, 0)
+	var tank := ENEMY_SCENE.instantiate()
+	tank.data = TANK_DATA
+	tank.global_position = player.global_position + Vector2(200, 0)
+	world.add_child(tank)
+	await process_frame
+	await physics_frame
+	tank._on_detection_body_entered(player)
+	assert(tank.state == 4, "ranged predators should use ORBIT, not CHASE (State.ORBIT == 4)")
+	var health_before_tank: float = player.health
+	for i in 40:
+		await physics_frame
+	assert(player.health < health_before_tank, "the tank should still damage Godzilla despite the tier-1-19 immunity")
+	var expected_tank_damage: float = player.max_health * 0.4 * GameManager.get_defense_multiplier()
+	assert(abs((health_before_tank - player.health) - expected_tank_damage) < 1.0, "the tank should deal exactly 40% of max_health per hit (scaled by defense)")
+	tank.queue_free()
+
+	player.health = player.max_health
 	var heli := ENEMY_SCENE.instantiate()
 	heli.data = HELICOPTER_DATA
 	heli.global_position = player.global_position + Vector2(200, 0)
@@ -389,6 +435,34 @@ func _initialize() -> void:
 	var final_dist: float = heli.global_position.distance_to(player.global_position)
 	assert(final_dist > 30.0, "the helicopter should keep some distance rather than closing to melee range")
 	heli.queue_free()
+
+	print("== level 22: the lightning ability wipes out everything nearby once fully charged ==")
+	assert(GameManager.MAX_LEVEL == 23, "MAX_LEVEL should sit one above the level-22 lightning unlock, so satiety/XP still counts for something there")
+	GameManager.growth_level = 22
+	player._on_leveled_up(22)
+	assert(not player.can_use_lightning(), "lightning shouldn't be usable before it's fully charged")
+	player.lightning_charge = 100.0
+	assert(player.can_use_lightning(), "lightning should be usable once fully charged at level 22")
+	var zap_target := ENEMY_SCENE.instantiate()
+	zap_target.data = OVIRAPTOR_DATA
+	zap_target.global_position = player.global_position + Vector2(150, 0)
+	world.add_child(zap_target)
+	await process_frame
+	await physics_frame
+	var satiety_before_lightning: float = GameManager.satiety
+	player.trigger_lightning()
+	# Check the charge reset before awaiting any frames: growth_level is
+	# still >= LIGHTNING_LEVEL, so the recharge-over-time logic in
+	# _physics_process starts ticking the charge back up again immediately,
+	# and would make an exact-zero check flaky after even one frame passes.
+	assert(player.lightning_charge == 0.0, "using the lightning should reset its charge")
+	assert(not player.can_use_lightning(), "lightning shouldn't be usable again until it recharges")
+	for i in 5:
+		await physics_frame
+		if not is_instance_valid(zap_target):
+			break
+	assert(not is_instance_valid(zap_target), "lightning should instantly destroy everything nearby, even an unbeatable Oviraptor")
+	assert(GameManager.satiety > satiety_before_lightning, "destroying something with lightning should grant satiety (XP)")
 
 	print("== save / load ==")
 	GameManager.growth_level = 15

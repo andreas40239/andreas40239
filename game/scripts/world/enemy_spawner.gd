@@ -22,6 +22,7 @@ const OVIRAPTOR_DATA := preload("res://resources/enemies/oviraptor.tres")
 const GIANT_FROG_DATA := preload("res://resources/enemies/giant_frog.tres")
 const HORNET_DATA := preload("res://resources/enemies/hornet.tres")
 const HELICOPTER_DATA := preload("res://resources/enemies/helicopter.tres")
+const TANK_DATA := preload("res://resources/enemies/tank.tres")
 
 ## A new species roughly every other level, so the map keeps feeling
 ## fresh instead of a long stretch (there used to be a 7-level gap
@@ -42,7 +43,11 @@ const SPECIES_POOL := [
 	{"data": GIANT_FROG_DATA, "min_level": 16, "weight": 1.1},
 	{"data": OVIRAPTOR_DATA, "min_level": 17, "weight": 1.0},
 	{"data": HORNET_DATA, "min_level": 19, "weight": 1.0},
-	{"data": HELICOPTER_DATA, "min_level": 21, "weight": 0.8},
+	# Panzer/Hubschrauber appear right alongside the Godzilla transformation
+	# at level 20 - the boss-tier threats that still hurt Godzilla once
+	# it's immune to everything below tier_level GameManager.GODZILLA_LEVEL.
+	{"data": TANK_DATA, "min_level": 20, "weight": 1.0},
+	{"data": HELICOPTER_DATA, "min_level": 20, "weight": 0.8},
 ]
 
 @export var enemy_scene: PackedScene
