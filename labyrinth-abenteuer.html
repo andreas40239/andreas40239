@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Labyrinth-Abenteuer</title>
+<style>
+  :root {
+    --bg: #14121f;
+    --panel: #241f38;
+    --panel-light: #35304f;
+    --text: #f0ecff;
+    --hp: #e5484d;
+    --mana: #3e8ef7;
+    --xp: #f7b93e;
+    --gold: #ffd34d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+  #game {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    background: var(--panel);
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    z-index: 5;
+  }
+  .bars { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .bar {
+    position: relative; height: 16px; border-radius: 8px;
+    background: rgba(0,0,0,.45); overflow: hidden;
+  }
+  .bar .fill { position: absolute; inset: 0; width: 100%; border-radius: 8px; transition: width .25s; }
+  .bar.hp .fill   { background: linear-gradient(#ff7a7e, var(--hp)); }
+  .bar.mana .fill { background: linear-gradient(#7db4ff, var(--mana)); }
+  .bar.xp .fill   { background: linear-gradient(#ffd97d, var(--xp)); }
+  .bar span {
+    position: absolute; inset: 0;
+    font-size: 11px; font-weight: 700; line-height: 16px;
+    text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,.8);
+  }
+  .badge {
+    background: var(--panel-light);
+    border-radius: 10px; padding: 6px 10px;
+    font-size: 13px; font-weight: 700; text-align: center;
+    white-space: nowrap;
+  }
+  .badge small { display: block; font-size: 9px; font-weight: 400; opacity: .7; }
+  #btnStats {
+    position: relative;
+    background: var(--panel-light);
+    border: 2px solid transparent;
+    color: var(--text);
+    border-radius: 12px; padding: 6px 12px;
+    font-size: 20px;
+  }
+  #btnStats.hasPoints {
+    border-color: var(--gold);
+    animation: pulse 1.2s infinite;
+  }
+  #btnStats .count {
+    position: absolute; top: -7px; right: -7px;
+    background: var(--gold); color: #4a3400;
+    font-size: 12px; font-weight: 800;
+    min-width: 20px; height: 20px; line-height: 20px;
+    border-radius: 10px;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  /* ---------- Spielfeld + Steuerung ---------- */
+  /* Hochformat: Spielfeld oben, Knöpfe darunter.
+     Querformat: Knöpfe links und rechts neben dem Spielfeld,
+     damit das Labyrinth die volle Höhe bekommt. */
+  #main {
+    flex: 1; min-height: 0;
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+      "canvas canvas canvas"
+      "dpad   .      actions";
+    align-items: end;
+  }
+  #canvasWrap { grid-area: canvas; align-self: stretch; position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #flash {
+    position: absolute; inset: 0; pointer-events: none;
+    background: #e5484d; opacity: 0; transition: opacity .3s;
+  }
+
+  #dpad {
+    grid-area: dpad;
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(3, 58px);
+    gap: 6px;
+  }
+  .dbtn, .abtn {
+    background: rgba(53,48,79,.85);
+    border: 2px solid rgba(255,255,255,.15);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .dbtn:active, .abtn:active { background: rgba(120,110,180,.9); transform: scale(.94); }
+  #actions {
+    grid-area: actions;
+    display: flex; flex-direction: row-reverse; gap: 16px; align-items: center;
+  }
+  .abtn {
+    width: 86px; height: 86px; border-radius: 50%;
+    font-size: 38px; position: relative;
+    flex-direction: column;
+  }
+  .abtn small { font-size: 10px; font-weight: 700; opacity: .85; }
+  .abtn.disabled { opacity: .4; }
+  .abtn.cd::after {
+    content: ""; position: absolute; inset: -2px; border-radius: 50%;
+    background: rgba(0,0,0,.5);
+  }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(10,8,18,.88);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: var(--panel);
+    border: 2px solid var(--panel-light);
+    border-radius: 20px;
+    padding: 26px 30px;
+    max-width: 440px; width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.6);
+  }
+  .panel h1 { font-size: 26px; margin-bottom: 8px; }
+  .panel h2 { font-size: 22px; margin-bottom: 8px; }
+  .panel p { font-size: 15px; opacity: .85; margin-bottom: 16px; line-height: 1.5; }
+  .panel button.big {
+    background: linear-gradient(#5a4fd0, #4338a8);
+    border: none; color: #fff;
+    font-size: 18px; font-weight: 700;
+    padding: 14px 30px; border-radius: 14px;
+    margin-top: 6px;
+  }
+  .panel button.big:active { transform: scale(.96); }
+  .statRow {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(0,0,0,.25);
+    border-radius: 12px; padding: 10px 12px;
+    margin-bottom: 8px; text-align: left;
+  }
+  .statRow .icon { font-size: 24px; width: 32px; }
+  .statRow .info { flex: 1; }
+  .statRow .info b { font-size: 15px; display: block; }
+  .statRow .info small { font-size: 11px; opacity: .7; }
+  .statRow .val { font-size: 16px; font-weight: 700; min-width: 40px; text-align: right; }
+  .statRow button {
+    width: 42px; height: 42px; border-radius: 10px;
+    border: none; font-size: 22px; font-weight: 800;
+    background: var(--gold); color: #4a3400;
+  }
+  .statRow button:disabled { background: #555; color: #999; }
+  #starInfo { font-size: 16px; margin-bottom: 14px; }
+  #starInfo b { color: var(--gold); }
+  .legend { font-size: 13px; text-align: left; opacity: .85; line-height: 1.9; margin-bottom: 12px; }
+
+  /* Querformat: Knöpfe links und rechts, damit das Labyrinth die volle Höhe nutzt.
+     Steht bewusst am Ende, damit diese Regeln die obigen überschreiben. */
+  @media (min-aspect-ratio: 5/4) {
+    #main {
+      grid-template-rows: 1fr;
+      grid-template-areas: "dpad canvas actions";
+    }
+    #actions { flex-direction: column; gap: 18px; }
+  }
+  /* Kleine Bildschirme: etwas kompaktere Knöpfe */
+  @media (max-width: 460px) {
+    #dpad { grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); }
+    .abtn { width: 68px; height: 68px; font-size: 30px; }
+    .abtn small { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="hud">
+    <div class="badge">🏰 Level <span id="dungeonLvl">1</span><small>Labyrinth</small></div>
+    <div class="bars">
+      <div class="bar hp"><div class="fill" id="hpFill"></div><span id="hpText"></span></div>
+      <div class="bar mana"><div class="fill" id="manaFill"></div><span id="manaText"></span></div>
+      <div class="bar xp"><div class="fill" id="xpFill"></div><span id="xpText"></span></div>
+    </div>
+    <div class="badge">🧙 Stufe <span id="heroLvl">1</span><small>Held</small></div>
+    <button id="btnStats">⭐<span class="count" id="starCount" style="display:none">0</span></button>
+  </div>
+
+  <div id="main">
+    <div id="canvasWrap">
+      <canvas id="canvas"></canvas>
+      <div id="flash"></div>
+    </div>
+    <div id="dpad">
+      <div></div><button class="dbtn" data-dir="up">▲</button><div></div>
+      <button class="dbtn" data-dir="left">◀</button><div></div><button class="dbtn" data-dir="right">▶</button>
+      <div></div><button class="dbtn" data-dir="down">▼</button><div></div>
+    </div>
+    <div id="actions">
+      <button class="abtn" id="btnMagic">✨<small id="magicCost">10 Mana</small></button>
+      <button class="abtn" id="btnSword">⚔️<small>Schwert</small></button>
+    </div>
+  </div>
+</div>
+
+<!-- Start -->
+<div class="overlay" id="ovStart">
+  <div class="panel">
+    <h1>🏰 Labyrinth-Abenteuer</h1>
+    <p>Finde den Ausgang <b>🚪</b> in jedem Labyrinth! Der Weg liegt im Dunkeln und wird erst sichtbar, wenn du ihn erkundest.</p>
+    <div class="legend">
+      🗡️ <b>Schwert</b> – trifft Monster direkt neben dir<br>
+      ✨ <b>Magie</b> – trifft alle sichtbaren Monster in der Nähe (kostet Mana)<br>
+      ❤️ <b>Herzen</b> – erscheinen zufällig und heilen dich<br>
+      ⭐ <b>Sterne</b> – pro Heldenstufe 2 Punkte zum Verteilen<br>
+      👹 Ab Labyrinth-Level 5 bewegen sich entdeckte Monster!
+    </div>
+    <button class="big" id="btnStart">Spiel starten</button>
+  </div>
+</div>
+
+<!-- Level geschafft -->
+<div class="overlay hidden" id="ovWin">
+  <div class="panel">
+    <h2>🎉 Level geschafft!</h2>
+    <p id="winText"></p>
+    <button class="big" id="btnNext">Weiter zu Level <span id="nextLvlNum">2</span></button>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay hidden" id="ovDead">
+  <div class="panel">
+    <h2>💀 Besiegt!</h2>
+    <p>Die Monster waren diesmal stärker. Aber ein echter Held gibt nicht auf!</p>
+    <button class="big" id="btnRetry">Level erneut versuchen</button>
+  </div>
+</div>
+
+<!-- Sterne verteilen -->
+<div class="overlay hidden" id="ovStats">
+  <div class="panel">
+    <h2>⭐ Heldenwerte</h2>
+    <div id="starInfo">Verfügbare Sterne: <b id="starsAvail">0</b> ⭐</div>
+    <div class="statRow">
+      <div class="icon">❤️</div>
+      <div class="info"><b>Lebenspunkte</b><small>+10 maximale Lebenspunkte</small></div>
+      <div class="val" id="valHp"></div>
+      <button data-stat="hp">+</button>
+    </div>
+    <div class="statRow">
+      <div class="icon">⚔️</div>
+      <div class="info"><b>Angriffsschaden</b><small>+2 Schaden pro Treffer</small></div>
+      <div class="val" id="valAtk"></div>
+      <button data-stat="atk">+</button>
+    </div>
+    <div class="statRow">
+      <div class="icon">🔮</div>
+      <div class="info"><b>Mana</b><small>+10 maximales Mana</small></div>
+      <div class="val" id="valMana"></div>
+      <button data-stat="mana">+</button>
+    </div>
+    <div class="statRow">
+      <div class="icon">🛡️</div>
+      <div class="info"><b>Rüstung</b><small>−1 erlittener Schaden</small></div>
+      <div class="val" id="valArmor"></div>
+      <button data-stat="armor">+</button>
+    </div>
+    <button class="big" id="btnCloseStats">Schließen</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   Labyrinth-Abenteuer – Offline-Prototyp für Android-Tablets
+   ===================================================================== */
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// ---------- Hilfsfunktionen ----------
+const rnd = (n) => Math.floor(Math.random() * n);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const el = (id) => document.getElementById(id);
+
+// ---------- Spielzustand ----------
+const state = {
+  running: false,
+  paused: false,
+  dungeonLevel: 1,
+  grid: [],          // 1 = Wand, 0 = Boden
+  cols: 0, rows: 0,
+  seen: [],          // aufgedeckte Zellen
+  exit: { x: 0, y: 0 },
+  monsters: [],
+  hearts: [],
+  effects: [],       // schwebende Texte & Animationen
+  heartTimer: 0,
+  manaTimer: 0,
+  player: null,
+};
+
+function newPlayer() {
+  return {
+    x: 1, y: 1,
+    maxHp: 50, hp: 50,
+    maxMana: 30, mana: 30,
+    atk: 8,
+    armor: 0,
+    level: 1, xp: 0, stars: 0,
+    facing: 1, // 1 = rechts, -1 = links
+    swordCd: 0, magicCd: 0,
+  };
+}
+
+const MAGIC_COST = 10;
+const MAGIC_RANGE = 3;
+const REVEAL_RADIUS = 2.7;
+const MONSTER_ATTACK_INTERVAL = 1.35; // Sekunden zwischen Monsterangriffen
+const CHASE_RANGE = 6;                // ab dieser Nähe jagt ein Monster den Spieler
+
+const MONSTER_TYPES = [
+  { icon: "🕷️", name: "Spinne" },
+  { icon: "🦇", name: "Fledermaus" },
+  { icon: "🐍", name: "Schlange" },
+  { icon: "👻", name: "Geist" },
+  { icon: "👹", name: "Oger" },
+  { icon: "🐉", name: "Drache" },
+];
+
+// ---------- Labyrinth-Erzeugung (Recursive Backtracker) ----------
+function mazeSize(level) {
+  // Level 1–5: passt auf den Bildschirm (feste, moderate Größen).
+  // Ab Level 6 wächst das Labyrinth weiter und die Kamera folgt dem Spieler.
+  const table = [
+    [13, 9], [15, 11], [17, 11], [19, 13], [21, 13],
+  ];
+  if (level <= 5) return table[level - 1];
+  const grow = level - 5;
+  return [21 + grow * 4, 13 + grow * 2];
+}
+
+function generateMaze(cols, rows) {
+  const g = Array.from({ length: rows }, () => Array(cols).fill(1));
+  const stack = [[1, 1]];
+  g[1][1] = 0;
+  while (stack.length) {
+    const [cx, cy] = stack[stack.length - 1];
+    const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => Math.random() - 0.5);
+    let carved = false;
+    for (const [dx, dy] of dirs) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx > 0 && ny > 0 && nx < cols - 1 && ny < rows - 1 && g[ny][nx] === 1) {
+        g[ny][nx] = 0;
+        g[cy + dy / 2][cx + dx / 2] = 0;
+        stack.push([nx, ny]);
+        carved = true;
+        break;
+      }
+    }
+    if (!carved) stack.pop();
+  }
+  // Ein paar zusätzliche Durchbrüche, damit es Schleifen gibt (weniger Sackgassen)
+  const extra = Math.floor(cols * rows / 60);
+  for (let i = 0; i < extra; i++) {
+    const x = 1 + rnd(cols - 2), y = 1 + rnd(rows - 2);
+    if (g[y][x] === 1) {
+      const horiz = g[y][x - 1] === 0 && g[y][x + 1] === 0;
+      const vert = g[y - 1][x] === 0 && g[y + 1][x] === 0;
+      if (horiz !== vert) g[y][x] = 0;
+    }
+  }
+  return g;
+}
+
+// Breitensuche: Distanzen von einem Startpunkt zu allen Bodenzellen
+function bfsDistances(sx, sy) {
+  const dist = Array.from({ length: state.rows }, () => Array(state.cols).fill(-1));
+  dist[sy][sx] = 0;
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < state.cols && ny < state.rows &&
+          state.grid[ny][nx] === 0 && dist[ny][nx] === -1) {
+        dist[ny][nx] = dist[y][x] + 1;
+        q.push([nx, ny]);
+      }
+    }
+  }
+  return dist;
+}
+
+function buildLevel(level) {
+  let [cols, rows] = mazeSize(level);
+  // Hochkant gehaltenes Tablet: Labyrinth mitdrehen, sonst bleibt
+  // oben und unten viel Bildschirm ungenutzt.
+  const wrap = el("canvasWrap");
+  if (wrap.clientHeight > wrap.clientWidth) [cols, rows] = [rows, cols];
+  state.cols = cols; state.rows = rows;
+  state.grid = generateMaze(cols, rows);
+  state.seen = Array.from({ length: rows }, () => Array(cols).fill(false));
+  state.monsters = [];
+  state.hearts = [];
+  state.effects = [];
+  state.heartTimer = 0;
+
+  const p = state.player;
+  p.x = 1; p.y = 1;
+
+  // Ausgang: am weitesten entfernte Bodenzelle
+  const dist = bfsDistances(1, 1);
+  let best = { x: 1, y: 1, d: 0 };
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      if (dist[y][x] > best.d) best = { x, y, d: dist[y][x] };
+  state.exit = { x: best.x, y: best.y };
+
+  // Monster verteilen (Anzahl & Stärke wachsen mit dem Level)
+  const cells = [];
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      if (state.grid[y][x] === 0 && dist[y][x] >= 8 &&
+          (x - 1) ** 2 + (y - 1) ** 2 > (REVEAL_RADIUS + 1) ** 2 &&
+          !(x === state.exit.x && y === state.exit.y))
+        cells.push([x, y]);
+  // ... aber nie so dicht, dass der Spieler im Gang eingekesselt wird
+  const count = Math.min(3 + Math.round(level * 0.9), Math.floor(cells.length / 9));
+  for (let i = 0; i < count && cells.length; i++) {
+    const idx = rnd(cells.length);
+    const [x, y] = cells.splice(idx, 1)[0];
+    const tier = clamp(Math.floor((level - 1) / 2) + (Math.random() < 0.3 ? 1 : 0), 0, MONSTER_TYPES.length - 1);
+    const t = MONSTER_TYPES[tier];
+    state.monsters.push({
+      x, y,
+      icon: t.icon, name: t.name,
+      maxHp: 14 + level * 6 + tier * 8,
+      hp: 14 + level * 6 + tier * 8,
+      atk: 3 + Math.round(level * 1.5) + tier * 2,
+      xp: 8 + level * 4 + tier * 6,
+      discovered: false,
+      moveTimer: 0,
+      attackTimer: 0,
+    });
+  }
+
+  revealAround();
+  updateHud();
+}
+
+// ---------- Sichtbarkeit / Nebel ----------
+function revealAround() {
+  const p = state.player;
+  const r = Math.ceil(REVEAL_RADIUS);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const x = p.x + dx, y = p.y + dy;
+      if (x < 0 || y < 0 || x >= state.cols || y >= state.rows) continue;
+      if (dx * dx + dy * dy <= REVEAL_RADIUS * REVEAL_RADIUS) {
+        state.seen[y][x] = true;
+      }
+    }
+  }
+  // Monster auf sichtbaren Feldern gelten als entdeckt
+  for (const m of state.monsters) {
+    if (!m.discovered && state.seen[m.y][m.x]) {
+      m.discovered = true;
+      addText(m.x, m.y, "❗", "#ffd34d");
+    }
+  }
+}
+
+// ---------- Effekte ----------
+function addText(x, y, text, color) {
+  state.effects.push({ type: "text", x, y, text, color, t: 0 });
+}
+function addBlast(x, y) {
+  state.effects.push({ type: "blast", x, y, t: 0 });
+}
+
+// ---------- Audio (kleine Piepser über WebAudio) ----------
+let audioCtx = null;
+function beep(freq, dur, type = "square", vol = 0.04) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + dur);
+  } catch (e) { /* Audio ist optional */ }
+}
+
+// ---------- Spielerbewegung ----------
+function tryMove(dx, dy) {
+  if (!state.running || state.paused) return;
+  const p = state.player;
+  if (dx > 0) p.facing = 1;
+  if (dx < 0) p.facing = -1;
+  const nx = p.x + dx, ny = p.y + dy;
+  if (nx < 0 || ny < 0 || nx >= state.cols || ny >= state.rows) return;
+  if (state.grid[ny][nx] === 1) return;
+
+  // In ein Monster laufen = Schwertangriff
+  const m = state.monsters.find(m => m.x === nx && m.y === ny);
+  if (m) { swordAttack(); return; }
+
+  p.x = nx; p.y = ny;
+  revealAround();
+
+  // Herz einsammeln
+  const hi = state.hearts.findIndex(h => h.x === nx && h.y === ny);
+  if (hi >= 0) {
+    state.hearts.splice(hi, 1);
+    const heal = Math.round(p.maxHp * 0.3);
+    p.hp = Math.min(p.maxHp, p.hp + heal);
+    addText(nx, ny, "+" + heal + " ❤️", "#7dff9b");
+    beep(880, 0.12, "sine", 0.06);
+    updateHud();
+  }
+
+  // Ausgang erreicht?
+  if (nx === state.exit.x && ny === state.exit.y) {
+    levelComplete();
+  }
+}
+
+// ---------- Kampf ----------
+function swordAttack() {
+  const p = state.player;
+  if (p.swordCd > 0 || !state.running || state.paused) return;
+  p.swordCd = 0.35;
+  let hit = false;
+  for (const m of state.monsters) {
+    if (Math.abs(m.x - p.x) + Math.abs(m.y - p.y) === 1) {
+      const dmg = p.atk + rnd(4);
+      damageMonster(m, dmg);
+      hit = true;
+    }
+  }
+  beep(hit ? 220 : 140, 0.08);
+  if (!hit) addText(p.x, p.y, "⚔️", "#aaa");
+}
+
+function magicAttack() {
+  const p = state.player;
+  if (p.magicCd > 0 || !state.running || state.paused) return;
+  if (p.mana < MAGIC_COST) {
+    addText(p.x, p.y, "Zu wenig Mana!", "#7db4ff");
+    beep(110, 0.15, "sawtooth");
+    return;
+  }
+  p.magicCd = 0.8;
+  p.mana -= MAGIC_COST;
+  addBlast(p.x, p.y);
+  beep(520, 0.25, "sine", 0.06);
+  let hit = false;
+  for (const m of state.monsters) {
+    const d2 = (m.x - p.x) ** 2 + (m.y - p.y) ** 2;
+    if (m.discovered && d2 <= MAGIC_RANGE * MAGIC_RANGE) {
+      damageMonster(m, Math.round(p.atk * 1.8) + rnd(5));
+      hit = true;
+    }
+  }
+  if (!hit) addText(p.x, p.y, "✨ verpufft", "#7db4ff");
+  updateHud();
+}
+
+function damageMonster(m, dmg) {
+  m.hp -= dmg;
+  addText(m.x, m.y, "-" + dmg, "#ff9b7d");
+  if (m.hp <= 0) {
+    state.monsters = state.monsters.filter(x => x !== m);
+    addText(m.x, m.y, "💥 +" + m.xp + " EP", "#ffd34d");
+    beep(660, 0.15, "triangle", 0.06);
+    gainXp(m.xp);
+  }
+}
+
+function damagePlayer(m) {
+  const p = state.player;
+  const dmg = Math.max(1, m.atk + rnd(3) - p.armor);
+  p.hp -= dmg;
+  addText(p.x, p.y, "-" + dmg, "#ff5a5f");
+  beep(90, 0.2, "sawtooth", 0.07);
+  const flash = el("flash");
+  flash.style.opacity = 0.35;
+  setTimeout(() => flash.style.opacity = 0, 120);
+  updateHud();
+  if (p.hp <= 0) {
+    p.hp = 0;
+    state.running = false;
+    updateHud();
+    setTimeout(() => el("ovDead").classList.remove("hidden"), 500);
+  }
+}
+
+// ---------- Erfahrung & Heldenstufen ----------
+function xpNeeded(level) { return Math.round(25 * Math.pow(level, 1.4)); }
+
+function gainXp(amount) {
+  const p = state.player;
+  p.xp += amount;
+  while (p.xp >= xpNeeded(p.level)) {
+    p.xp -= xpNeeded(p.level);
+    p.level++;
+    p.stars += 2;
+    p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.25));
+    addText(p.x, p.y, "⬆️ Stufe " + p.level + "! +2 ⭐", "#ffd34d");
+    beep(784, 0.3, "sine", 0.07);
+  }
+  updateHud();
+}
+
+function spendStar(stat) {
+  const p = state.player;
+  if (p.stars <= 0) return;
+  p.stars--;
+  if (stat === "hp")    { p.maxHp += 10; p.hp += 10; }
+  if (stat === "atk")   { p.atk += 2; }
+  if (stat === "mana")  { p.maxMana += 10; p.mana += 10; }
+  if (stat === "armor") { p.armor += 1; }
+  beep(600, 0.1, "sine", 0.05);
+  updateStatsPanel();
+  updateHud();
+}
+
+// ---------- Level-Abschluss / Tod ----------
+function levelComplete() {
+  state.running = false;
+  beep(523, 0.15, "sine", 0.06);
+  setTimeout(() => beep(659, 0.15, "sine", 0.06), 150);
+  setTimeout(() => beep(784, 0.3, "sine", 0.06), 300);
+  const bonus = 15 + state.dungeonLevel * 5;
+  gainXp(bonus);
+  el("winText").innerHTML =
+    "Du hast den Ausgang von Labyrinth <b>" + state.dungeonLevel + "</b> gefunden!<br>" +
+    "Bonus: <b>+" + bonus + " EP</b>" +
+    (state.dungeonLevel + 1 === 5 ? "<br>⚠️ Ab jetzt bewegen sich entdeckte Monster!" : "") +
+    (state.dungeonLevel + 1 === 6 ? "<br>🗺️ Das Labyrinth ist jetzt größer als der Bildschirm!" : "");
+  el("nextLvlNum").textContent = state.dungeonLevel + 1;
+  el("ovWin").classList.remove("hidden");
+}
+
+// ---------- Spielschleife (Ticks) ----------
+let lastTick = performance.now();
+function tick(now) {
+  const dt = Math.min(0.1, (now - lastTick) / 1000);
+  lastTick = now;
+
+  if (state.running && !state.paused) {
+    const p = state.player;
+    p.swordCd = Math.max(0, p.swordCd - dt);
+    p.magicCd = Math.max(0, p.magicCd - dt);
+
+    // Mana-Regeneration
+    state.manaTimer += dt;
+    if (state.manaTimer >= 1.2) {
+      state.manaTimer = 0;
+      if (p.mana < p.maxMana) { p.mana = Math.min(p.maxMana, p.mana + 1); updateHud(); }
+    }
+
+    // Herzen erscheinen zufällig auf aufgedeckten Feldern
+    state.heartTimer += dt;
+    if (state.heartTimer >= 5) {
+      state.heartTimer = 0;
+      if (state.hearts.length < 3 && Math.random() < 0.6) spawnHeart();
+    }
+
+    // Monster-Verhalten
+    const monstersMove = state.dungeonLevel >= 5;
+    const moveInterval = Math.max(0.45, 1.0 - (state.dungeonLevel - 5) * 0.05);
+    for (const m of state.monsters) {
+      if (!m.discovered) continue;
+      const adjacent = Math.abs(m.x - p.x) + Math.abs(m.y - p.y) === 1;
+
+      // Angriff, wenn direkt neben dem Spieler
+      m.attackTimer += dt;
+      if (adjacent && m.attackTimer >= MONSTER_ATTACK_INTERVAL) {
+        m.attackTimer = 0;
+        damagePlayer(m);
+        if (!state.running) break;
+        continue;
+      }
+
+      // Bewegung erst ab Labyrinth-Level 5
+      if (!monstersMove || adjacent) continue;
+      m.moveTimer += dt;
+      if (m.moveTimer >= moveInterval) {
+        m.moveTimer = 0;
+        moveMonster(m);
+      }
+    }
+  }
+
+  // Effekte altern lassen
+  for (const e of state.effects) e.t += dt;
+  state.effects = state.effects.filter(e => e.t < (e.type === "text" ? 1.1 : 0.5));
+
+  draw();
+  requestAnimationFrame(tick);
+}
+
+function moveMonster(m) {
+  const p = state.player;
+  const dist = Math.abs(m.x - p.x) + Math.abs(m.y - p.y);
+  let options = [];
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = m.x + dx, ny = m.y + dy;
+    if (nx < 0 || ny < 0 || nx >= state.cols || ny >= state.rows) continue;
+    if (state.grid[ny][nx] === 1) continue;
+    if (state.monsters.some(o => o !== m && o.x === nx && o.y === ny)) continue;
+    if (nx === p.x && ny === p.y) continue;
+    options.push([nx, ny]);
+  }
+  if (!options.length) return;
+  if (dist <= CHASE_RANGE) {
+    // Jage den Spieler: wähle den Schritt, der die Distanz verringert
+    options.sort((a, b) =>
+      (Math.abs(a[0] - p.x) + Math.abs(a[1] - p.y)) -
+      (Math.abs(b[0] - p.x) + Math.abs(b[1] - p.y)));
+    // kleine Zufallschance, nicht perfekt zu jagen
+    const pick = Math.random() < 0.8 ? options[0] : options[rnd(options.length)];
+    [m.x, m.y] = pick;
+  } else {
+    [m.x, m.y] = options[rnd(options.length)];
+  }
+  if (state.seen[m.y][m.x]) m.discovered = true;
+}
+
+function spawnHeart() {
+  const p = state.player;
+  const cells = [];
+  for (let y = 0; y < state.rows; y++)
+    for (let x = 0; x < state.cols; x++)
+      if (state.grid[y][x] === 0 && state.seen[y][x] &&
+          !(x === p.x && y === p.y) &&
+          !(x === state.exit.x && y === state.exit.y) &&
+          !state.monsters.some(m => m.x === x && m.y === y) &&
+          !state.hearts.some(h => h.x === x && h.y === y))
+        cells.push([x, y]);
+  if (!cells.length) return;
+  const [x, y] = cells[rnd(cells.length)];
+  state.hearts.push({ x, y });
+  addText(x, y, "❤️", "#ff7a7e");
+}
+
+// ---------- Zeichnen ----------
+// Passt die Auflösung der Zeichenfläche an ihre tatsächliche Größe an.
+// Wird in jedem Bild geprüft, damit auch Drehen des Tablets sofort sitzt.
+function resize() {
+  const wrap = el("canvasWrap");
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(wrap.clientWidth * dpr), h = Math.round(wrap.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", resize);
+
+function draw() {
+  resize();
+  const wrap = el("canvasWrap");
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  ctx.clearRect(0, 0, W, H);
+  if (!state.grid.length) return;
+
+  const p = state.player;
+  let tile, offX, offY;
+  if (state.dungeonLevel <= 5) {
+    // Ganzes Labyrinth passt auf den Bildschirm
+    tile = Math.floor(Math.min(W / state.cols, H / state.rows));
+    offX = (W - tile * state.cols) / 2;
+    offY = (H - tile * state.rows) / 2;
+  } else {
+    // Kamera folgt dem Spieler
+    tile = clamp(Math.round(Math.min(W, H) / 12), 38, 80);
+    offX = clamp(W / 2 - (p.x + 0.5) * tile, W - state.cols * tile, 0);
+    offY = clamp(H / 2 - (p.y + 0.5) * tile, H - state.rows * tile, 0);
+    if (state.cols * tile < W) offX = (W - tile * state.cols) / 2;
+    if (state.rows * tile < H) offY = (H - tile * state.rows) / 2;
+  }
+
+  const cx = (x) => offX + x * tile;
+  const cy = (y) => offY + y * tile;
+  const inView = (x, y) =>
+    cx(x) > -tile && cy(y) > -tile && cx(x) < W + tile && cy(y) < H + tile;
+
+  // Umriss des Spielfelds: zeigt, wie groß das Labyrinth ist,
+  // verrät aber noch nichts über den Verlauf der Gänge.
+  ctx.fillStyle = "#100e1c";
+  ctx.fillRect(offX, offY, state.cols * tile, state.rows * tile);
+  ctx.strokeStyle = "rgba(140,128,200,.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(offX + 1, offY + 1, state.cols * tile - 2, state.rows * tile - 2);
+
+  // Boden & Wände (nur aufgedeckte Zellen)
+  for (let y = 0; y < state.rows; y++) {
+    for (let x = 0; x < state.cols; x++) {
+      if (!state.seen[y][x] || !inView(x, y)) continue;
+      const d2 = (x - p.x) ** 2 + (y - p.y) ** 2;
+      const near = d2 <= REVEAL_RADIUS * REVEAL_RADIUS;
+      if (state.grid[y][x] === 1) {
+        ctx.fillStyle = near ? "#4d4470" : "#332d4d";
+        ctx.fillRect(cx(x), cy(y), tile + 0.5, tile + 0.5);
+        ctx.fillStyle = near ? "#5c5285" : "#3d3659";
+        ctx.fillRect(cx(x), cy(y), tile + 0.5, tile * 0.3);
+      } else {
+        ctx.fillStyle = near ? "#1e1a30" : "#171426";
+        ctx.fillRect(cx(x), cy(y), tile + 0.5, tile + 0.5);
+      }
+    }
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Ausgang
+  if (state.seen[state.exit.y][state.exit.x] && inView(state.exit.x, state.exit.y)) {
+    ctx.font = (tile * 0.7) + "px serif";
+    ctx.fillText("🚪", cx(state.exit.x) + tile / 2, cy(state.exit.y) + tile / 2);
+  }
+
+  // Herzen
+  ctx.font = (tile * 0.55) + "px serif";
+  for (const h of state.hearts) {
+    if (state.seen[h.y][h.x] && inView(h.x, h.y)) {
+      const bounce = Math.sin(performance.now() / 250) * tile * 0.05;
+      ctx.fillText("❤️", cx(h.x) + tile / 2, cy(h.y) + tile / 2 + bounce);
+    }
+  }
+
+  // Monster
+  for (const m of state.monsters) {
+    if (!m.discovered || !state.seen[m.y][m.x] || !inView(m.x, m.y)) continue;
+    ctx.font = (tile * 0.65) + "px serif";
+    ctx.fillText(m.icon, cx(m.x) + tile / 2, cy(m.y) + tile / 2);
+    // Lebensbalken
+    const bw = tile * 0.7, bh = Math.max(3, tile * 0.08);
+    const bx = cx(m.x) + (tile - bw) / 2, by = cy(m.y) + tile * 0.06;
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = "#e5484d";
+    ctx.fillRect(bx, by, bw * Math.max(0, m.hp / m.maxHp), bh);
+  }
+
+  // Spieler
+  ctx.save();
+  ctx.translate(cx(p.x) + tile / 2, cy(p.y) + tile / 2);
+  if (p.facing === -1) ctx.scale(-1, 1);
+  ctx.font = (tile * 0.7) + "px serif";
+  ctx.fillText("🧙", 0, 0);
+  ctx.restore();
+
+  // Effekte
+  for (const e of state.effects) {
+    if (e.type === "text") {
+      const prog = e.t / 1.1;
+      ctx.globalAlpha = 1 - prog;
+      ctx.fillStyle = e.color;
+      ctx.font = "bold " + Math.max(13, tile * 0.34) + "px sans-serif";
+      ctx.fillText(e.text, cx(e.x) + tile / 2, cy(e.y) - tile * 0.15 - prog * tile * 0.8);
+      ctx.globalAlpha = 1;
+    } else if (e.type === "blast") {
+      const prog = e.t / 0.5;
+      ctx.globalAlpha = (1 - prog) * 0.6;
+      ctx.strokeStyle = "#7db4ff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx(e.x) + tile / 2, cy(e.y) + tile / 2, prog * MAGIC_RANGE * tile, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ---------- HUD ----------
+function updateHud() {
+  const p = state.player;
+  if (!p) return;
+  el("hpFill").style.width = (100 * p.hp / p.maxHp) + "%";
+  el("hpText").textContent = "❤️ " + p.hp + " / " + p.maxHp;
+  el("manaFill").style.width = (100 * p.mana / p.maxMana) + "%";
+  el("manaText").textContent = "🔮 " + p.mana + " / " + p.maxMana;
+  el("xpFill").style.width = (100 * p.xp / xpNeeded(p.level)) + "%";
+  el("xpText").textContent = "EP " + p.xp + " / " + xpNeeded(p.level);
+  el("dungeonLvl").textContent = state.dungeonLevel;
+  el("heroLvl").textContent = p.level;
+  const btn = el("btnStats");
+  const cnt = el("starCount");
+  if (p.stars > 0) {
+    btn.classList.add("hasPoints");
+    cnt.style.display = "";
+    cnt.textContent = p.stars;
+  } else {
+    btn.classList.remove("hasPoints");
+    cnt.style.display = "none";
+  }
+  el("btnMagic").classList.toggle("disabled", p.mana < MAGIC_COST);
+}
+
+function updateStatsPanel() {
+  const p = state.player;
+  el("starsAvail").textContent = p.stars;
+  el("valHp").textContent = p.maxHp;
+  el("valAtk").textContent = p.atk;
+  el("valMana").textContent = p.maxMana;
+  el("valArmor").textContent = p.armor;
+  document.querySelectorAll("#ovStats .statRow button")
+    .forEach(b => b.disabled = p.stars <= 0);
+}
+
+// ---------- Eingabe ----------
+function bindHold(button, fn) {
+  // Tippen = 1 Schritt, Halten = wiederholte Schritte
+  let interval = null, timeout = null;
+  const start = (ev) => {
+    ev.preventDefault();
+    fn();
+    timeout = setTimeout(() => { interval = setInterval(fn, 160); }, 320);
+  };
+  const stop = () => {
+    clearTimeout(timeout); clearInterval(interval);
+    timeout = interval = null;
+  };
+  button.addEventListener("touchstart", start, { passive: false });
+  button.addEventListener("touchend", stop);
+  button.addEventListener("touchcancel", stop);
+  button.addEventListener("mousedown", start);
+  button.addEventListener("mouseup", stop);
+  button.addEventListener("mouseleave", stop);
+}
+
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+document.querySelectorAll(".dbtn").forEach(btn => {
+  const [dx, dy] = DIRS[btn.dataset.dir];
+  bindHold(btn, () => tryMove(dx, dy));
+});
+
+el("btnSword").addEventListener("pointerdown", (e) => { e.preventDefault(); swordAttack(); });
+el("btnMagic").addEventListener("pointerdown", (e) => { e.preventDefault(); magicAttack(); });
+
+// Tastatur (praktisch zum Testen am PC)
+window.addEventListener("keydown", (e) => {
+  const map = {
+    ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+    w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
+  };
+  if (map[e.key]) { e.preventDefault(); tryMove(...map[e.key]); }
+  if (e.key === " ") { e.preventDefault(); swordAttack(); }
+  if (e.key === "m") magicAttack();
+});
+
+// ---------- Overlays ----------
+el("btnStart").addEventListener("click", () => {
+  el("ovStart").classList.add("hidden");
+  state.player = newPlayer();
+  state.dungeonLevel = 1;
+  buildLevel(1);
+  state.running = true;
+});
+
+el("btnNext").addEventListener("click", () => {
+  el("ovWin").classList.add("hidden");
+  state.dungeonLevel++;
+  buildLevel(state.dungeonLevel);
+  state.running = true;
+});
+
+el("btnRetry").addEventListener("click", () => {
+  el("ovDead").classList.add("hidden");
+  const p = state.player;
+  p.hp = p.maxHp;
+  p.mana = p.maxMana;
+  buildLevel(state.dungeonLevel);
+  state.running = true;
+});
+
+el("btnStats").addEventListener("click", () => {
+  state.paused = true;
+  updateStatsPanel();
+  el("ovStats").classList.remove("hidden");
+});
+el("btnCloseStats").addEventListener("click", () => {
+  el("ovStats").classList.add("hidden");
+  state.paused = false;
+});
+document.querySelectorAll("#ovStats .statRow button").forEach(b =>
+  b.addEventListener("click", () => spendStar(b.dataset.stat)));
+
+// ---------- Start ----------
+el("magicCost").textContent = MAGIC_COST + " Mana";
+resize();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
