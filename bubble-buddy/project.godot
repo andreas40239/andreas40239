@@ -1,0 +1,39 @@
+; Bubble Buddy - Godot 4 project configuration
+; Offline-first, zero-tracking kids game. No network code anywhere in this project.
+
+config_version=5
+
+[application]
+
+config/name="Bubble Buddy"
+config/description="Steer a friendly little fish through a gentle endless ocean. Fully offline, no ads, no tracking."
+config/version="1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.35, 0.78, 0.85, 1)
+boot_splash/show_image=false
+
+[autoload]
+
+SaveData="*res://autoload/save_data.gd"
+Sound="*res://autoload/sound.gd"
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_2d=1
