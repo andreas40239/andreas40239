@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="state_green">#FF1B5E20</color>
+    <color name="state_yellow">#FFF9A825</color>
+    <color name="state_red">#FFC62828</color>
+    <color name="state_idle">#FF263238</color>
+
+    <color name="on_dark">#FFFFFFFF</color>
+    <color name="on_light">#FF1A1A1A</color>
+</resources>
