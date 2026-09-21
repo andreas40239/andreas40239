@@ -13,17 +13,20 @@ enum State { SCHLAFEN, RUHEN, PATROUILLE, WARNUNG, JAGEN, BELLEN_NACH_OBEN, RUEC
 ## Hoehenunterschied, ab dem die Katze als ausser Reichweite gilt.
 const REACH_HEIGHT := 1.6
 const CHASE_LIMIT := 9.0
-const CHASE_TIME := 4.0
+const CHASE_TIME := 3.0
 const BARK_UP_TIME := 1.0
 
+## Wichtig fuers Spielgefuehl: kein Hund darf die Laufgeschwindigkeit der
+## Katze (4 m/s) erreichen, sonst ist Weglaufen unmoeglich. Der kleine Hund
+## wirkt trotzdem schnell, weil er in kurzen Sprints jagt.
 const PARAMS := {
 	DogSize.KLEIN: {
-		"patrol_speed": 1.6, "chase_speed": 5.0, "perception": 6.0,
+		"patrol_speed": 1.4, "chase_speed": 3.2, "perception": 6.0,
 		"height": 0.75, "radius": 0.22, "scale": 0.8,
-		"sprint_on": 0.9, "sprint_off": 0.35,
+		"sprint_on": 0.8, "sprint_off": 0.5,
 	},
 	DogSize.GROSS: {
-		"patrol_speed": 1.1, "chase_speed": 3.2, "perception": 10.0,
+		"patrol_speed": 0.9, "chase_speed": 2.2, "perception": 9.0,
 		"height": 1.15, "radius": 0.32, "scale": 1.25,
 		"sprint_on": 99.0, "sprint_off": 0.0,
 	},
@@ -160,7 +163,7 @@ func _process_return() -> void:
 # --- Hilfen -----------------------------------------------------------------
 
 func _notices_player() -> bool:
-	if passive:
+	if passive or is_recovering():
 		return false
 	return _player_in_range(PARAMS[dog_size]["perception"], REACH_HEIGHT)
 
@@ -173,6 +176,11 @@ func _enter(new_state: State, duration: float) -> void:
 		# Schlafender Hund liegt flach, wacher Hund steht.
 		var lying := new_state == State.SCHLAFEN
 		visual.scale = Vector3(1.0, 0.55, 1.0) if lying else Vector3.ONE
+
+## Nach einem Treffer laesst der Hund von der Katze ab.
+func _on_hit_player() -> void:
+	if state != State.SCHLAFEN:
+		_enter(State.RUECKKEHR, 0.0)
 
 ## Ein schlafender Hund tut niemandem weh - die Katze klettert ueber ihn hinweg.
 func is_dangerous() -> bool:

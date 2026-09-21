@@ -14,9 +14,9 @@ const REACH_HEIGHT := 2.2
 const ATTACK_COOLDOWN := 0.6
 
 @export var territory_half_width: float = 3.0
-@export var patrol_speed: float = 2.0
-@export var attack_speed_x: float = 4.5
-@export var attack_speed_y: float = 4.5
+@export var patrol_speed: float = 1.6
+@export var attack_speed_x: float = 3.2
+@export var attack_speed_y: float = 4.2
 
 var state: State = State.SITZEN
 
@@ -114,13 +114,17 @@ func _process_retreat() -> void:
 
 ## Eindringling: die Spielerkatze steht im Revier und auf aehnlicher Hoehe.
 func _intruder_present() -> bool:
-	if _player == null or not is_instance_valid(_player):
+	if _player == null or not is_instance_valid(_player) or is_recovering():
 		return false
 	if _player.state in [Player.State.DEAD, Player.State.VICTORY]:
 		return false
 	var in_territory := absf(_player.global_position.x - home_position.x) <= territory_half_width
 	var same_level := absf(_player.global_position.y - home_position.y) <= REACH_HEIGHT
 	return in_territory and same_level
+
+## Nach einem Treffer zieht sich die Revierkatze zurueck.
+func _on_hit_player() -> void:
+	_enter(State.RUECKZUG, 0.0)
 
 func _enter(new_state: State, duration: float) -> void:
 	state = new_state

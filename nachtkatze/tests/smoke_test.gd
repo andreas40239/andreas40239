@@ -15,7 +15,16 @@ func _ready() -> void:
 	# Erst einen Frame abwarten: waehrend _ready baut der Baum noch auf und
 	# add_child() auf die Wurzel schlaegt fehl.
 	await get_tree().process_frame
+	# Der Testlauf schliesst Levels ab - den echten Spielstand nicht veraendern.
+	var saved_progress := SaveGame.completed_levels.duplicate()
+	var saved_music := SaveGame.music_on
+	var saved_sound := SaveGame.sound_on
 	await _run_all()
+	SaveGame.completed_levels = saved_progress
+	SaveGame.music_on = saved_music
+	SaveGame.sound_on = saved_sound
+	SaveGame.save_game()
+	SaveGame.apply_audio()
 	print("")
 	print("--- Ergebnis: %d Pruefungen, %d Fehler ---" % [_checks, _failures.size()])
 	for failure in _failures:
@@ -35,6 +44,13 @@ func _run_all() -> void:
 	await _test_dog_states()
 	await _test_territory_cat()
 	await _test_car()
+	await _test_car_is_jumpable()
+	await _test_car_jump_tolerance()
+	await _test_flight_from_enemies()
+	await _test_hit_recovery()
+	await _test_level_catalog()
+	await _test_save_and_progress()
+	await _test_menu_screens()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -347,6 +363,188 @@ func _test_car() -> void:
 	await _despawn(level)
 
 ## GDD Abschnitt 7: Level 0 erklaert nur ueber Symbole und kann nicht scheitern.
+## Der Sprung ueber das Auto muss Timingfehler verzeihen - ein Fenster von
+## Sekundenbruchteilen waere fuer die Zielgruppe ab 5 Jahren unbrauchbar.
+func _test_car_jump_tolerance() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var car: Car = level.get_node("Gegner/Auto")
+	level.get_node("Gegner/KleinerHund").free()
+	level.get_node("Gegner/GrosserHund").free()
+	level.get_node("Gegner/Revierkatze").free()
+
+	var trigger_points := [2.4, 3.0, 3.6, 4.2, 4.8]
+	var successes := 0
+	for trigger in trigger_points:
+		player.global_position = Vector3(20.0, 0.4, 0.0)
+		player.velocity = Vector3.ZERO
+		player.health = player.max_health
+		player.is_invulnerable = false
+		car.warning_time = 0.2
+		car.restart_cycle(0.1)
+		await _wait(0.25)
+		var jumped := false
+		for i in int(4.0 * PHYSICS_FPS):
+			await get_tree().physics_frame
+			if car.state != Car.State.FAHREN:
+				continue
+			var gap: float = car.global_position.x - player.global_position.x
+			if not jumped and gap > 0.0 and gap <= trigger:
+				PlayerInput.press_jump()
+				jumped = true
+			if jumped and car.global_position.x < player.global_position.x - 3.0:
+				break
+		if player.health == player.max_health:
+			successes += 1
+	_check(successes >= 3,
+		"Der Sprung verzeiht Timingfehler (%d von %d Absprungpunkten gelingen)"
+			% [successes, trigger_points.size()])
+	await _despawn(level)
+
+## Aus dem Spieltest: die Katze muss weglaufen koennen. Kein Gegner darf
+## ihre Laufgeschwindigkeit erreichen.
+func _test_flight_from_enemies() -> void:
+	_check(Dog.PARAMS[Dog.DogSize.KLEIN]["chase_speed"] < Player.RUN_SPEED,
+		"Kleiner Hund jagt langsamer als die Katze laeuft (%.1f < %.1f m/s)"
+			% [Dog.PARAMS[Dog.DogSize.KLEIN]["chase_speed"], Player.RUN_SPEED])
+	_check(Dog.PARAMS[Dog.DogSize.GROSS]["chase_speed"] < Player.RUN_SPEED,
+		"Grosser Hund jagt langsamer als die Katze laeuft (%.1f < %.1f m/s)"
+			% [Dog.PARAMS[Dog.DogSize.GROSS]["chase_speed"], Player.RUN_SPEED])
+
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var dog: Dog = level.get_node("Gegner/KleinerHund")
+	# Nur den kleinen Hund pruefen, sonst mischen Auto und grosser Hund mit.
+	level.get_node("Gegner/Auto").free()
+	level.get_node("Gegner/GrosserHund").free()
+	level.get_node("Gegner/Revierkatze").free()
+	player.global_position = Vector3(dog.global_position.x + 2.5, 0.4, 0.0)
+	await _wait(0.4)
+	var health_before := player.health
+	PlayerInput.set_touch_move(Vector2.RIGHT)
+	await _wait(3.0)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	var distance: float = absf(player.global_position.x - dog.global_position.x)
+	_check(player.health == health_before,
+		"Wegrennen gelingt ohne Treffer (LP %d -> %d)" % [health_before, player.health])
+	_check(distance > 6.0, "Der Abstand waechst beim Weglaufen (%.1f m)" % distance)
+	await _despawn(level)
+
+## Nach einem Treffer laesst der Gegner los, damit die Katze wegkommt.
+func _test_hit_recovery() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var dog: Dog = level.get_node("Gegner/KleinerHund")
+	level.get_node("Gegner/Auto").free()
+	player.global_position = dog.global_position
+	await _wait(0.2)
+	var after_hit := player.health
+	_check(after_hit == player.max_health - 1,
+		"Erster Treffer kostet einen Lebenspunkt (LP %d)" % after_hit)
+	# Selbst wenn die Katze liegen bleibt, folgt kein sofortiger zweiter Treffer.
+	await _wait(1.4)
+	_check(player.health == after_hit,
+		"Kein zweiter Treffer in der Erholungszeit (LP %d)" % player.health)
+	await _despawn(level)
+
+## Aus dem Spieltest: wer rechtzeitig springt, nimmt vom Auto keinen Schaden.
+func _test_car_is_jumpable() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var car: Car = level.get_node("Gegner/Auto")
+	level.get_node("Gegner/KleinerHund").free()
+	level.get_node("Gegner/GrosserHund").free()
+	level.get_node("Gegner/Revierkatze").free()
+	player.global_position = Vector3(20.0, 0.4, 0.0)
+	await _wait(0.3)
+	var health_before := player.health
+	car.warning_time = 0.3
+	car.restart_cycle(0.1)
+
+	var jumped := false
+	var passed := false
+	for i in int(5.0 * PHYSICS_FPS):
+		await get_tree().physics_frame
+		if car.state != Car.State.FAHREN:
+			continue
+		var gap: float = car.global_position.x - player.global_position.x
+		if not jumped and gap > 0.0 and gap <= 3.4:
+			PlayerInput.press_jump()
+			jumped = true
+		if jumped and car.global_position.x < player.global_position.x - 3.0:
+			passed = true
+			break
+	_check(jumped, "Auto kam in Sprungweite")
+	_check(passed, "Auto ist unter der Katze durchgefahren")
+	_check(player.health == health_before,
+		"Rechtzeitiger Sprung ueber das Auto kostet nichts (LP %d -> %d)"
+			% [health_before, player.health])
+	await _despawn(level)
+
+## GDD Abschnitt 12: Levels werden nacheinander freigeschaltet.
+func _test_level_catalog() -> void:
+	_check(Game.catalog != null, "Levelkatalog ist geladen")
+	_check(Game.level_count() >= 2, "Katalog kennt Tutorial und Graubox (%d)" % Game.level_count())
+	var all_present := true
+	for index in Game.level_count():
+		var data := Game.catalog.get_level(index)
+		if data == null or not ResourceLoader.exists(data.scene_path):
+			all_present = false
+	_check(all_present, "Jeder Katalogeintrag zeigt auf eine vorhandene Szene")
+	_check(Game.catalog.index_of_scene(TUTORIAL_PATH) == 0, "Das Tutorial steht an erster Stelle")
+
+## GDD Abschnitt 13: Fortschritt und Toneinstellungen per ConfigFile.
+func _test_save_and_progress() -> void:
+	SaveGame.reset_progress()
+	_check(SaveGame.is_unlocked(0), "Level 0 ist immer offen")
+	_check(not SaveGame.is_unlocked(1), "Das zweite Level ist zuerst gesperrt")
+	SaveGame.mark_completed(0)
+	_check(SaveGame.is_unlocked(1), "Nach dem Tutorial ist das naechste Level frei")
+	_check(SaveGame.next_open_level(Game.level_count()) == 1,
+		"\"Spielen\" setzt beim naechsten ungeloesten Level fort")
+
+	SaveGame.set_music_on(false)
+	# Neu einlesen: kommt alles aus der Datei zurueck?
+	SaveGame.completed_levels.clear()
+	SaveGame.music_on = true
+	SaveGame.load_game()
+	_check(SaveGame.is_completed(0), "Fortschritt uebersteht das Neuladen")
+	_check(not SaveGame.music_on, "Toneinstellung uebersteht das Neuladen")
+
+	var music_bus := AudioServer.get_bus_index("Music")
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	_check(music_bus > 0 and sfx_bus > 0, "Audio-Busse Music und SFX sind angelegt")
+	SaveGame.apply_audio()
+	_check(AudioServer.is_bus_mute(music_bus), "Der Musikschalter stummt den Bus")
+	SaveGame.set_music_on(true)
+	_check(not AudioServer.is_bus_mute(music_bus), "Und schaltet ihn wieder ein")
+
+## GDD Abschnitt 12: Startbild und Hauptmenue.
+func _test_menu_screens() -> void:
+	var title: Node = load("res://scenes/ui/title_screen.tscn").instantiate()
+	get_tree().root.add_child(title)
+	await get_tree().process_frame
+	_check(title.get_node_or_null("Vignette/Kirchturm") != null,
+		"Startbild zeigt die Daemmerungsszene mit Kirchturm")
+	_check(title.get_node_or_null("Vignette/Katze") != null,
+		"Die Katze sitzt als Silhouette auf dem Dach")
+	title.free()
+	await get_tree().process_frame
+
+	SaveGame.reset_progress()
+	var menu: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
+	get_tree().root.add_child(menu)
+	await get_tree().process_frame
+	var list: VBoxContainer = menu.get_node("UI/Root/LevelPanel/LevelListe")
+	_check(list.get_child_count() == Game.level_count(),
+		"Levelauswahl listet alle %d Levels" % Game.level_count())
+	if list.get_child_count() >= 2:
+		_check(not (list.get_child(0) as Button).disabled, "Level 0 ist anwaehlbar")
+		_check((list.get_child(1) as Button).disabled,
+			"Noch gesperrte Levels sind nicht anwaehlbar")
+	menu.free()
+	await get_tree().process_frame
+
 func _test_tutorial_level() -> void:
 	var level := await _spawn_level(TUTORIAL_PATH, true)
 	var player: Player = level.get_node("Player")

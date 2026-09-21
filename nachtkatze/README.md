@@ -1,14 +1,21 @@
 # Nachtkatze - Godot-Projekt
 
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
-Dieser Stand deckt **Meilenstein 1 bis 4** ab: Bewegungsprototyp,
-Kernsysteme, Gegner und das vollstaendig spielbare Tutorial (Level 0).
+Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab: Bewegungsprototyp,
+Kernsysteme, Gegner, das spielbare Tutorial (Level 0) sowie Startbild,
+Menues und Speichern. Meilenstein 5 (Grafik) ist bewusst uebersprungen -
+die Assets kommen spaeter.
 
 | | |
 |---|---|
 | Engine | Godot 4.3, Renderer "Mobile" |
-| Hauptszene | `scenes/levels/level_00_tutorial.tscn` |
+| Hauptszene | `scenes/ui/title_screen.tscn` |
 | Zielplattform | Android, Querformat (Export folgt in Meilenstein 9) |
+
+![Startbild](../docs/bilder/menu_00_startbild.png)
+
+Startbild in der Daemmerung: die Katze als Silhouette auf dem Dach, dahinter
+der angestrahlte Kirchturm. Antippen fuehrt ins Hauptmenue.
 
 ![Spielansicht](../docs/bilder/tut_00_spielansicht.png)
 
@@ -19,8 +26,8 @@ Tutorials - Erklaerungen laufen ohne ein einziges Wort.
 ## Starten
 
 1. Godot 4.3 oeffnen, Ordner `nachtkatze/` als Projekt importieren.
-2. F5 druecken - das Tutorial (Level 0) startet, danach folgt das
-   Graubox-Level als Spielwiese.
+2. F5 druecken - es startet das Startbild, danach Hauptmenue, Tutorial und
+   als zweites Level die Graubox-Spielwiese.
 
 Am Rechner laesst sich die Katze mit Pfeiltasten (laufen und klettern),
 Leertaste (springen) und Escape (Pause) steuern. Auf dem Geraet gilt die
@@ -90,6 +97,35 @@ Erklaert wird ausschliesslich ueber gezeichnete Symbole - Joystick mit
 Pfeilen, Sprungpfeil, Kletterpfeile, Pfote und Ausrufezeichen. Sie tauchen
 auf, sobald die Katze den jeweiligen Bereich betritt.
 
+**Meilenstein 6 - Benutzeroberflaeche**
+
+- Startbild in der Daemmerung, Antippen fuehrt weiter
+- Hauptmenue mit Spielen (setzt beim naechsten ungeloesten Level fort),
+  Levelauswahl und Einstellungen
+- Levelauswahl: Levels werden nacheinander freigeschaltet, geschaffte Levels
+  sind mit einem Haken markiert
+- Einstellungen: Musik und Sound getrennt schaltbar. Die Audio-Busse `Music`
+  und `SFX` sind angelegt und werden schon stummgeschaltet; Toene kommen in
+  Meilenstein 7 dazu.
+- Pausenmenue mit Weiter, Neustart und Zurueck zum Menue; nach dem Sieg
+  zusaetzlich eine Menue-Schaltflaeche
+- Gespeichert wird per `ConfigFile` unter `user://nachtkatze.cfg`:
+  geschaffte Levels und die beiden Tonschalter
+
+![Levelauswahl](../docs/bilder/menu_02_levelauswahl.png)
+
+**Balancing nach dem zweiten Spieltest**
+
+- Kein Gegner erreicht mehr die Laufgeschwindigkeit der Katze (4 m/s):
+  kleiner Hund 3,2 m/s in kurzen Sprints, grosser Hund 2,2 m/s,
+  Revierkatze 1,6 m/s. Weglaufen funktioniert damit immer.
+- Nach einem Treffer laesst der Gegner 1,5 s lang los und nimmt die Katze
+  nicht wahr - sonst haette man am Boden mehrere Treffer hintereinander
+  kassiert.
+- Autos sind flach (0,68 m Schadenshoehe) und ihr Schadensbereich ist
+  kuerzer als die Karosserie. Wer rechtzeitig springt, kommt sicher
+  darueber: das Zeitfenster ist rund 0,3 s breit statt 0,1 s.
+
 ## Levelaufbau der Graubox (Spielwiese nach dem Tutorial)
 
 | Abschnitt | Inhalt |
@@ -143,8 +179,9 @@ godot --headless --path nachtkatze --fixed-fps 60 res://tests/smoke_test.tscn
 Prueft Metriken, Laufen, Sprunghoehe, Kameraverhalten beim Fallen, alle
 Kletterzonen beider Levels, Kantengriff, die schwerste Dachluecke, Futter,
 Treffer mit Unverwundbarkeit, die Zustandsautomaten von Hund, Revierkatze und
-Auto, HUD, Levelziel, Game Over und das Tutorial. Exit-Code 0 heisst alles
-gruen (aktuell 65 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+Auto, HUD, Levelziel, Game Over, das Tutorial, das Weglaufen vor Gegnern,
+den Sprung ueber ein Auto samt Timing-Spielraum, Levelkatalog, Speicherstand
+und die Menues. Exit-Code 0 heisst alles gruen (aktuell 93 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -160,7 +197,8 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
 ```
 
-Ergebnis: rund 24 MB, `org.nachtkatze.prototyp`, minSdk 21, targetSdk 34,
+Ergebnis: rund 24 MB, `org.nachtkatze.prototyp` in Version 0.3.0,
+minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
 daher Vulkan (auf Geraeten ab etwa 2016 vorhanden).
@@ -191,6 +229,6 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Meilenstein 5: Asset-Kit, Toon-Shader, die drei Tageszeiten und der
-Parallax-Hintergrund. Danach Meilenstein 6 (Startbild, Hauptmenue,
-Levelauswahl, Speichern) und Meilenstein 7 (Ton).
+Meilenstein 5 (Asset-Kit, Toon-Shader, Tageszeiten, Parallax-Hintergrund),
+sobald die Assets da sind. Danach Meilenstein 7 (Ton) und Meilenstein 8
+(Levels 1 bis 10).

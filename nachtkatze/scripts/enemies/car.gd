@@ -12,14 +12,18 @@ enum State { WARTEN, WARNUNG, FAHREN }
 @export var damage: int = 1
 ## -1 faehrt nach links, 1 nach rechts.
 @export_range(-1, 1, 2) var drive_direction: int = -1
-@export var speed: float = 9.0
+## Flach gehalten, damit ein rechtzeitiger Sprung sicher darueber fuehrt:
+## bei 0,68 m Schadenshoehe ist die Katze rund 0,69 s hoch genug, das Auto
+## braucht nur 0,35 s zum Vorbeifahren. Der Schadensbereich ist ausserdem
+## kuerzer als die Karosserie - die Stossstange streift nicht.
+@export var speed: float = 8.5
 ## Abstand, in dem das Auto vor der Katze auftaucht (ausserhalb des Bildes).
 @export var spawn_distance: float = 13.0
 ## Strecke, die es danach faehrt.
 @export var travel_length: float = 28.0
 ## Pause zwischen zwei Durchfahrten.
-@export var pause_time: float = 5.0
-@export var warning_time: float = 0.8
+@export var pause_time: float = 8.0
+@export var warning_time: float = 1.0
 
 var state: State = State.WARTEN
 

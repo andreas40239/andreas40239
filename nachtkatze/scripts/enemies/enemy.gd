@@ -16,10 +16,14 @@ const MAX_FALL_SPEED := 20.0
 ## Passive Gegner warnen nur und greifen nie an (Tutorial, GDD Abschnitt 7).
 @export var passive: bool = false
 
+## Nach einem Treffer laesst der Gegner locker, damit die Katze fliehen kann.
+@export var hit_recovery_time: float = 1.5
+
 var home_position := Vector3.ZERO
 
 var _player: Player = null
 var _warning_pulse := 0.0
+var _hit_recovery := 0.0
 
 @onready var visual: Node3D = get_node_or_null("Visual")
 @onready var warning_sign: Node3D = get_node_or_null("Visual/WarnZeichen")
@@ -40,6 +44,7 @@ func _find_player() -> void:
 func _tick_common(delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_find_player()
+	_hit_recovery = maxf(_hit_recovery - delta, 0.0)
 	_damage_on_contact()
 	if warning_sign != null and warning_sign.visible:
 		_warning_pulse += delta
@@ -59,8 +64,19 @@ func _damage_on_contact() -> void:
 		return
 	for body in hitbox.get_overlapping_bodies():
 		var player := body as Player
-		if player != null:
-			player.take_damage(damage, global_position)
+		if player == null or player.is_invulnerable:
+			continue
+		player.take_damage(damage, global_position)
+		_hit_recovery = hit_recovery_time
+		_on_hit_player()
+
+## Nach einem gelandeten Treffer - abgeleitete Gegner ziehen sich zurueck.
+func _on_hit_player() -> void:
+	pass
+
+## Waehrend der Erholung nimmt der Gegner die Katze nicht wahr.
+func is_recovering() -> bool:
+	return _hit_recovery > 0.0
 
 ## Passive Gegner (Tutorial) tun nichts; Abgeleitete koennen weiter einschraenken.
 func is_dangerous() -> bool:

@@ -1,10 +1,9 @@
 extends CanvasLayer
 class_name HUD
-## HUD und Menues fuer Meilenstein 2 (GDD Abschnitt 12):
+## HUD und Menues im Level (GDD Abschnitt 12):
 ## Lebenspunkte oben links, Pause oben rechts, Joystick und Sprungtaste unten,
-## dazu Pausen-, Sieg- und Game-Over-Anzeige.
-##
-## Start- und Hauptmenue sowie Levelauswahl folgen in Meilenstein 6.
+## dazu Pausen-, Sieg- und Game-Over-Anzeige sowie die Tutorial-Symbole.
+## Start- und Hauptmenue stehen in scenes/ui/.
 
 @onready var paw_container: HBoxContainer = %Paws
 @onready var pause_button: TouchButton = %PauseButton
@@ -29,6 +28,8 @@ func _ready() -> void:
 	%RestartButton.pressed.connect(_restart)
 	%RetryButton.pressed.connect(_restart)
 	%NextButton.pressed.connect(_continue)
+	%MenuButton.pressed.connect(Game.open_menu)
+	%WinMenuButton.pressed.connect(Game.open_menu)
 
 	pause_panel.visible = false
 	win_panel.visible = false

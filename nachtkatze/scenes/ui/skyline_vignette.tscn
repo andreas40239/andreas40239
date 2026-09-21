@@ -1,0 +1,202 @@
+[gd_scene load_steps=17 format=3]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_daemmerung"]
+sky_top_color = Color(0.16, 0.13, 0.32, 1)
+sky_horizon_color = Color(0.82, 0.42, 0.26, 1)
+sky_curve = 0.13
+ground_bottom_color = Color(0.08, 0.07, 0.12, 1)
+ground_horizon_color = Color(0.5, 0.28, 0.22, 1)
+sun_angle_max = 25.0
+
+[sub_resource type="Sky" id="Sky_daemmerung"]
+sky_material = SubResource("ProceduralSkyMaterial_daemmerung")
+
+[sub_resource type="Environment" id="Environment_daemmerung"]
+background_mode = 2
+sky = SubResource("Sky_daemmerung")
+ambient_light_source = 3
+ambient_light_energy = 0.6
+tonemap_mode = 3
+glow_enabled = true
+glow_intensity = 0.45
+glow_bloom = 0.05
+glow_hdr_threshold = 1.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_silhouette"]
+albedo_color = Color(0.055, 0.05, 0.085, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mittelgrund"]
+albedo_color = Color(0.12, 0.11, 0.18, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fern"]
+albedo_color = Color(0.17, 0.16, 0.25, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fenster"]
+albedo_color = Color(1, 0.82, 0.5, 1)
+emission_enabled = true
+emission = Color(1, 0.75, 0.4, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_turm"]
+albedo_color = Color(0.72, 0.62, 0.52, 1)
+roughness = 0.9
+emission_enabled = true
+emission = Color(1, 0.68, 0.38, 1)
+emission_energy_multiplier = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kuppel"]
+albedo_color = Color(0.5, 0.62, 0.62, 1)
+roughness = 0.8
+emission_enabled = true
+emission = Color(0.6, 0.8, 0.85, 1)
+emission_energy_multiplier = 0.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_dachVorn"]
+size = Vector3(28, 3, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dachMitte"]
+size = Vector3(11, 4, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_block"]
+size = Vector3(7, 9, 5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fenster"]
+size = Vector3(0.5, 0.7, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_schornstein"]
+size = Vector3(0.6, 1.1, 0.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_turm"]
+size = Vector3(3, 13, 3)
+
+[sub_resource type="SphereMesh" id="SphereMesh_kuppel"]
+radius = 1.9
+height = 2.8
+radial_segments = 14
+rings = 7
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_katze"]
+radius = 0.2
+height = 0.55
+radial_segments = 10
+rings = 5
+
+[node name="SkylineVignette" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_daemmerung")
+
+[node name="TiefeSonne" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.94, 0, -0.342, 0.116, 0.94, 0.32, 0.321, -0.342, 0.883, 0, 10, 0)
+light_color = Color(1, 0.6, 0.36, 1)
+light_energy = 0.9
+
+[node name="Kirchturm" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -30)
+
+[node name="Turm" type="MeshInstance3D" parent="Kirchturm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.5, 0)
+mesh = SubResource("BoxMesh_turm")
+surface_material_override/0 = SubResource("StandardMaterial3D_turm")
+
+[node name="Kuppel" type="MeshInstance3D" parent="Kirchturm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 13.6, 0)
+mesh = SubResource("SphereMesh_kuppel")
+surface_material_override/0 = SubResource("StandardMaterial3D_kuppel")
+
+[node name="Strahler" type="OmniLight3D" parent="Kirchturm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 4)
+light_color = Color(1, 0.74, 0.46, 1)
+light_energy = 8.0
+omni_range = 24.0
+
+[node name="BlockLinks" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 2.5, -13)
+mesh = SubResource("BoxMesh_block")
+surface_material_override/0 = SubResource("StandardMaterial3D_fern")
+
+[node name="Fenster1" type="MeshInstance3D" parent="BlockLinks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 1.6, 2.55)
+mesh = SubResource("BoxMesh_fenster")
+surface_material_override/0 = SubResource("StandardMaterial3D_fenster")
+
+[node name="Fenster2" type="MeshInstance3D" parent="BlockLinks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 0.2, 2.55)
+mesh = SubResource("BoxMesh_fenster")
+surface_material_override/0 = SubResource("StandardMaterial3D_fenster")
+
+[node name="Fenster3" type="MeshInstance3D" parent="BlockLinks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 3.1, 2.55)
+mesh = SubResource("BoxMesh_fenster")
+surface_material_override/0 = SubResource("StandardMaterial3D_fenster")
+
+[node name="BlockRechts" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.2, 0, 0, 0, 0.75, 0, 0, 0, 1, 14, 1.6, -15)
+mesh = SubResource("BoxMesh_block")
+surface_material_override/0 = SubResource("StandardMaterial3D_fern")
+
+[node name="Fenster1" type="MeshInstance3D" parent="BlockRechts"]
+transform = Transform3D(0.83, 0, 0, 0, 1.33, 0, 0, 0, 1, -1.5, 1, 2.55)
+mesh = SubResource("BoxMesh_fenster")
+surface_material_override/0 = SubResource("StandardMaterial3D_fenster")
+
+[node name="Fenster2" type="MeshInstance3D" parent="BlockRechts"]
+transform = Transform3D(0.83, 0, 0, 0, 1.33, 0, 0, 0, 1, 1.2, 2.4, 2.55)
+mesh = SubResource("BoxMesh_fenster")
+surface_material_override/0 = SubResource("StandardMaterial3D_fenster")
+
+[node name="DachMitteLinks" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0.4, -3)
+mesh = SubResource("BoxMesh_dachMitte")
+surface_material_override/0 = SubResource("StandardMaterial3D_mittelgrund")
+
+[node name="DachMitteRechts" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 1.4, 1)
+mesh = SubResource("BoxMesh_dachMitte")
+surface_material_override/0 = SubResource("StandardMaterial3D_mittelgrund")
+
+[node name="DachVorn" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.2, 4.5)
+mesh = SubResource("BoxMesh_dachVorn")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="Schornstein" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 1.4, 0, 0, 0, 1.1, 11.5, 4.1, 1)
+mesh = SubResource("BoxMesh_schornstein")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="Katze" type="Node3D" parent="."]
+transform = Transform3D(1.6, 0, 0, 0, 1.6, 0, 0, 0, 1.6, 6, 3.84, 1)
+
+[node name="Koerper" type="MeshInstance3D" parent="Katze"]
+mesh = SubResource("CapsuleMesh_katze")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="Kopf" type="MeshInstance3D" parent="Katze"]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0.18, 0.22, 0)
+mesh = SubResource("CapsuleMesh_katze")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="OhrVorn" type="MeshInstance3D" parent="Katze"]
+transform = Transform3D(0.18, 0, 0, 0, 0.3, 0, 0, 0, 0.18, 0.24, 0.38, 0.05)
+mesh = SubResource("BoxMesh_schornstein")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="OhrHinten" type="MeshInstance3D" parent="Katze"]
+transform = Transform3D(0.18, 0, 0, 0, 0.3, 0, 0, 0, 0.18, 0.11, 0.38, -0.05)
+mesh = SubResource("BoxMesh_schornstein")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="Schwanz" type="MeshInstance3D" parent="Katze"]
+transform = Transform3D(0.1, -0.42, 0, 0.42, 0.1, 0, 0, 0, 0.28, -0.24, 0.06, 0)
+mesh = SubResource("CapsuleMesh_katze")
+surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 12)
+fov = 50.0
+near = 0.05
+far = 300.0

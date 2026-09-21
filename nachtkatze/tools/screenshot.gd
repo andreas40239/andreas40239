@@ -32,6 +32,10 @@ const SHOTS := [
 
 func _ready() -> void:
 	await get_tree().process_frame
+	if OS.get_cmdline_user_args().has("menu"):
+		await _capture_menus()
+		get_tree().quit()
+		return
 	var tutorial := OS.get_cmdline_user_args().has("tutorial")
 	var shots: Array = TUTORIAL_SHOTS if tutorial else SHOTS
 	var level: Node = load(TUTORIAL_PATH if tutorial else LEVEL_PATH).instantiate()
@@ -72,3 +76,28 @@ func _ready() -> void:
 		print("Bild gespeichert: ", ProjectSettings.globalize_path(path))
 
 	get_tree().quit()
+
+
+## Startbild und Hauptmenue aufnehmen (GDD Abschnitt 12).
+func _capture_menus() -> void:
+	var title: Node = load("res://scenes/ui/title_screen.tscn").instantiate()
+	get_tree().root.add_child(title)
+	await _save_frame("menu_00_startbild")
+	title.free()
+
+	var menu: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
+	get_tree().root.add_child(menu)
+	await _save_frame("menu_01_hauptmenue")
+	menu.call("_show_levels")
+	await _save_frame("menu_02_levelauswahl")
+	menu.call("_show_settings")
+	await _save_frame("menu_03_einstellungen")
+	menu.free()
+
+func _save_frame(name: String) -> void:
+	for i in 6:
+		await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var path := "user://%s.png" % name
+	image.save_png(path)
+	print("Bild gespeichert: ", ProjectSettings.globalize_path(path))

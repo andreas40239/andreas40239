@@ -179,10 +179,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.8, 6.3, 0)
 territory_half_width = 2.0
 
 [node name="Auto" parent="Gegner" instance=ExtResource("13_car")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, 0)
 drive_direction = -1
-speed = 9.0
-pause_time = 6.0
+speed = 8.5
+pause_time = 9.0
 
 [node name="Futter" type="Node3D" parent="."]
 

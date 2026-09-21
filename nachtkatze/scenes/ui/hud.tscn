@@ -114,11 +114,11 @@ custom_minimum_size = Vector2(0, 64)
 text = "Level neu starten"
 theme_override_font_sizes/font_size = 30
 
-[node name="Hint" type="Label" parent="Root/PausePanel/Box"]
-text = "Hauptmenü und Levelauswahl folgen in Meilenstein 6."
-horizontal_alignment = 1
-autowrap_mode = 2
-theme_override_font_sizes/font_size = 18
+[node name="MenuButton" type="Button" parent="Root/PausePanel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+text = "Zurück zum Menü"
+theme_override_font_sizes/font_size = 30
 
 [node name="WinPanel" type="Control" parent="Root"]
 unique_name_in_owner = true
@@ -151,6 +151,12 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 64)
 text = "Weiter"
 theme_override_font_sizes/font_size = 30
+
+[node name="WinMenuButton" type="Button" parent="Root/WinPanel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+text = "Menü"
+theme_override_font_sizes/font_size = 26
 
 [node name="GameOverPanel" type="Control" parent="Root"]
 unique_name_in_owner = true

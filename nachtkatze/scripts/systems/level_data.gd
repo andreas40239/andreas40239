@@ -6,6 +6,8 @@ class_name LevelData
 enum TimeOfDay { TAG, DAEMMERUNG, NACHT }
 
 @export var display_name: String = "Level"
+## Szene dieses Levels - der Katalog findet es darueber wieder.
+@export_file("*.tscn") var scene_path: String = ""
 @export var time_of_day: TimeOfDay = TimeOfDay.TAG
 
 @export_group("Leben")
@@ -15,10 +17,6 @@ enum TimeOfDay { TAG, DAEMMERUNG, NACHT }
 @export_range(1, 9) var start_health: int = 3
 ## Tutorial-Modus: Lebenspunkte fallen nie unter 1, Scheitern unmoeglich (GDD Abschnitt 7).
 @export var no_fail: bool = false
-
-@export_group("Ablauf")
-## Naechstes Level; leer bedeutet "letztes Level".
-@export_file("*.tscn") var next_level_path: String = ""
 
 @export_group("Balancing")
 ## Reine Datenwerte fuer spaetere Meilensteine (Gegner, Autos, Futterdichte).

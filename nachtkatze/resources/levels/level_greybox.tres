@@ -4,12 +4,12 @@
 
 [resource]
 script = ExtResource("1_data")
-display_name = "Graubox - Meilenstein 1+2"
+scene_path = "res://scenes/levels/level_greybox.tscn"
+display_name = "Graubox - Spielwiese"
 time_of_day = 0
 max_health = 3
 start_health = 3
 no_fail = false
-next_level_path = ""
 small_dogs = 1
 big_dogs = 1
 territory_cats = 1

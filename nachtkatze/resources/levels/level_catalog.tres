@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="LevelCatalog" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/level_catalog.gd" id="1_catalog"]
+[ext_resource type="Resource" path="res://resources/levels/level_00.tres" id="2_level00"]
+[ext_resource type="Resource" path="res://resources/levels/level_greybox.tres" id="3_greybox"]
+
+[resource]
+script = ExtResource("1_catalog")
+levels = Array[Resource]([ExtResource("2_level00"), ExtResource("3_greybox")])

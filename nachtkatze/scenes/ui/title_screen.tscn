@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/title_screen.gd" id="1_title"]
+[ext_resource type="PackedScene" path="res://scenes/ui/skyline_vignette.tscn" id="2_vignette"]
+
+[node name="TitleScreen" type="Node3D"]
+script = ExtResource("1_title")
+
+[node name="Vignette" parent="." instance=ExtResource("2_vignette")]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="UI"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Titel" type="Label" parent="UI/Root"]
+anchor_right = 1.0
+offset_top = 48.0
+offset_bottom = 160.0
+mouse_filter = 2
+text = "Nachtkatze"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 88
+theme_override_colors/font_color = Color(1, 0.85, 0.6, 1)
+
+[node name="TippHinweis" type="Label" parent="UI/Root"]
+unique_name_in_owner = true
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -140.0
+offset_bottom = -70.0
+mouse_filter = 2
+text = "tippen"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 34
+theme_override_colors/font_color = Color(1, 0.95, 0.9, 1)
