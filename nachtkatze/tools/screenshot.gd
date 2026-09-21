@@ -7,6 +7,17 @@ extends Node
 ## Die Bilder landen in user:// (siehe Ausgabe).
 
 const LEVEL_PATH := "res://scenes/levels/level_greybox.tscn"
+const TUTORIAL_PATH := "res://scenes/levels/level_00_tutorial.tscn"
+
+## Aufnahmen fuer das Tutorial-Level (Aufruf mit "-- tutorial").
+const TUTORIAL_SHOTS := [
+	{"name": "tut_00_spielansicht", "position": Vector3.ZERO, "fov": 0.0},
+	{"name": "tut_01_start", "position": Vector3(6.0, 3.0, 15.0), "fov": 55.0},
+	{"name": "tut_02_balkon", "position": Vector3(13.0, 4.0, 16.0), "fov": 55.0},
+	{"name": "tut_03_hund", "position": Vector3(20.0, 4.0, 16.0), "fov": 55.0},
+	{"name": "tut_04_dach", "position": Vector3(29.0, 6.5, 17.0), "fov": 58.0},
+	{"name": "tut_05_ziel", "position": Vector3(36.0, 6.0, 15.0), "fov": 55.0},
+]
 
 ## "spielansicht" nutzt die echte Verfolgerkamera an der Startposition,
 ## alle anderen Eintraege sind feste Uebersichtsstandorte.
@@ -21,7 +32,9 @@ const SHOTS := [
 
 func _ready() -> void:
 	await get_tree().process_frame
-	var level: Node = load(LEVEL_PATH).instantiate()
+	var tutorial := OS.get_cmdline_user_args().has("tutorial")
+	var shots: Array = TUTORIAL_SHOTS if tutorial else SHOTS
+	var level: Node = load(TUTORIAL_PATH if tutorial else LEVEL_PATH).instantiate()
 	get_tree().root.add_child(level)
 	await get_tree().physics_frame
 
@@ -30,7 +43,7 @@ func _ready() -> void:
 	var player: Node3D = level.get_node("Player")
 	player.set_physics_process(false)
 
-	for shot in SHOTS:
+	for shot in shots:
 		if shot["fov"] <= 0.0:
 			# Echte Spielansicht: Kamera und Katze bleiben, wie sie das Level setzt.
 			camera.set_physics_process(true)

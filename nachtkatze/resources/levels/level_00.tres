@@ -4,14 +4,14 @@
 
 [resource]
 script = ExtResource("1_data")
-display_name = "Graubox - Meilenstein 1+2"
+display_name = "Level 0 - Tutorial"
 time_of_day = 0
 max_health = 3
 start_health = 3
-no_fail = false
-next_level_path = ""
+no_fail = true
+next_level_path = "res://scenes/levels/level_greybox.tscn"
 small_dogs = 1
-big_dogs = 1
+big_dogs = 0
 territory_cats = 1
-cars = 1
-food_density = 1.0
+cars = 0
+food_density = 1.5

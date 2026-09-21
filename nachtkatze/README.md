@@ -1,24 +1,26 @@
 # Nachtkatze - Godot-Projekt
 
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
-Dieser Stand deckt **Meilenstein 1 (Bewegungsprototyp)** und
-**Meilenstein 2 (Kernsysteme)** ab.
+Dieser Stand deckt **Meilenstein 1 bis 4** ab: Bewegungsprototyp,
+Kernsysteme, Gegner und das vollstaendig spielbare Tutorial (Level 0).
 
 | | |
 |---|---|
 | Engine | Godot 4.3, Renderer "Mobile" |
-| Hauptszene | `scenes/levels/level_greybox.tscn` |
+| Hauptszene | `scenes/levels/level_00_tutorial.tscn` |
 | Zielplattform | Android, Querformat (Export folgt in Meilenstein 9) |
 
-![Spielansicht](../docs/bilder/00_spielansicht.png)
+![Spielansicht](../docs/bilder/tut_00_spielansicht.png)
 
 So sieht es durch die Spielkamera aus: Pfoten oben links, Pause oben rechts,
-Joystick unten links, Sprungtaste unten rechts.
+Joystick unten links, Sprungtaste unten rechts. In der Mitte das Symbol des
+Tutorials - Erklaerungen laufen ohne ein einziges Wort.
 
 ## Starten
 
 1. Godot 4.3 oeffnen, Ordner `nachtkatze/` als Projekt importieren.
-2. F5 druecken - das Graubox-Level startet.
+2. F5 druecken - das Tutorial (Level 0) startet, danach folgt das
+   Graubox-Level als Spielwiese.
 
 Am Rechner laesst sich die Katze mit Pfeiltasten (laufen und klettern),
 Leertaste (springen) und Escape (Pause) steuern. Auf dem Geraet gilt die
@@ -53,7 +55,42 @@ rechts. Greifen und Klettern brauchen keine eigene Taste.
 - Levelparameter als `LevelData`-Ressource (`resources/levels/`), damit
   Balancing ohne Codeaenderung moeglich ist
 
-## Levelaufbau der Graubox
+**Meilenstein 3 - Gegner**
+
+Jeder Angriff wird angekuendigt: waehrend der Warnzeit (0,7 s) steht der
+Gegner still und zeigt ein Ausrufezeichen ueber dem Kopf. Ton kommt in
+Meilenstein 7 dazu, bis dahin ist die Warnung rein sichtbar.
+
+- **Kleiner Hund:** schnell, jagt in kurzen Sprints, kleiner Wahrnehmungsradius
+- **Grosser Hund:** langsam, grosser Radius, breiterer Angriffsbereich
+- Beide durchlaufen Ruhen, Patrouille, Warnung, Jagen, Rueckkehr. Sie klettern
+  und springen nicht: ist die Katze auf der Fassade, bellen sie nach oben und
+  kehren zur Patrouille zurueck. Zaunluecke (0,62 m) und geparkte Autos
+  sperren sie schon durch ihre Groesse aus.
+- **Revierkatze:** verteidigt nur ihr Dachgebiet, erkennbar an den
+  Blumentoepfen an beiden Raendern. Sitzen, Revier-Patrouille, Warnung mit
+  Buckel, Angriffssprung, Rueckzug. Verlaesst die Spielerkatze das Revier,
+  zieht sie sich zurueck.
+- **Fahrendes Auto:** kuendigt sich mit dem Scheinwerfer an, faehrt dann an
+  der Katze vorbei. Treffer kostet einen Lebenspunkt mit Rueckstoss, kein
+  Sofort-Aus. Es setzt sich jeweils ausserhalb des Bildes neu an, damit die
+  Warnung auch sichtbar ist.
+- **Passive Gegner** (Tutorial) warnen nur und tun der Katze nichts.
+
+**Meilenstein 4 - Level 0 (Tutorial)**
+
+Die Abfolge aus GDD Abschnitt 7, jede Mechanik einzeln und ohne Text:
+Laufen, Sprung ueber ein niedriges Hindernis, Klettern an der Regenrinne auf
+den ersten Balkon, Fischgraete fressen, schlafender Hund (wacht kurz auf und
+bellt, tut aber nichts), Dach mit passiver Revierkatze, Sprung ueber eine
+kleine Dachluecke von 1,5 m, Futternapf auf dem beleuchteten Balkon.
+Scheitern ist ausgeschlossen: die Lebenspunkte fallen nie unter 1.
+
+Erklaert wird ausschliesslich ueber gezeichnete Symbole - Joystick mit
+Pfeilen, Sprungpfeil, Kletterpfeile, Pfote und Ausrufezeichen. Sie tauchen
+auf, sobald die Katze den jeweiligen Bereich betritt.
+
+## Levelaufbau der Graubox (Spielwiese nach dem Tutorial)
 
 | Abschnitt | Inhalt |
 |---|---|
@@ -61,6 +98,9 @@ rechts. Greifen und Klettern brauchen keine eigene Taste.
 | Fassade | Regenrinne auf Balkon 1, Sprung auf Balkon 2, zweite Rinne aufs Dach |
 | Daecher | Dachluecken mit 1,5 m (leicht) und 3,2 m (schwer), untere Ausweichroute ueber Balkon und Markise |
 | Finale | 6 m Kletterpassage, zwei Balkone, Futternapf auf 9 m Hoehe |
+
+![Tutorial: schlafender Hund und Revierkatze](../docs/bilder/tut_03_hund.png)
+![Tutorial: Ziel](../docs/bilder/tut_05_ziel.png)
 
 ![Fassade](../docs/bilder/02_fassade.png)
 ![Daecher](../docs/bilder/03_daecher.png)
@@ -100,10 +140,11 @@ tools/     Entwicklerwerkzeug fuer Bilder aus dem Level
 godot --headless --path nachtkatze --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-Prueft Metriken, Laufen, Sprunghoehe, alle Kletterzonen, Kantengriff, die
-schwerste Dachluecke, Futter, Treffer mit Unverwundbarkeit, HUD, Levelziel,
-Game Over und den Tutorial-Modus. Exit-Code 0 heisst alles gruen
-(aktuell 38 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+Prueft Metriken, Laufen, Sprunghoehe, Kameraverhalten beim Fallen, alle
+Kletterzonen beider Levels, Kantengriff, die schwerste Dachluecke, Futter,
+Treffer mit Unverwundbarkeit, die Zustandsautomaten von Hund, Revierkatze und
+Auto, HUD, Levelziel, Game Over und das Tutorial. Exit-Code 0 heisst alles
+gruen (aktuell 65 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -119,9 +160,9 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
 ```
 
-Ergebnis: rund 48 MB, `org.nachtkatze.prototyp`, minSdk 21, targetSdk 34,
-Querformat, Architekturen arm64-v8a und armeabi-v7a, signiert mit den
-Schemata v1, v2 und v3. Das Spiel nutzt den Mobile-Renderer und braucht
+Ergebnis: rund 24 MB, `org.nachtkatze.prototyp`, minSdk 21, targetSdk 34,
+Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
+`armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
 daher Vulkan (auf Geraeten ab etwa 2016 vorhanden).
 
 Bilder aus dem Level erzeugen:
@@ -133,9 +174,9 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Bewusste Vereinfachungen
 
-- `Hazard` ist ein roter Platzhalterblock, nur damit Treffer und
-  Unverwundbarkeit pruefbar sind. Die echten Gegner mit Zustandsautomaten und
-  Warnsignalen (Hunde, Revierkatzen, Autos) sind Meilenstein 3.
+- Gegner sind noch Graubox-Kisten ohne Animationen; die Zustandsautomaten und
+  Warnzeiten stimmen aber schon. Animationen und Ton folgen in Meilenstein 5
+  und 7.
 - Die Grafik ist bewusst Graubox. Asset-Kit, Toon-Shader und Parallax-
   Hintergrund kommen in Meilenstein 5; die drei Tageszeiten sind als
   Lichtvoreinstellung schon angelegt und ueber `LevelData` umschaltbar.
@@ -150,6 +191,6 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Meilenstein 3: Hunde, Revierkatzen und Autos als Zustandsautomaten mit
-Warnzeit von 0,6 bis 0,8 s. `Hazard` wird dabei durch echte Gegnerszenen
-ersetzt, die Trefferlogik der Katze bleibt unveraendert.
+Meilenstein 5: Asset-Kit, Toon-Shader, die drei Tageszeiten und der
+Parallax-Hintergrund. Danach Meilenstein 6 (Startbild, Hauptmenue,
+Levelauswahl, Speichern) und Meilenstein 7 (Ton).

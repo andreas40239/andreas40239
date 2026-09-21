@@ -14,11 +14,13 @@ class_name HUD
 @onready var pause_panel: Control = %PausePanel
 @onready var win_panel: Control = %WinPanel
 @onready var game_over_panel: Control = %GameOverPanel
+@onready var hint_overlay: HintOverlay = %HintOverlay
 
 var _player: Player = null
 var _paws: Array[PawIcon] = []
 
 func _ready() -> void:
+	add_to_group("hud")
 	pause_button.pressed.connect(_toggle_pause)
 	jump_button.pressed.connect(PlayerInput.press_jump)
 	jump_button.released.connect(PlayerInput.release_jump)
@@ -61,6 +63,14 @@ func _rebuild_paws(count: int) -> void:
 		paw_container.add_child(paw)
 		_paws.append(paw)
 
+# --- Tutorial-Hinweise (GDD Abschnitt 7) ------------------------------------
+
+func show_hint(kind: HintOverlay.Hint) -> void:
+	hint_overlay.show_hint(kind)
+
+func hide_hint(kind: HintOverlay.Hint = HintOverlay.Hint.KEIN) -> void:
+	hint_overlay.hide_hint(kind)
+
 # --- Pause ------------------------------------------------------------------
 
 func _toggle_pause() -> void:
@@ -84,18 +94,25 @@ func _continue() -> void:
 # --- Levelende --------------------------------------------------------------
 
 func _on_level_completed(_data: LevelData) -> void:
+	hint_overlay.hide_hint()
 	touch_controls.visible = false
 	pause_panel.visible = false
 	win_panel.visible = true
 	%NextButton.text = "Weiter" if Game.has_next_level() else "Nochmal spielen"
 	await get_tree().create_timer(1.2, true, false, true).timeout
+	# Der Spieler kann in der Zwischenzeit schon weitergetippt haben.
+	if not is_inside_tree():
+		return
 	get_tree().paused = true
 
 func _on_level_failed(_data: LevelData) -> void:
+	hint_overlay.hide_hint()
 	touch_controls.visible = false
 	pause_panel.visible = false
 	game_over_panel.visible = true
 	# GDD Abschnitt 3: kurzer Hinweis, danach Neustart des Levels von vorne.
 	await get_tree().create_timer(Game.AUTO_RESTART_DELAY, true, false, true).timeout
+	if not is_inside_tree():
+		return
 	if game_over_panel.visible:
 		_restart()

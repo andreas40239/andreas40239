@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Nachtkatze"
 config/description="Stilisierter 2.5D-Plattformer mit einer Streunerkatze (Meilenstein 1+2: Bewegungsprototyp und Kernsysteme)."
-run/main_scene="res://scenes/levels/level_greybox.tscn"
+run/main_scene="res://scenes/levels/level_00_tutorial.tscn"
 config/features=PackedStringArray("4.3", "Mobile")
 config/icon="res://icon.svg"
 
@@ -32,6 +32,7 @@ window/handheld/orientation=0
 3d_physics/layer_4="Kantenzone"
 3d_physics/layer_5="Aufsammelbar"
 3d_physics/layer_6="Gefahr"
+3d_physics/layer_7="Gegner"
 
 [physics]
 

@@ -5,6 +5,7 @@ extends Node
 ## Beendet sich mit Exit-Code 0 (alles gruen) oder 1 (mindestens ein Fehler).
 
 const LEVEL_PATH := "res://scenes/levels/level_greybox.tscn"
+const TUTORIAL_PATH := "res://scenes/levels/level_00_tutorial.tscn"
 const PHYSICS_FPS := 60.0
 
 var _failures: Array[String] = []
@@ -29,7 +30,12 @@ func _run_all() -> void:
 	await _test_ledge_grab()
 	await _test_hard_gap()
 	await _test_food()
+	await _test_camera_follows_fall()
 	await _test_damage_and_invulnerability()
+	await _test_dog_states()
+	await _test_territory_cat()
+	await _test_car()
+	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
 	await _test_game_over()
@@ -102,20 +108,7 @@ func _test_climbing() -> void:
 		"Oben auf dem Balkon angekommen: y = %.2f" % player.global_position.y)
 	_check(player.state != Player.State.CLIMB, "Klettern oben beendet")
 
-	# Jede Kletterzone im Level muss tatsaechlich nach oben fuehren.
-	for child in level.get_node("Kletterzonen").get_children():
-		var climb := child as ClimbZone
-		var bottom: float = climb.global_position.y - climb.height * 0.5
-		player.global_position = Vector3(climb.global_position.x, bottom + 0.4, 0.0)
-		player.velocity = Vector3.ZERO
-		await _wait(0.2)
-		PlayerInput.set_touch_move(Vector2(0.0, 1.0))
-		await _wait(climb.height / 2.0 + 2.0)
-		PlayerInput.set_touch_move(Vector2.ZERO)
-		await _wait(0.4)
-		_check(player.global_position.y > climb.get_top_y() - 0.1,
-			"%s fuehrt bis nach oben (y = %.2f, Oberkante %.2f)"
-				% [climb.name, player.global_position.y, climb.get_top_y()])
+	await _check_climb_zones(level, player)
 	await _despawn(level)
 
 ## GDD Abschnitt 2: automatisches Festhalten an greifbaren Kanten.
@@ -207,11 +200,11 @@ func _test_food() -> void:
 
 ## GDD Abschnitt 3: Treffer -1 LP, 1 s Unverwundbarkeit, Rueckstoss.
 func _test_damage_and_invulnerability() -> void:
-	var level := await _spawn_level()
+	var level := await _spawn_level(LEVEL_PATH, true)
 	var player: Player = level.get_node("Player")
-	var hazard: Hazard = level.get_node("Gefahren/GefahrStrasse")
+	var dog: Dog = level.get_node("Gegner/KleinerHund")
 	var before := player.health
-	player.global_position = hazard.global_position
+	player.global_position = dog.global_position
 	await _wait(0.1)
 	_check(player.health == before - 1,
 		"Treffer kostet genau 1 LP (%d -> %d)" % [before, player.health])
@@ -221,14 +214,188 @@ func _test_damage_and_invulnerability() -> void:
 
 	# Waehrend der Unverwundbarkeit darf kein zweiter Treffer zaehlen.
 	var during := player.health
-	player.global_position = hazard.global_position
+	player.global_position = dog.global_position
 	await _wait(0.3)
 	_check(player.health == during, "Kein zweiter Treffer waehrend der Unverwundbarkeit")
 
-	# Nach 1 s laeuft die Unverwundbarkeit ab.
-	await _wait(1.0)
+	# Nach 1 s laeuft die Unverwundbarkeit ab. Dafuer muessen die Gegner
+	# stillstehen, sonst trifft der Hund sofort wieder - was richtig waere.
+	level.get_node("Gegner").process_mode = Node.PROCESS_MODE_DISABLED
+	player.global_position = Vector3(5.0, 0.4, 0.0)
+	await _wait(1.2)
 	_check(not player.is_invulnerable, "Unverwundbarkeit endet nach 1 s")
 	_check(player.visual.visible, "Figur ist nach dem Blinken wieder sichtbar")
+	await _despawn(level)
+
+## Aus dem Spieltest: beim Fallen und Herunterklettern muss die Kamera
+## schnell genug mitgehen, damit der Landeplatz sichtbar bleibt.
+func _test_camera_follows_fall() -> void:
+	var level := await _spawn_level()
+	var player: Player = level.get_node("Player")
+	var camera: FollowCamera = level.get_node("Camera3D")
+	# Freier Fall aus 9 m ueber einem leeren Strassenstueck.
+	player.global_position = Vector3(15.0, 9.0, 0.0)
+	player.velocity = Vector3.ZERO
+	await _wait(0.3)
+	var worst_lag := 0.0
+	for i in int(2.0 * PHYSICS_FPS):
+		await get_tree().physics_frame
+		var lag: float = camera.global_position.y - (player.global_position.y + camera.offset.y)
+		worst_lag = maxf(worst_lag, lag)
+		if player.is_on_floor():
+			break
+	_check(worst_lag < 2.0,
+		"Kamera bleibt beim Fallen dran (groesster Rueckstand %.2f m)" % worst_lag)
+	await _wait(1.0)
+	var settled: float = absf(camera.global_position.y - (player.global_position.y + camera.offset.y))
+	_check(settled < 0.5,
+		"Kamera hat nach der Landung aufgeschlossen (%.2f m Abstand)" % settled)
+
+	# Herunterklettern zaehlt genauso als Fallen.
+	var zone: ClimbZone = level.get_node("Kletterzonen/Strommast")
+	player.global_position = Vector3(zone.global_position.x, zone.get_top_y() - 0.3, 0.0)
+	await _wait(0.3)
+	PlayerInput.set_touch_move(Vector2(0.0, -1.0))
+	await _wait(1.2)
+	var climb_lag: float = camera.global_position.y - (player.global_position.y + camera.offset.y)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	_check(climb_lag < 0.8,
+		"Kamera folgt beim Herunterklettern (Rueckstand %.2f m)" % climb_lag)
+	await _despawn(level)
+
+## GDD Abschnitt 4: Hunde warnen erst, jagen dann, koennen aber nicht klettern.
+func _test_dog_states() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var dog: Dog = level.get_node("Gegner/KleinerHund")
+	player.global_position = Vector3(5.0, 0.4, 0.0)
+	await _wait(0.5)
+	_check(dog.state in [Dog.State.PATROUILLE, Dog.State.RUHEN],
+		"Ohne Katze patrouilliert der Hund (Zustand %d)" % dog.state)
+
+	player.global_position = Vector3(dog.global_position.x + 3.5, 0.4, 0.0)
+	await _wait(0.25)
+	_check(dog.state == Dog.State.WARNUNG,
+		"Hund warnt erst (Zustand %d)" % dog.state)
+	await _wait(dog.warning_time + 0.3)
+	_check(dog.state == Dog.State.JAGEN,
+		"Nach der Warnzeit jagt der Hund (Zustand %d)" % dog.state)
+
+	# Katze bringt sich auf der Fassade in Sicherheit.
+	player.global_position = Vector3(dog.global_position.x + 1.5, 4.0, 0.0)
+	await _wait(0.4)
+	_check(dog.state in [Dog.State.BELLEN_NACH_OBEN, Dog.State.RUECKKEHR],
+		"Ausser Reichweite bellt der Hund nach oben (Zustand %d)" % dog.state)
+	await _wait(2.0)
+	_check(dog.global_position.y < 1.2,
+		"Hund bleibt auf Strassenebene (y = %.2f)" % dog.global_position.y)
+	await _despawn(level)
+
+## GDD Abschnitt 4: Revierkatzen verteidigen nur ihr Gebiet.
+func _test_territory_cat() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var cat: TerritoryCat = level.get_node("Gegner/Revierkatze")
+	player.global_position = Vector3(5.0, 0.4, 0.0)
+	await _wait(0.4)
+	_check(cat.state != TerritoryCat.State.ANGRIFF,
+		"Ohne Eindringling kein Angriff (Zustand %d)" % cat.state)
+
+	player.global_position = Vector3(cat.home_position.x + 1.0, cat.home_position.y + 0.1, 0.0)
+	await _wait(0.25)
+	_check(cat.state == TerritoryCat.State.WARNUNG,
+		"Revierkatze macht erst Buckel (Zustand %d)" % cat.state)
+	var attacked := false
+	for i in int((cat.warning_time + 1.2) * PHYSICS_FPS):
+		await get_tree().physics_frame
+		if cat.state == TerritoryCat.State.ANGRIFF:
+			attacked = true
+			break
+	_check(attacked, "Nach der Warnzeit springt die Revierkatze an")
+
+	# Revier verlassen: die Revierkatze zieht sich zurueck.
+	player.global_position = Vector3(5.0, 0.4, 0.0)
+	await _wait(2.5)
+	_check(cat.state in [TerritoryCat.State.RUECKZUG, TerritoryCat.State.SITZEN,
+			TerritoryCat.State.PATROUILLE],
+		"Ausserhalb des Reviers zieht sie sich zurueck (Zustand %d)" % cat.state)
+	_check(absf(cat.global_position.x - cat.home_position.x) <= cat.territory_half_width + 1.0,
+		"Revierkatze bleibt in ihrem Revier (x = %.2f)" % cat.global_position.x)
+	await _despawn(level)
+
+## GDD Abschnitt 4: Autos kuendigen sich per Scheinwerfer an und kosten 1 LP.
+func _test_car() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var car: Car = level.get_node("Gegner/Auto")
+	player.global_position = Vector3(20.0, 0.4, 0.0)
+	car.pause_time = 0.3
+	car.warning_time = 0.4
+	car.restart_cycle(0.15)
+	await _wait(0.3)
+	_check(car.state == Car.State.WARNUNG,
+		"Auto kuendigt sich mit Scheinwerferlicht an (Zustand %d)" % car.state)
+	await _wait(0.5)
+	_check(car.state == Car.State.FAHREN,
+		"Nach der Warnung faehrt das Auto los (Zustand %d)" % car.state)
+
+	var before := player.health
+	car.global_position = Vector3(player.global_position.x, car.global_position.y, 0.0)
+	await _wait(0.2)
+	_check(player.health == before - 1,
+		"Auto kostet einen Lebenspunkt (%d -> %d)" % [before, player.health])
+	await _despawn(level)
+
+## GDD Abschnitt 7: Level 0 erklaert nur ueber Symbole und kann nicht scheitern.
+func _test_tutorial_level() -> void:
+	var level := await _spawn_level(TUTORIAL_PATH, true)
+	var player: Player = level.get_node("Player")
+	var hud: HUD = level.get_node("HUD")
+	_check(player.no_fail, "Im Tutorial ist Scheitern ausgeschlossen")
+
+	player.global_position = Vector3(1.5, 0.4, 0.0)
+	await _wait(0.3)
+	_check(hud.hint_overlay.current_hint() == HintOverlay.Hint.LAUFEN,
+		"Laufen-Symbol erscheint am Start")
+	player.global_position = Vector3(9.6, 0.4, 0.0)
+	await _wait(0.3)
+	_check(hud.hint_overlay.current_hint() == HintOverlay.Hint.KLETTERN,
+		"Klettern-Symbol erscheint an der Regenrinne")
+
+	# Der schlafende Hund ist ungefaehrlich - die Katze klettert ueber ihn hinweg.
+	var dog: Dog = level.get_node("Gegner/SchlafenderHund")
+	var before := player.health
+	player.global_position = dog.global_position
+	await _wait(0.5)
+	_check(player.health == before, "Schlafender Hund tut der Katze nichts")
+	_check(dog.state in [Dog.State.SCHLAFEN, Dog.State.BELLEN_NACH_OBEN],
+		"Schlafender Hund wacht hoechstens kurz auf (Zustand %d)" % dog.state)
+
+	# Die passive Revierkatze faucht nur.
+	var cat: TerritoryCat = level.get_node("Gegner/PassiveRevierkatze")
+	player.global_position = Vector3(cat.home_position.x + 1.0, cat.home_position.y + 0.1, 0.0)
+	await _wait(cat.warning_time + 0.8)
+	_check(cat.state == TerritoryCat.State.WARNUNG,
+		"Passive Revierkatze faucht nur und greift nicht an (Zustand %d)" % cat.state)
+	_check(player.health == before, "Passive Revierkatze kostet keinen Lebenspunkt")
+
+	# Auch im Tutorial muss jede Rinne bis nach oben fuehren.
+	level.get_node("Gegner").process_mode = Node.PROCESS_MODE_DISABLED
+	await _check_climb_zones(level, player)
+
+	# Die kleine Dachluecke muss aus dem Lauf zu schaffen sein.
+	var roof_a: Node3D = level.get_node("Welt/DachA")
+	var roof_b: Node3D = level.get_node("Welt/DachB")
+	var gap: float = (roof_b.global_position.x - roof_b.size.x * 0.5) \
+		- (roof_a.global_position.x + roof_a.size.x * 0.5)
+	_check(gap > 1.0 and gap < 1.8,
+		"Tutorial-Dachluecke ist klein gehalten (%.2f m)" % gap)
+
+	# Ziel des Tutorials.
+	var bowl: FoodBowl = level.get_node("Futternapf")
+	player.global_position = bowl.global_position + Vector3(0.0, 0.4, 0.0)
+	await _wait(0.3)
+	_check(Game.is_level_finished, "Futternapf beendet auch das Tutorial")
 	await _despawn(level)
 
 func _test_hud_paws() -> void:
@@ -297,11 +464,38 @@ func _test_game_over() -> void:
 
 # --- Hilfen -----------------------------------------------------------------
 
-func _spawn_level() -> Node:
+## Jede Kletterzone eines Levels muss tatsaechlich bis nach oben fuehren -
+## eine Platte ueber der Rinne wuerde die Katze sonst blockieren.
+func _check_climb_zones(level: Node, player: Player) -> void:
+	var zones := level.get_node_or_null("Kletterzonen")
+	if zones == null:
+		return
+	for child in zones.get_children():
+		var climb := child as ClimbZone
+		var bottom: float = climb.global_position.y - climb.height * 0.5
+		player.global_position = Vector3(climb.global_position.x, bottom + 0.4, 0.0)
+		player.velocity = Vector3.ZERO
+		await _wait(0.2)
+		PlayerInput.set_touch_move(Vector2(0.0, 1.0))
+		await _wait(climb.height / 2.0 + 2.0)
+		PlayerInput.set_touch_move(Vector2.ZERO)
+		await _wait(0.4)
+		_check(player.global_position.y > climb.get_top_y() - 0.1,
+			"%s fuehrt bis nach oben (y = %.2f, Oberkante %.2f)"
+				% [climb.name, player.global_position.y, climb.get_top_y()])
+
+func _spawn_level(path: String = LEVEL_PATH, keep_enemies: bool = false) -> Node:
 	PlayerInput.reset()
 	get_tree().paused = false
-	var scene: PackedScene = load(LEVEL_PATH)
+	var scene: PackedScene = load(path)
 	var level := scene.instantiate()
+	if not keep_enemies:
+		# Mechanik-Tests sollen nicht von patrouillierenden Gegnern gestoert werden.
+		var enemies := level.get_node_or_null("Gegner")
+		if enemies != null:
+			for enemy in enemies.get_children():
+				enemies.remove_child(enemy)
+				enemy.free()
 	get_tree().root.add_child(level)
 	await get_tree().physics_frame
 	await get_tree().physics_frame

@@ -1,0 +1,206 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/levels/level.gd" id="1_level"]
+[ext_resource type="Resource" path="res://resources/levels/level_00.tres" id="2_data"]
+[ext_resource type="PackedScene" path="res://scenes/world/grey_block.tscn" id="3_block"]
+[ext_resource type="PackedScene" path="res://scenes/world/climb_zone.tscn" id="4_climb"]
+[ext_resource type="PackedScene" path="res://scenes/world/ledge_zone.tscn" id="5_ledge"]
+[ext_resource type="PackedScene" path="res://scenes/world/tutorial_hint.tscn" id="6_hint"]
+[ext_resource type="PackedScene" path="res://scenes/items/collectible.tscn" id="7_food"]
+[ext_resource type="PackedScene" path="res://scenes/items/food_bowl.tscn" id="8_bowl"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dog.tscn" id="9_dog"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/territory_cat.tscn" id="10_cat"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="11_player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="12_hud"]
+[ext_resource type="Script" path="res://scripts/player/follow_camera.gd" id="13_camera"]
+
+[sub_resource type="Environment" id="Environment_tutorial"]
+background_mode = 1
+background_color = Color(0.42, 0.62, 0.85, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.72, 0.88, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 3
+glow_intensity = 0.35
+glow_bloom = 0.0
+glow_hdr_threshold = 1.2
+
+[node name="Level00Tutorial" type="Node3D"]
+script = ExtResource("1_level")
+level_data = ExtResource("2_data")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_tutorial")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.906, 0, 0.423, 0.272, 0.766, -0.5826, -0.324, 0.643, 0.694, 0, 14, 0)
+light_energy = 1.0
+
+[node name="Welt" type="Node3D" parent="."]
+
+[node name="Strasse" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, -0.5, 0)
+size = Vector3(52, 1, 6)
+kind = 0
+
+[node name="Hindernis" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.25, 0)
+size = Vector3(1, 0.5, 2)
+kind = 4
+
+[node name="FassadeA" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 1.7, -2)
+size = Vector3(7, 3.4, 2)
+kind = 1
+
+[node name="BalkonA" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.3, 2.85, 0)
+size = Vector3(5, 0.3, 2.4)
+kind = 2
+
+[node name="FassadeB" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.5, 3.2, -2)
+size = Vector3(11, 6.4, 2)
+kind = 1
+
+[node name="DachA" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 5.8, 0)
+size = Vector3(9.6, 0.4, 3)
+kind = 3
+
+[node name="DachB" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.9, 5.8, 0)
+size = Vector3(3.2, 0.4, 3)
+kind = 3
+
+[node name="FassadeC" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 3.2, -2)
+size = Vector3(7, 6.4, 2)
+kind = 1
+
+[node name="ZielBalkon" parent="Welt" instance=ExtResource("3_block")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 5.85, 0)
+size = Vector3(4, 0.3, 2.4)
+kind = 2
+
+[node name="Kletterzonen" type="Node3D" parent="."]
+
+[node name="Regenrinne1" parent="Kletterzonen" instance=ExtResource("4_climb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.4, 1.5, -0.4)
+height = 3.0
+exit_direction = 1
+
+[node name="Regenrinne2" parent="Kletterzonen" instance=ExtResource("4_climb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.6, 3, -0.4)
+height = 6.0
+exit_direction = 1
+
+[node name="Kanten" type="Node3D" parent="."]
+
+[node name="KanteDachA" parent="Kanten" instance=ExtResource("5_ledge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.05, 5.85, 0)
+facing = -1
+size = Vector3(0.5, 0.7, 1)
+exit_offset = Vector3(0.75, 0.6, 0)
+
+[node name="KanteDachB" parent="Kanten" instance=ExtResource("5_ledge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.15, 5.85, 0)
+facing = -1
+size = Vector3(0.5, 0.7, 1)
+exit_offset = Vector3(0.75, 0.6, 0)
+
+[node name="Hinweise" type="Node3D" parent="."]
+
+[node name="HinweisLaufen" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, 0)
+hint = 1
+size = Vector3(4, 3, 2)
+
+[node name="HinweisSpringen" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 1, 0)
+hint = 2
+size = Vector3(2.4, 3, 2)
+
+[node name="HinweisKlettern" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.6, 1, 0)
+hint = 3
+size = Vector3(2.4, 3, 2)
+
+[node name="HinweisFressen" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.9, 3.7, 0)
+hint = 4
+size = Vector3(2.2, 1.8, 2)
+
+[node name="HinweisVorsichtHund" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1, 0)
+hint = 5
+size = Vector3(2.6, 3, 2)
+
+[node name="HinweisKletternDach" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.4, 1, 0)
+hint = 3
+size = Vector3(2.4, 3, 2)
+
+[node name="HinweisVorsichtKatze" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.6, 6.6, 0)
+hint = 5
+size = Vector3(2.4, 2, 2)
+
+[node name="HinweisSprungLuecke" parent="Hinweise" instance=ExtResource("6_hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.8, 6.6, 0)
+hint = 2
+size = Vector3(2.2, 2, 2)
+
+[node name="Gegner" type="Node3D" parent="."]
+
+[node name="SchlafenderHund" parent="Gegner" instance=ExtResource("9_dog")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.4, 0)
+dog_size = 0
+start_sleeping = true
+passive = true
+patrol_distance = 0.0
+
+[node name="PassiveRevierkatze" parent="Gegner" instance=ExtResource("10_cat")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 6.3, 0)
+passive = true
+territory_half_width = 2.5
+patrol_speed = 1.4
+
+[node name="Futter" type="Node3D" parent="."]
+
+[node name="Graete1" parent="Futter" instance=ExtResource("7_food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.6, 0)
+kind = 0
+
+[node name="Graete2" parent="Futter" instance=ExtResource("7_food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 3.6, 0)
+kind = 0
+
+[node name="Graete3" parent="Futter" instance=ExtResource("7_food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.8, 3.6, 0)
+kind = 0
+
+[node name="Graete4" parent="Futter" instance=ExtResource("7_food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.5, 6.6, 0)
+kind = 0
+
+[node name="Graete5" parent="Futter" instance=ExtResource("7_food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.9, 6.6, 0)
+kind = 0
+
+[node name="Futternapf" parent="." instance=ExtResource("8_bowl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 6, 0)
+
+[node name="Player" parent="." instance=ExtResource("11_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 7)
+fov = 45.0
+near = 0.05
+far = 120.0
+script = ExtResource("13_camera")
+target_path = NodePath("../Player")
+offset = Vector3(0, 1, 7)
+
+[node name="HUD" parent="." instance=ExtResource("12_hud")]

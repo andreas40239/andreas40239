@@ -15,18 +15,20 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(54, 54)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+## Vier Zehen rund um den Ballen.
+const TOES := [
+	Vector2(-0.26, -0.20),
+	Vector2(-0.09, -0.31),
+	Vector2(0.09, -0.31),
+	Vector2(0.26, -0.20),
+]
+
 func _draw() -> void:
-	var color := FILLED_COLOR if filled else EMPTY_COLOR
-	var s := minf(size.x, size.y)
-	var center := size * 0.5
-	# Ballen
-	draw_circle(center + Vector2(0.0, s * 0.12), s * 0.26, color)
-	# Vier Zehen
-	var toes := [
-		Vector2(-0.26, -0.20),
-		Vector2(-0.09, -0.31),
-		Vector2(0.09, -0.31),
-		Vector2(0.26, -0.20),
-	]
-	for toe in toes:
-		draw_circle(center + toe * s, s * 0.105, color)
+	draw_paw(self, size * 0.5, minf(size.x, size.y),
+		FILLED_COLOR if filled else EMPTY_COLOR)
+
+## Zeichnet eine Pfote auf eine beliebige Zeichenflaeche.
+static func draw_paw(canvas: CanvasItem, center: Vector2, span: float, color: Color) -> void:
+	canvas.draw_circle(center + Vector2(0.0, span * 0.12), span * 0.26, color)
+	for toe in TOES:
+		canvas.draw_circle(center + toe * span, span * 0.105, color)

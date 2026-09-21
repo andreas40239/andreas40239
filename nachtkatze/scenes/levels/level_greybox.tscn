@@ -1,11 +1,13 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/levels/level.gd" id="1_level"]
 [ext_resource type="Resource" path="res://resources/levels/level_greybox.tres" id="2_data"]
 [ext_resource type="PackedScene" path="res://scenes/world/grey_block.tscn" id="3_block"]
 [ext_resource type="PackedScene" path="res://scenes/world/climb_zone.tscn" id="4_climb"]
 [ext_resource type="PackedScene" path="res://scenes/world/ledge_zone.tscn" id="5_ledge"]
-[ext_resource type="PackedScene" path="res://scenes/world/hazard.tscn" id="6_hazard"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dog.tscn" id="6_dog"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/territory_cat.tscn" id="12_cat"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/car.tscn" id="13_car"]
 [ext_resource type="PackedScene" path="res://scenes/items/collectible.tscn" id="7_food"]
 [ext_resource type="PackedScene" path="res://scenes/items/food_bowl.tscn" id="8_bowl"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="9_player"]
@@ -53,8 +55,8 @@ size = Vector3(4, 1.4, 2.2)
 kind = 4
 
 [node name="ZaunMitLuecke" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.7, 0)
-size = Vector3(0.35, 1.9, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 1.56, 0)
+size = Vector3(0.35, 1.88, 2)
 kind = 5
 
 [node name="FassadeA" parent="Welt" instance=ExtResource("3_block")]
@@ -160,19 +162,27 @@ facing = -1
 size = Vector3(0.5, 0.7, 1)
 exit_offset = Vector3(0.75, 0.6, 0)
 
-[node name="Gefahren" type="Node3D" parent="."]
+[node name="Gegner" type="Node3D" parent="."]
 
-[node name="GefahrStrasse" parent="Gefahren" instance=ExtResource("6_hazard")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.5, 0.65, 0)
-size = Vector3(0.9, 0.9, 1.2)
-patrol_distance = 3.0
-patrol_speed = 1.6
+[node name="KleinerHund" parent="Gegner" instance=ExtResource("6_dog")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.5, 0.4, 0)
+dog_size = 0
+patrol_distance = 4.0
 
-[node name="GefahrDach" parent="Gefahren" instance=ExtResource("6_hazard")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.8, 6.45, 0)
-size = Vector3(0.8, 0.8, 1)
-patrol_distance = 1.4
-patrol_speed = 1.0
+[node name="GrosserHund" parent="Gegner" instance=ExtResource("6_dog")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31, 0.6, 0)
+dog_size = 1
+patrol_distance = 3.5
+
+[node name="Revierkatze" parent="Gegner" instance=ExtResource("12_cat")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.8, 6.3, 0)
+territory_half_width = 2.0
+
+[node name="Auto" parent="Gegner" instance=ExtResource("13_car")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0.5, 0)
+drive_direction = -1
+speed = 9.0
+pause_time = 6.0
 
 [node name="Futter" type="Node3D" parent="."]
 
