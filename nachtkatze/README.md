@@ -10,7 +10,10 @@ Dieser Stand deckt **Meilenstein 1 (Bewegungsprototyp)** und
 | Hauptszene | `scenes/levels/level_greybox.tscn` |
 | Zielplattform | Android, Querformat (Export folgt in Meilenstein 9) |
 
-![Strassenebene](../docs/bilder/01_strasse.png)
+![Spielansicht](../docs/bilder/00_spielansicht.png)
+
+So sieht es durch die Spielkamera aus: Pfoten oben links, Pause oben rechts,
+Joystick unten links, Sprungtaste unten rechts.
 
 ## Starten
 
@@ -103,6 +106,24 @@ Game Over und den Tutorial-Modus. Exit-Code 0 heisst alles gruen
 (aktuell 38 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
+## Android-APK bauen
+
+Gebraucht werden Godot 4.3 (Editor-Binary), die Export-Templates 4.3.stable,
+ein JDK und aus dem Android-SDK die Ordner `build-tools` (wegen `apksigner`)
+und `platform-tools`. SDK-Pfad und Debug-Keystore stehen in den
+Editor-Einstellungen (`export/android/android_sdk_path`,
+`export/android/debug_keystore`). Das Preset liegt als
+`export_presets.cfg` im Projekt.
+
+```
+godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
+```
+
+Ergebnis: rund 48 MB, `org.nachtkatze.prototyp`, minSdk 21, targetSdk 34,
+Querformat, Architekturen arm64-v8a und armeabi-v7a, signiert mit den
+Schemata v1, v2 und v3. Das Spiel nutzt den Mobile-Renderer und braucht
+daher Vulkan (auf Geraeten ab etwa 2016 vorhanden).
+
 Bilder aus dem Level erzeugen:
 
 ```
@@ -120,6 +141,9 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
   Lichtvoreinstellung schon angelegt und ueber `LevelData` umschaltbar.
 - Start- und Hauptmenue, Levelauswahl und Speichern sind Meilenstein 6.
 - Ton fehlt komplett (Meilenstein 7); die Audio-Busse kommen dort dazu.
+- Die Graubox rendert ohne Schlagschatten. Je nach Renderer beschattete sich
+  die Katze selbst und wurde fast schwarz; ohne Assets bringen Schatten noch
+  nichts. Beleuchtung und Schatten kommen in Meilenstein 5 richtig dazu.
 - Ein Sturz aus grosser Hoehe kostet nichts - das GDD kennt keinen Fallschaden.
   Nur wer unter das Level faellt, verliert einen Lebenspunkt und setzt an der
   letzten sicheren Stelle wieder auf.

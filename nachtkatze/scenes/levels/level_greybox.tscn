@@ -17,7 +17,7 @@ background_mode = 1
 background_color = Color(0.42, 0.62, 0.85, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.6, 0.72, 0.88, 1)
-ambient_light_energy = 0.35
+ambient_light_energy = 0.5
 tonemap_mode = 3
 glow_intensity = 0.35
 glow_bloom = 0.0
@@ -33,7 +33,7 @@ environment = SubResource("Environment_level")
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.906, 0, 0.423, 0.272, 0.766, -0.5826, -0.324, 0.643, 0.694, 0, 14, 0)
 light_energy = 1.0
-shadow_enabled = true
+shadow_enabled = false
 
 [node name="Welt" type="Node3D" parent="."]
 
@@ -209,6 +209,6 @@ near = 0.05
 far = 120.0
 script = ExtResource("11_camera")
 target_path = NodePath("../Player")
-offset = Vector3(0, 1.2, 8)
+offset = Vector3(0, 1.0, 7)
 
 [node name="HUD" parent="." instance=ExtResource("10_hud")]

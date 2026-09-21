@@ -8,12 +8,12 @@ class_name GreyBlock
 enum Kind { STRASSE, FASSADE, BALKON, DACH, PROP, ZAUN }
 
 const COLORS := {
-	Kind.STRASSE: Color(0.32, 0.32, 0.35),
-	Kind.FASSADE: Color(0.78, 0.71, 0.58),
-	Kind.BALKON: Color(0.62, 0.58, 0.50),
-	Kind.DACH: Color(0.55, 0.45, 0.40),
-	Kind.PROP: Color(0.45, 0.50, 0.45),
-	Kind.ZAUN: Color(0.38, 0.42, 0.48),
+	Kind.STRASSE: Color(0.52, 0.52, 0.56),
+	Kind.FASSADE: Color(0.80, 0.73, 0.60),
+	Kind.BALKON: Color(0.68, 0.64, 0.55),
+	Kind.DACH: Color(0.62, 0.50, 0.44),
+	Kind.PROP: Color(0.52, 0.58, 0.52),
+	Kind.ZAUN: Color(0.46, 0.50, 0.56),
 }
 
 @export var size := Vector3(2.0, 1.0, 2.0):
