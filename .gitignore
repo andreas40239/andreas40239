@@ -1,0 +1,5 @@
+# Godot-Importcache und Exporte
+.godot/
+export_presets.cfg
+*.translation
+build/
