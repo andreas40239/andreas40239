@@ -1,10 +1,10 @@
 # Nachtkatze - Godot-Projekt
 
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
-Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab: Bewegungsprototyp,
-Kernsysteme, Gegner, das spielbare Tutorial (Level 0) sowie Startbild,
-Menues und Speichern. Meilenstein 5 (Grafik) ist bewusst uebersprungen -
-die Assets kommen spaeter.
+Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab (Bewegungsprototyp,
+Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern) und aus
+**Meilenstein 5** das Asset-Kit samt Toon-Shader. Die Levels stehen noch
+in der Graubox - der Umbau auf das Kit ist der naechste Schritt.
 
 | | |
 |---|---|
@@ -164,7 +164,9 @@ exakt eingehalten werden:
 
 ```
 scenes/    Spielszenen: Spielerin, Bausteine, Futter, HUD, Level
-scripts/   GDScript nach Zustaendigkeit (player, world, items, ui, systems)
+scripts/   GDScript nach Zustaendigkeit (player, world, items, ui, systems,
+           enemies, assets)
+assets/    Toon-Shader und das gemeinsame Material
 resources/ Levelparameter als .tres
 tests/     Kopflose Funktionspruefung
 tools/     Entwicklerwerkzeug fuer Bilder aus dem Level
@@ -180,8 +182,9 @@ Prueft Metriken, Laufen, Sprunghoehe, Kameraverhalten beim Fallen, alle
 Kletterzonen beider Levels, Kantengriff, die schwerste Dachluecke, Futter,
 Treffer mit Unverwundbarkeit, die Zustandsautomaten von Hund, Revierkatze und
 Auto, HUD, Levelziel, Game Over, das Tutorial, das Weglaufen vor Gegnern,
-den Sprung ueber ein Auto samt Timing-Spielraum, Levelkatalog, Speicherstand
-und die Menues. Exit-Code 0 heisst alles gruen (aktuell 93 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+den Sprung ueber ein Auto samt Timing-Spielraum, Levelkatalog, Speicherstand,
+die Menues und das Asset-Kit (darunter, ob die Normalen nach aussen zeigen).
+Exit-Code 0 heisst alles gruen (aktuell 107 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -227,8 +230,62 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
   Nur wer unter das Level faellt, verliert einen Lebenspunkt und setzt an der
   letzten sicheren Stelle wieder auf.
 
+## Asset-Kit (GDD Abschnitt 8)
+
+27 Bauteile, alle prozedural erzeugt - wie es GDD Abschnitt 15 vorsieht.
+Es gibt keine Modelldateien und keine Texturen: `AssetKit` baut die Meshes
+aus Kisten, Zylindern, Kegeln, Kuppeln und Prismen zusammen, jede Flaeche
+mit eigener Normale, damit die Kanten hart bleiben.
+
+| Gruppe | Bauteile |
+|---|---|
+| Wohnblock | Geschoss-Segment, Balkonband mit Metallgelaender, Markise offen und geschlossen, Dachabschluss |
+| Einfamilienhaus | Haus mit rotem Ziegelvordach |
+| Dach-Props | Solarkollektor mit Boiler, Satellitenschuessel, Antenne, Klimageraet |
+| Strasse | Laterne, Strommast, Stromleitung, geparktes und fahrendes Auto, Zaun mit und ohne Luecke, Gartentor |
+| Vegetation | Kiefer, Zypresse, Olivenbaum, Oleanderbusch |
+| Landmarken | Kirchturm mit Kuppel, Tankstelle mit gruenem Leuchtband |
+| Interaktiv | Fischgraete, ganzer Fisch, Futternapf |
+
+![Asset-Kit: Wohnblock](../docs/bilder/kit_0_wohnblock.png)
+![Asset-Kit: Strasse](../docs/bilder/kit_2_strasse.png)
+![Asset-Kit: Vegetation](../docs/bilder/kit_3_vegetation.png)
+
+### Farben und Shader
+
+Statt Texturen traegt jeder Eckpunkt seine Farbe aus `Palette`; der
+Alphakanal steuert, wie stark eine Flaeche leuchtet. Damit kommt das ganze
+Kit mit einem einzigen Material aus - gut fuer die Batchverarbeitung auf
+dem Geraet. Der Toon-Shader stuft das Sonnenlicht in drei harte Helligkeits-
+stufen (GDD Abschnitt 9).
+
+Zwei Dinge sind dabei wichtig zu wissen:
+
+- Der Compatibility-Renderer unterstuetzt keine eigenen `light()`-Funktionen.
+  Fuer ihn hat der Shader einen Ersatzpfad, den `AssetKit.configure_material()`
+  automatisch einschaltet. Auf dem Geraet (Mobile-Renderer) laeuft der
+  richtige Weg ueber `light()`.
+- Beide Wege sind auf dieselbe Helligkeit geeicht: `light()` teilt durch PI
+  wie Godots eingebautes Lambert, der Ersatzpfad rechnet mit 0,85.
+  `Level._apply_time_of_day()` meldet Sonnenrichtung und -farbe je Tageszeit
+  an den Ersatzpfad weiter.
+
+### Verwenden
+
+Im Level die Szene `scenes/world/asset_piece.tscn` instanzieren und `kind`
+setzen - Mesh, Material und Kollision entstehen von selbst. Kollision gibt es
+nur bei Teilen, auf denen die Katze stehen soll oder die sie aufhalten;
+Pflanzen und Dach-Props sind reine Zier.
+
+Alle Bauteile ansehen:
+
+```
+xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
+  --resolution 1600x900 res://tools/screenshot.tscn -- kit
+```
+
 ## Naechste Schritte
 
-Meilenstein 5 (Asset-Kit, Toon-Shader, Tageszeiten, Parallax-Hintergrund),
-sobald die Assets da sind. Danach Meilenstein 7 (Ton) und Meilenstein 8
-(Levels 1 bis 10).
+Aus Meilenstein 5 fehlen noch der Parallax-Hintergrund und vor allem der
+Umbau der beiden Levels von der Graubox auf das Asset-Kit. Danach
+Meilenstein 7 (Ton) und Meilenstein 8 (Levels 1 bis 10).

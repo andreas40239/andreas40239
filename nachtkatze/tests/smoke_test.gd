@@ -51,6 +51,7 @@ func _run_all() -> void:
 	await _test_level_catalog()
 	await _test_save_and_progress()
 	await _test_menu_screens()
+	await _test_asset_kit()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -659,6 +660,87 @@ func _test_game_over() -> void:
 	_check(player2.health == 1, "Im Tutorial-Modus bleibt 1 LP (ist %d)" % player2.health)
 	_check(player2.state != Player.State.DEAD, "Im Tutorial-Modus kein Game Over")
 	await _despawn(level2)
+
+## GDD Abschnitt 8 und 15: modulares Asset-Kit, prozedural erzeugt.
+func _test_asset_kit() -> void:
+	var kinds: Array = AssetKit.Kind.values()
+	_check(kinds.size() >= 25, "Asset-Kit umfasst %d Bauteile" % kinds.size())
+
+	var without_faces: Array[String] = []
+	var odd_size: Array[String] = []
+	var inside_out: Array[String] = []
+	var worst_ratio := 1.0
+	for kind in kinds:
+		var mesh := AssetKit.get_mesh(kind)
+		var faces := mesh.get_faces().size() / 3
+		var box := mesh.get_aabb()
+		if faces < 4:
+			without_faces.append(AssetKit.kind_name(kind))
+		if box.size.length() < 0.08 or box.size.length() > 40.0:
+			odd_size.append("%s (%.2f m)" % [AssetKit.kind_name(kind), box.size.length()])
+		var ratio := _outward_normal_ratio(mesh)
+		worst_ratio = minf(worst_ratio, ratio)
+		# Nach innen gedrehte Flaechen bleiben im Spiel schwarz - genau das war
+		# bei Zylindern, Kegeln und Kuppeln der Fall.
+		if ratio < 0.5:
+			inside_out.append("%s (%.0f%%)" % [AssetKit.kind_name(kind), ratio * 100.0])
+
+	_check(without_faces.is_empty(), "Jedes Bauteil hat Flaechen %s" % str(without_faces))
+	_check(odd_size.is_empty(), "Jedes Bauteil hat sinnvolle Masse %s" % str(odd_size))
+	_check(inside_out.is_empty(),
+		"Normalen zeigen nach aussen, schlechtestes Teil %.0f%% %s"
+			% [worst_ratio * 100.0, str(inside_out)])
+
+	var arrays := AssetKit.get_mesh(AssetKit.Kind.GESCHOSS_SEGMENT).surface_get_arrays(0)
+	_check(arrays[Mesh.ARRAY_COLOR] != null, "Bauteile tragen Vertex-Farben statt Texturen")
+	_check(arrays[Mesh.ARRAY_NORMAL] != null, "Bauteile tragen eigene Flaechennormalen")
+
+	# Massstab: ein Geschoss ist 3 m hoch (GDD Abschnitt 2).
+	var segment_height: float = AssetKit.get_mesh(AssetKit.Kind.GESCHOSS_SEGMENT).get_aabb().size.y
+	_check(absf(segment_height - 3.0) < 0.35,
+		"Geschoss-Segment ist 3 m hoch (%.2f m)" % segment_height)
+	_check(AssetKit.ZAUN_LUECKE > 0.55 and AssetKit.ZAUN_LUECKE < 0.75,
+		"Zaunluecke passt zur Katze, nicht zum Hund (%.2f m)" % AssetKit.ZAUN_LUECKE)
+
+	# Kollision nur dort, wo die Katze auch etwas davon hat.
+	_check(AssetKit.get_collision_boxes(AssetKit.Kind.BALKONBAND).size() > 0,
+		"Balkonband ist begehbar")
+	_check(AssetKit.get_collision_boxes(AssetKit.Kind.MARKISE_OFFEN).size() > 0,
+		"Offene Markise traegt die Katze")
+	_check(AssetKit.get_collision_boxes(AssetKit.Kind.KIEFER).is_empty(),
+		"Pflanzen sind reine Zier")
+
+	# Ein Bauteil im Baum: Mesh, Material und Kollision entstehen von selbst.
+	var piece: AssetPiece = load("res://scenes/world/asset_piece.tscn").instantiate()
+	piece.kind = AssetKit.Kind.BALKONBAND
+	get_tree().root.add_child(piece)
+	await get_tree().physics_frame
+	var mesh_instance: MeshInstance3D = piece.get_node("Mesh")
+	_check(mesh_instance.mesh != null, "AssetPiece baut sein Mesh selbst")
+	_check(mesh_instance.material_override is ShaderMaterial,
+		"Alle Bauteile teilen sich das Toon-Material")
+	var shapes := 0
+	for child in piece.get_children():
+		if child is CollisionShape3D:
+			shapes += 1
+	_check(shapes > 0, "AssetPiece legt seine Kollision an (%d)" % shapes)
+	piece.free()
+	await get_tree().process_frame
+
+## Anteil der Eckpunkte, deren Normale vom Mittelpunkt wegzeigt.
+func _outward_normal_ratio(mesh: ArrayMesh) -> float:
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	if vertices.is_empty() or normals.size() != vertices.size():
+		return 0.0
+	var center := mesh.get_aabb().get_center()
+	var outward := 0
+	for i in vertices.size():
+		var direction := vertices[i] - center
+		if direction.length() < 0.001 or normals[i].dot(direction.normalized()) > 0.0:
+			outward += 1
+	return float(outward) / float(vertices.size())
 
 # --- Hilfen -----------------------------------------------------------------
 

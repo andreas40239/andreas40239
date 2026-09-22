@@ -32,6 +32,10 @@ const SHOTS := [
 
 func _ready() -> void:
 	await get_tree().process_frame
+	if OS.get_cmdline_user_args().has("kit"):
+		await _capture_asset_kit()
+		get_tree().quit()
+		return
 	if OS.get_cmdline_user_args().has("menu"):
 		await _capture_menus()
 		get_tree().quit()
@@ -101,3 +105,26 @@ func _save_frame(name: String) -> void:
 	var path := "user://%s.png" % name
 	image.save_png(path)
 	print("Bild gespeichert: ", ProjectSettings.globalize_path(path))
+
+
+## Das Asset-Kit reihenweise aufnehmen.
+func _capture_asset_kit() -> void:
+	var showcase: Node3D = load("res://tools/asset_showcase.tscn").instantiate()
+	get_tree().root.add_child(showcase)
+	await get_tree().process_frame
+	var camera: Camera3D = showcase.get_node("Camera3D")
+	var index := 0
+	for info in showcase.row_infos:
+		# Nur die aktuelle Reihe zeigen, sonst steht alles hintereinander im Bild.
+		for other in showcase.row_infos:
+			(other["node"] as Node3D).visible = other == info
+		var width: float = info["width"] + 3.0
+		# Sichtfeld 55 Grad im 16:9-Bild: sichtbare Breite = 1,85 * Abstand.
+		var height: float = info["height"] + 4.0
+		var distance: float = maxf(width / 1.85, height / 1.04)
+		camera.global_position = Vector3(width * 0.5 - 1.5,
+			height * 0.42, info["z"] + distance)
+		camera.rotation = Vector3.ZERO
+		await _save_frame("kit_%d_%s" % [index, String(info["name"]).to_lower().replace(" ", "_")])
+		index += 1
+	showcase.free()

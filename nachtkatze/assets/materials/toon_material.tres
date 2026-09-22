@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/toon.gdshader" id="1_toon"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_toon")
+shader_parameter/light_steps = 3
+shader_parameter/emission_strength = 1.0
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/fallback_sun = false
+shader_parameter/fallback_sun_direction = Vector3(0.32, -0.64, -0.69)
+shader_parameter/fallback_sun_color = Color(1, 0.96, 0.88, 1)
+shader_parameter/fallback_sun_energy = 0.85

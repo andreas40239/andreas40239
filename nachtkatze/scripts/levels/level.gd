@@ -48,6 +48,8 @@ func _apply_time_of_day(time_of_day: LevelData.TimeOfDay) -> void:
 	if sun != null:
 		sun.light_color = light_color
 		sun.light_energy = light_energy
+		# Der Ersatzpfad des Toon-Shaders kennt die Szenenlichter nicht.
+		AssetKit.set_sun(-sun.global_transform.basis.z, light_color, light_energy * 0.85)
 	if world_environment != null and world_environment.environment != null:
 		var env := world_environment.environment
 		env.background_color = sky_color
