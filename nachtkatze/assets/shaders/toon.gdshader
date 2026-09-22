@@ -11,6 +11,8 @@ shader_type spatial;
 render_mode diffuse_lambert, specular_disabled, cull_back;
 
 uniform int light_steps : hint_range(2, 4) = 3;
+/// Helligkeit der dunkelsten Stufe - ohne sie saufen abgewandte Flaechen ab.
+uniform float shadow_level : hint_range(0.0, 0.8) = 0.3;
 uniform float emission_strength : hint_range(0.0, 8.0) = 1.0;
 uniform vec3 tint : source_color = vec3(1.0);
 
@@ -27,7 +29,8 @@ vec3 to_linear(vec3 color) {
 
 float quantize_light(float value) {
 	float steps = float(light_steps);
-	return clamp(floor(value * steps) / max(steps - 1.0, 1.0), 0.0, 1.0);
+	float stepped = clamp(floor(value * steps) / max(steps - 1.0, 1.0), 0.0, 1.0);
+	return mix(shadow_level, 1.0, stepped);
 }
 
 void fragment() {

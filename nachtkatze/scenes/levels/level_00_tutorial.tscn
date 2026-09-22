@@ -1,206 +1,288 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
-[ext_resource type="Script" path="res://scripts/levels/level.gd" id="1_level"]
-[ext_resource type="Resource" path="res://resources/levels/level_00.tres" id="2_data"]
-[ext_resource type="PackedScene" path="res://scenes/world/grey_block.tscn" id="3_block"]
-[ext_resource type="PackedScene" path="res://scenes/world/climb_zone.tscn" id="4_climb"]
-[ext_resource type="PackedScene" path="res://scenes/world/ledge_zone.tscn" id="5_ledge"]
-[ext_resource type="PackedScene" path="res://scenes/world/tutorial_hint.tscn" id="6_hint"]
-[ext_resource type="PackedScene" path="res://scenes/items/collectible.tscn" id="7_food"]
-[ext_resource type="PackedScene" path="res://scenes/items/food_bowl.tscn" id="8_bowl"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/dog.tscn" id="9_dog"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/territory_cat.tscn" id="10_cat"]
-[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="11_player"]
-[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="12_hud"]
-[ext_resource type="Script" path="res://scripts/player/follow_camera.gd" id="13_camera"]
+[ext_resource type="Resource" path="res://resources/levels/level_00.tres" id="data"]
+[ext_resource type="Script" path="res://scripts/levels/level.gd" id="level"]
+[ext_resource type="PackedScene" path="res://scenes/world/asset_piece.tscn" id="piece"]
+[ext_resource type="PackedScene" path="res://scenes/world/climb_zone.tscn" id="climb"]
+[ext_resource type="PackedScene" path="res://scenes/world/ledge_zone.tscn" id="ledge"]
+[ext_resource type="PackedScene" path="res://scenes/items/collectible.tscn" id="food"]
+[ext_resource type="PackedScene" path="res://scenes/items/food_bowl.tscn" id="bowl"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/dog.tscn" id="dog"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/territory_cat.tscn" id="cat"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="hud"]
+[ext_resource type="Script" path="res://scripts/player/follow_camera.gd" id="camera"]
+[ext_resource type="PackedScene" path="res://scenes/world/tutorial_hint.tscn" id="hint"]
 
-[sub_resource type="Environment" id="Environment_tutorial"]
+[sub_resource type="Environment" id="Environment_level"]
 background_mode = 1
 background_color = Color(0.42, 0.62, 0.85, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.6, 0.72, 0.88, 1)
-ambient_light_energy = 0.5
+ambient_light_energy = 0.55
 tonemap_mode = 3
 glow_intensity = 0.35
 glow_bloom = 0.0
 glow_hdr_threshold = 1.2
 
 [node name="Level00Tutorial" type="Node3D"]
-script = ExtResource("1_level")
-level_data = ExtResource("2_data")
+script = ExtResource("level")
+level_data = ExtResource("data")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_tutorial")
+environment = SubResource("Environment_level")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.906, 0, 0.423, 0.272, 0.766, -0.5826, -0.324, 0.643, 0.694, 0, 14, 0)
+transform = Transform3D(0.8779, 0.3733, -0.2999, -0, 0.6262, 0.7796, 0.4789, -0.6845, 0.5498, 0, 14, 0)
 light_energy = 1.0
 
 [node name="Welt" type="Node3D" parent="."]
-
-[node name="Strasse" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, -0.5, 0)
-size = Vector3(52, 1, 6)
+[node name="Strasse" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 0)
+kind = 27
+tiles = 13
+[node name="Gartenmauer" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 0)
+kind = 28
+[node name="FassadeAUnten" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, -1)
 kind = 0
-
-[node name="Hindernis" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.25, 0)
-size = Vector3(1, 0.5, 2)
+tiles = 2
+solid = false
+[node name="FassadeAOben" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3, -1)
+kind = 0
+tiles = 2
+solid = false
+[node name="DachHausA" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 6, 0)
 kind = 4
-
-[node name="FassadeA" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 1.7, -2)
-size = Vector3(7, 3.4, 2)
+tiles = 4
+[node name="BalkonA" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 3, 0)
 kind = 1
-
-[node name="BalkonA" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.3, 2.85, 0)
-size = Vector3(5, 0.3, 2.4)
-kind = 2
-
-[node name="FassadeB" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.5, 3.2, -2)
-size = Vector3(11, 6.4, 2)
-kind = 1
-
-[node name="DachA" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 5.8, 0)
-size = Vector3(9.6, 0.4, 3)
+tiles = 2
+[node name="MarkiseA" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 2.2, -0.8)
 kind = 3
-
-[node name="DachB" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.9, 5.8, 0)
-size = Vector3(3.2, 0.4, 3)
-kind = 3
-
-[node name="FassadeC" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 3.2, -2)
-size = Vector3(7, 6.4, 2)
+solid = false
+[node name="FassadeBUnten" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, -1)
+kind = 0
+tiles = 3
+solid = false
+[node name="FassadeBOben" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 3, -1)
+kind = 0
+tiles = 3
+solid = false
+[node name="DachB" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 6, 0)
+kind = 4
+tiles = 5
+[node name="FassadeCUnten" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.5, 0, -1)
+kind = 0
+solid = false
+[node name="FassadeCOben" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.5, 3, -1)
+kind = 0
+solid = false
+[node name="DachC" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.5, 6, 0)
+kind = 4
+tiles = 2
+[node name="FassadeZielUnten" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.5, 0, -1)
+kind = 0
+tiles = 2
+solid = false
+[node name="FassadeZielOben" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.5, 3, -1)
+kind = 0
+tiles = 2
+solid = false
+[node name="ZielBalkon" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.5, 6, 0)
 kind = 1
+tiles = 2
 
-[node name="ZielBalkon" parent="Welt" instance=ExtResource("3_block")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 5.85, 0)
-size = Vector3(4, 0.3, 2.4)
-kind = 2
+[node name="Zierde" type="Node3D" parent="."]
+[node name="Zypresse" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.4)
+kind = 19
+solid = false
+[node name="Oleander" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.6, 0, -2.3)
+kind = 21
+solid = false
+[node name="Olivenbaum" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, -2.6)
+kind = 20
+solid = false
+[node name="Kiefer" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.5, 0, -2.8)
+kind = 18
+solid = false
+[node name="Laterne1" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 0, -2.2)
+kind = 10
+solid = false
+[node name="Laterne2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -2.2)
+kind = 10
+solid = false
+[node name="Laterne3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37, 0, -2.2)
+kind = 10
+solid = false
+[node name="Gartentor" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 0, -2.2)
+kind = 17
+solid = false
+[node name="Zaun" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0, -2.2)
+kind = 15
+tiles = 2
+solid = false
+[node name="Solarkollektor" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.5, 6, -0.7)
+kind = 6
+solid = false
+[node name="Klimageraet" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.6, 6, -0.9)
+kind = 9
+solid = false
+[node name="Antenne" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.5, 6, -0.7)
+kind = 8
+solid = false
+[node name="Satellitenschuessel" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.8, 6, -0.8)
+kind = 7
+solid = false
+[node name="Kirchturm" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27, 0, -28)
+kind = 22
+solid = false
+[node name="Tankstelle" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, -10)
+kind = 23
+solid = false
+[node name="Einfamilienhaus" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0, -7)
+kind = 5
+solid = false
+[node name="Strommast" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33, 0, -2.6)
+kind = 11
+solid = false
 
 [node name="Kletterzonen" type="Node3D" parent="."]
-
-[node name="Regenrinne1" parent="Kletterzonen" instance=ExtResource("4_climb")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.4, 1.5, -0.4)
+[node name="Regenrinne1" parent="Kletterzonen" instance=ExtResource("climb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.2, 1.5, -0.4)
 height = 3.0
 exit_direction = 1
-
-[node name="Regenrinne2" parent="Kletterzonen" instance=ExtResource("4_climb")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.6, 3, -0.4)
+exit_offset = Vector3(1.2, 0.45, 0)
+[node name="Regenrinne2" parent="Kletterzonen" instance=ExtResource("climb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.4, 3, -0.4)
 height = 6.0
 exit_direction = 1
+exit_offset = Vector3(1.2, 0.45, 0)
 
 [node name="Kanten" type="Node3D" parent="."]
-
-[node name="KanteDachA" parent="Kanten" instance=ExtResource("5_ledge")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.05, 5.85, 0)
+[node name="KanteDachB" parent="Kanten" instance=ExtResource("ledge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.85, 5.85, 0)
 facing = -1
 size = Vector3(0.5, 0.7, 1)
 exit_offset = Vector3(0.75, 0.6, 0)
-
-[node name="KanteDachB" parent="Kanten" instance=ExtResource("5_ledge")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.15, 5.85, 0)
+[node name="KanteDachC" parent="Kanten" instance=ExtResource("ledge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.35, 5.85, 0)
+facing = -1
+size = Vector3(0.5, 0.7, 1)
+exit_offset = Vector3(0.75, 0.6, 0)
+[node name="KanteZiel" parent="Kanten" instance=ExtResource("ledge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.35, 5.85, 0)
 facing = -1
 size = Vector3(0.5, 0.7, 1)
 exit_offset = Vector3(0.75, 0.6, 0)
 
 [node name="Hinweise" type="Node3D" parent="."]
-
-[node name="HinweisLaufen" parent="Hinweise" instance=ExtResource("6_hint")]
+[node name="HinweisLaufen" parent="Hinweise" instance=ExtResource("hint")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, 0)
 hint = 1
 size = Vector3(4, 3, 2)
-
-[node name="HinweisSpringen" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 1, 0)
+[node name="HinweisSpringen" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.6, 1, 0)
 hint = 2
 size = Vector3(2.4, 3, 2)
-
-[node name="HinweisKlettern" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.6, 1, 0)
+[node name="HinweisKlettern" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.4, 1, 0)
 hint = 3
 size = Vector3(2.4, 3, 2)
-
-[node name="HinweisFressen" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.9, 3.7, 0)
+[node name="HinweisFressen" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.8, 3.7, 0)
 hint = 4
 size = Vector3(2.2, 1.8, 2)
-
-[node name="HinweisVorsichtHund" parent="Hinweise" instance=ExtResource("6_hint")]
+[node name="HinweisVorsichtHund" parent="Hinweise" instance=ExtResource("hint")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1, 0)
 hint = 5
 size = Vector3(2.6, 3, 2)
-
-[node name="HinweisKletternDach" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.4, 1, 0)
+[node name="HinweisKletternDach" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.2, 1, 0)
 hint = 3
 size = Vector3(2.4, 3, 2)
-
-[node name="HinweisVorsichtKatze" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.6, 6.6, 0)
+[node name="HinweisVorsichtKatze" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.4, 6.6, 0)
 hint = 5
 size = Vector3(2.4, 2, 2)
-
-[node name="HinweisSprungLuecke" parent="Hinweise" instance=ExtResource("6_hint")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.8, 6.6, 0)
+[node name="HinweisSprungLuecke" parent="Hinweise" instance=ExtResource("hint")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.2, 6.6, 0)
 hint = 2
 size = Vector3(2.2, 2, 2)
 
 [node name="Gegner" type="Node3D" parent="."]
-
-[node name="SchlafenderHund" parent="Gegner" instance=ExtResource("9_dog")]
+[node name="SchlafenderHund" parent="Gegner" instance=ExtResource("dog")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.4, 0)
 dog_size = 0
 start_sleeping = true
 passive = true
 patrol_distance = 0.0
-
-[node name="PassiveRevierkatze" parent="Gegner" instance=ExtResource("10_cat")]
+[node name="PassiveRevierkatze" parent="Gegner" instance=ExtResource("cat")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 6.3, 0)
 passive = true
 territory_half_width = 2.5
 patrol_speed = 1.4
 
 [node name="Futter" type="Node3D" parent="."]
-
-[node name="Graete1" parent="Futter" instance=ExtResource("7_food")]
+[node name="Graete1" parent="Futter" instance=ExtResource("food")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.6, 0)
 kind = 0
-
-[node name="Graete2" parent="Futter" instance=ExtResource("7_food")]
+[node name="Graete2" parent="Futter" instance=ExtResource("food")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 3.6, 0)
 kind = 0
-
-[node name="Graete3" parent="Futter" instance=ExtResource("7_food")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.8, 3.6, 0)
+[node name="Graete3" parent="Futter" instance=ExtResource("food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.2, 3.6, 0)
 kind = 0
-
-[node name="Graete4" parent="Futter" instance=ExtResource("7_food")]
+[node name="Graete4" parent="Futter" instance=ExtResource("food")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.5, 6.6, 0)
 kind = 0
-
-[node name="Graete5" parent="Futter" instance=ExtResource("7_food")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.9, 6.6, 0)
+[node name="Graete5" parent="Futter" instance=ExtResource("food")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.5, 6.6, 0)
 kind = 0
+[node name="Futternapf" parent="." instance=ExtResource("bowl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.5, 6, 0)
 
-[node name="Futternapf" parent="." instance=ExtResource("8_bowl")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.5, 6, 0)
-
-[node name="Player" parent="." instance=ExtResource("11_player")]
+[node name="Player" parent="." instance=ExtResource("player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 7)
 fov = 45.0
 near = 0.05
-far = 120.0
-script = ExtResource("13_camera")
+far = 200.0
+script = ExtResource("camera")
 target_path = NodePath("../Player")
 offset = Vector3(0, 1, 7)
 
-[node name="HUD" parent="." instance=ExtResource("12_hud")]
+[node name="HUD" parent="." instance=ExtResource("hud")]

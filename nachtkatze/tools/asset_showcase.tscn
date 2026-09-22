@@ -22,11 +22,11 @@ script = ExtResource("1_showcase")
 environment = SubResource("Environment_showcase")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.906, 0, 0.423, 0.272, 0.766, -0.5826, -0.324, 0.643, 0.694, 0, 20, 0)
+transform = Transform3D(0.8779, 0.3733, -0.2999, -0, 0.6262, 0.7796, 0.4789, -0.6845, 0.5498, 0, 20, 0)
 light_energy = 1.0
 
 [node name="Boden" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, -0.2, -20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, -0.62, -20)
 mesh = SubResource("BoxMesh_boden")
 
 [node name="Camera3D" type="Camera3D" parent="."]

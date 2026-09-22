@@ -11,6 +11,12 @@ class_name AssetPiece
 		kind = value
 		_apply()
 
+## Wie viele Module nebeneinander (nur bei kachelbaren Bauteilen).
+@export_range(1, 24) var tiles: int = 1:
+	set(value):
+		tiles = value
+		_apply()
+
 ## Aus: reine Zier, die Katze laeuft hindurch.
 @export var solid: bool = true:
 	set(value):
@@ -32,7 +38,7 @@ func _apply() -> void:
 	var mesh_instance := get_node_or_null("Mesh") as MeshInstance3D
 	if mesh_instance == null:
 		return
-	mesh_instance.mesh = AssetKit.get_mesh(kind)
+	mesh_instance.mesh = AssetKit.get_mesh(kind, tiles)
 	mesh_instance.material_override = AssetKit.get_material()
 	mesh_instance.rotation.y = deg_to_rad(yaw_degrees)
 	_rebuild_collision()
@@ -41,7 +47,7 @@ func _rebuild_collision() -> void:
 	for child in get_children():
 		if child is CollisionShape3D:
 			child.queue_free()
-	var boxes := AssetKit.get_collision_boxes(kind) if solid else ([] as Array[AABB])
+	var boxes := AssetKit.get_collision_boxes(kind, tiles) if solid else ([] as Array[AABB])
 	collision_layer = 1 if boxes.size() > 0 else 0
 	collision_mask = 0
 	for box in boxes:

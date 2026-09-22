@@ -3,8 +3,8 @@
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
 Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab (Bewegungsprototyp,
 Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern) und aus
-**Meilenstein 5** das Asset-Kit samt Toon-Shader. Die Levels stehen noch
-in der Graubox - der Umbau auf das Kit ist der naechste Schritt.
+**Meilenstein 5** das Asset-Kit samt Toon-Shader - beide Levels sind
+daraus gebaut. Offen bleibt aus Meilenstein 5 der Parallax-Hintergrund.
 
 | | |
 |---|---|
@@ -17,7 +17,7 @@ in der Graubox - der Umbau auf das Kit ist der naechste Schritt.
 Startbild in der Daemmerung: die Katze als Silhouette auf dem Dach, dahinter
 der angestrahlte Kirchturm. Antippen fuehrt ins Hauptmenue.
 
-![Spielansicht](../docs/bilder/tut_00_spielansicht.png)
+![Spielansicht](../docs/bilder/tut_01_start.png)
 
 So sieht es durch die Spielkamera aus: Pfoten oben links, Pause oben rechts,
 Joystick unten links, Sprungtaste unten rechts. In der Mitte das Symbol des
@@ -126,6 +126,20 @@ auf, sobald die Katze den jeweiligen Bereich betritt.
   kuerzer als die Karosserie. Wer rechtzeitig springt, kommt sicher
   darueber: das Zeitfenster ist rund 0,3 s breit statt 0,1 s.
 
+## Levels aus dem Kit
+
+Beide Levels bestehen aus Modulen des Asset-Kits: Strassenstuecke zu 4 m,
+Geschoss-Segmente zu 4 m, Balkone und Daecher zu 2 m. Die Bauteile werden
+ueber `tiles` aneinandergereiht, Mesh und Kollision entstehen daraus
+automatisch. Die spielrelevanten Masse sind dabei gleich geblieben: 3 m je
+Geschoss, Dachluecken von 1,5 m und 3,2 m, dieselben Kletterhoehen.
+
+Nur was die Katze traegt oder aufhaelt, hat Kollision. Balkongelaender,
+Dachattika und alle Zierbauteile stehen ausserhalb der Spielebene oder sind
+als `solid = false` gesetzt, damit sie den Weg nicht verstellen.
+
+![Graubox aus dem Kit](../docs/bilder/03_daecher.png)
+
 ## Levelaufbau der Graubox (Spielwiese nach dem Tutorial)
 
 | Abschnitt | Inhalt |
@@ -200,7 +214,7 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
 ```
 
-Ergebnis: rund 24 MB, `org.nachtkatze.prototyp` in Version 0.3.0,
+Ergebnis: rund 24 MB, `org.nachtkatze.prototyp` in Version 0.4.0,
 minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
@@ -223,9 +237,11 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
   Lichtvoreinstellung schon angelegt und ueber `LevelData` umschaltbar.
 - Start- und Hauptmenue, Levelauswahl und Speichern sind Meilenstein 6.
 - Ton fehlt komplett (Meilenstein 7); die Audio-Busse kommen dort dazu.
-- Die Graubox rendert ohne Schlagschatten. Je nach Renderer beschattete sich
-  die Katze selbst und wurde fast schwarz; ohne Assets bringen Schatten noch
-  nichts. Beleuchtung und Schatten kommen in Meilenstein 5 richtig dazu.
+- Die Levels rendern ohne Schlagschatten. Je nach Renderer beschattete sich
+  die Katze selbst und wurde fast schwarz. Der Toon-Shader stuft stattdessen
+  das Sonnenlicht; echte Schatten und LightmapGI sind spaeter dran.
+- Spielerkatze und Gegner nutzen noch Standardmaterialien statt des
+  Toon-Shaders - sie sollen sich klar von der Kulisse abheben.
 - Ein Sturz aus grosser Hoehe kostet nichts - das GDD kennt keinen Fallschaden.
   Nur wer unter das Level faellt, verliert einen Lebenspunkt und setzt an der
   letzten sicheren Stelle wieder auf.
@@ -286,6 +302,5 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Aus Meilenstein 5 fehlen noch der Parallax-Hintergrund und vor allem der
-Umbau der beiden Levels von der Graubox auf das Asset-Kit. Danach
+Aus Meilenstein 5 fehlt noch der Parallax-Hintergrund. Danach
 Meilenstein 7 (Ton) und Meilenstein 8 (Levels 1 bis 10).

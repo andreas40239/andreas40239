@@ -17,7 +17,7 @@ const PUTZ_SCHATTEN := Color(0.62, 0.55, 0.45, 0.0)
 const ZIEGEL_ROT := Color(0.66, 0.29, 0.20, 0.0)
 const BETON := Color(0.58, 0.57, 0.55, 0.0)
 const BETON_DUNKEL := Color(0.48, 0.47, 0.46, 0.0)
-const ASPHALT := Color(0.46, 0.46, 0.50, 0.0)
+const ASPHALT := Color(0.62, 0.62, 0.66, 0.0)
 
 # --- Material ---------------------------------------------------------------
 const METALL := Color(0.55, 0.57, 0.62, 0.0)

@@ -8,13 +8,21 @@ const LEVEL_PATH := "res://scenes/levels/level_greybox.tscn"
 const TUTORIAL_PATH := "res://scenes/levels/level_00_tutorial.tscn"
 const PHYSICS_FPS := 60.0
 
+## Nach dieser Zeit gilt der Lauf als haengengeblieben.
+const WATCHDOG_SECONDS := 420
+
 var _failures: Array[String] = []
 var _checks := 0
+var _finished := false
+var _last_check := "(noch keine)"
 
 func _ready() -> void:
 	# Erst einen Frame abwarten: waehrend _ready baut der Baum noch auf und
 	# add_child() auf die Wurzel schlaegt fehl.
 	await get_tree().process_frame
+	# Wachhund: bricht ein Skriptfehler eine Pruefung ab, wuerde der Lauf sonst
+	# stumm haengen bleiben.
+	_start_watchdog()
 	# Der Testlauf schliesst Levels ab - den echten Spielstand nicht veraendern.
 	var saved_progress := SaveGame.completed_levels.duplicate()
 	var saved_music := SaveGame.music_on
@@ -26,10 +34,21 @@ func _ready() -> void:
 	SaveGame.save_game()
 	SaveGame.apply_audio()
 	print("")
+	_finished = true
 	print("--- Ergebnis: %d Pruefungen, %d Fehler ---" % [_checks, _failures.size()])
 	for failure in _failures:
 		print("FEHLER: ", failure)
 	get_tree().quit(1 if _failures.size() > 0 else 0)
+
+func _start_watchdog() -> void:
+	var watchdog := func() -> void:
+		await get_tree().create_timer(WATCHDOG_SECONDS, true, false, true).timeout
+		if not _finished:
+			print("")
+			print("--- ABBRUCH: Testlauf haengt nach %d s (letzte Pruefung: %s) ---"
+				% [WATCHDOG_SECONDS, _last_check])
+			get_tree().quit(2)
+	watchdog.call()
 
 func _run_all() -> void:
 	_test_metrics()
@@ -155,10 +174,8 @@ func _test_ledge_grab() -> void:
 func _test_hard_gap() -> void:
 	var level := await _spawn_level()
 	var player: Player = level.get_node("Player")
-	var roof_b: Node3D = level.get_node("Welt/DachB")
-	var roof_c: Node3D = level.get_node("Welt/DachC")
-	var edge_b: float = roof_b.global_position.x + roof_b.size.x * 0.5
-	var edge_c: float = roof_c.global_position.x - roof_c.size.x * 0.5
+	var edge_b: float = _piece_edges(level.get_node("Welt/DachB")).y
+	var edge_c: float = _piece_edges(level.get_node("Welt/DachC")).x
 	_check(absf((edge_c - edge_b) - 3.2) < 0.05,
 		"Dachluecke misst %.2f m (geplant 3,2 m)" % (edge_c - edge_b))
 
@@ -583,10 +600,8 @@ func _test_tutorial_level() -> void:
 	await _check_climb_zones(level, player)
 
 	# Die kleine Dachluecke muss aus dem Lauf zu schaffen sein.
-	var roof_a: Node3D = level.get_node("Welt/DachA")
-	var roof_b: Node3D = level.get_node("Welt/DachB")
-	var gap: float = (roof_b.global_position.x - roof_b.size.x * 0.5) \
-		- (roof_a.global_position.x + roof_a.size.x * 0.5)
+	var gap: float = _piece_edges(level.get_node("Welt/DachC")).x \
+		- _piece_edges(level.get_node("Welt/DachB")).y
 	_check(gap > 1.0 and gap < 1.8,
 		"Tutorial-Dachluecke ist klein gehalten (%.2f m)" % gap)
 
@@ -727,6 +742,15 @@ func _test_asset_kit() -> void:
 	piece.free()
 	await get_tree().process_frame
 
+## Linke und rechte Kante der Standflaeche eines Bauteils.
+func _piece_edges(piece: AssetPiece) -> Vector2:
+	var left := INF
+	var right := -INF
+	for box in AssetKit.get_collision_boxes(piece.kind, piece.tiles):
+		left = minf(left, piece.global_position.x + box.position.x)
+		right = maxf(right, piece.global_position.x + box.end.x)
+	return Vector2(left, right)
+
 ## Anteil der Eckpunkte, deren Normale vom Mittelpunkt wegzeigt.
 func _outward_normal_ratio(mesh: ArrayMesh) -> float:
 	var arrays := mesh.surface_get_arrays(0)
@@ -794,6 +818,7 @@ func _wait(seconds: float) -> void:
 
 func _check(condition: bool, description: String) -> void:
 	_checks += 1
+	_last_check = description
 	if condition:
 		print("  ok   ", description)
 	else:

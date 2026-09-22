@@ -43,11 +43,26 @@ enum Kind {
 	FISCHGRAETE,
 	GANZER_FISCH,
 	FUTTERNAPF,
+	# Untergrund
+	STRASSEN_SEGMENT,
+	MAUERSTUECK,
 }
 
 const MATERIAL_PATH := "res://assets/materials/toon_material.tres"
 ## Lichte Hoehe der Zaunluecke: die Katze (0,55 m) passt hindurch, kein Hund.
 const ZAUN_LUECKE := 0.62
+
+## Breite der kachelbaren Bauteile - damit lassen sich Fassaden, Balkone,
+## Daecher und Strassen aus Modulen zusammensetzen (GDD Abschnitt 8).
+const MODULE_WIDTH := {
+	Kind.GESCHOSS_SEGMENT: 4.0,
+	Kind.BALKONBAND: 2.0,
+	Kind.DACHABSCHLUSS: 2.0,
+	Kind.ZAUN: 2.0,
+	Kind.ZAUN_MIT_LUECKE: 2.0,
+	Kind.STRASSEN_SEGMENT: 4.0,
+	Kind.MAUERSTUECK: 2.0,
+}
 
 static var _mesh_cache := {}
 static var _material: ShaderMaterial = null
@@ -73,28 +88,58 @@ static func set_sun(direction: Vector3, color: Color, energy: float = 0.85) -> v
 	material.set_shader_parameter("fallback_sun_color", color)
 	material.set_shader_parameter("fallback_sun_energy", energy)
 
-## Mesh eines Bauteils; Ergebnisse werden zwischengespeichert.
-static func get_mesh(kind: Kind) -> ArrayMesh:
-	if _mesh_cache.has(kind):
-		return _mesh_cache[kind]
-	var surface := MeshBuilder.create()
-	_build(kind, surface)
-	var mesh := MeshBuilder.finish(surface)
-	_mesh_cache[kind] = mesh
+## Mesh eines Bauteils, wahlweise mehrfach aneinandergereiht.
+## Ergebnisse werden zwischengespeichert, gleiche Teile teilen sich ihr Mesh.
+static func get_mesh(kind: Kind, tiles: int = 1) -> ArrayMesh:
+	tiles = maxi(tiles, 1)
+	var key := "%d_%d" % [kind, tiles]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var mesh: ArrayMesh
+	if tiles == 1:
+		var surface := MeshBuilder.create()
+		_build(kind, surface)
+		mesh = MeshBuilder.finish(surface)
+	else:
+		var base := get_mesh(kind, 1)
+		var width := module_width(kind)
+		var surface := MeshBuilder.create()
+		for i in tiles:
+			var offset := (float(i) - float(tiles - 1) * 0.5) * width
+			surface.append_from(base, 0, Transform3D(Basis(), Vector3(offset, 0, 0)))
+		mesh = surface.commit()
+	_mesh_cache[key] = mesh
 	return mesh
+
+## Breite eines Moduls; 0 bedeutet "nicht kachelbar".
+static func module_width(kind: Kind) -> float:
+	return MODULE_WIDTH.get(kind, 0.0)
 
 ## Kollisionskoerper eines Bauteils in lokalen Koordinaten. Leer bedeutet:
 ## reine Zier, die Katze laeuft hindurch.
-static func get_collision_boxes(kind: Kind) -> Array[AABB]:
+static func get_collision_boxes(kind: Kind, tiles: int = 1) -> Array[AABB]:
+	var boxes := _base_collision_boxes(kind)
+	var width := module_width(kind)
+	if tiles <= 1 or width <= 0.0:
+		return boxes
+	# Gekachelte Bauteile bekommen einen entsprechend breiteren Koerper.
+	var total := width * float(tiles)
+	var stretched: Array[AABB] = []
+	for box in boxes:
+		stretched.append(AABB(Vector3(-total * 0.5, box.position.y, box.position.z),
+			Vector3(total, box.size.y, box.size.z)))
+	return stretched
+
+static func _base_collision_boxes(kind: Kind) -> Array[AABB]:
 	match kind:
 		Kind.GESCHOSS_SEGMENT:
 			return [AABB(Vector3(-2, 0, -2), Vector3(4, 3, 2))]
 		Kind.BALKONBAND:
-			return [AABB(Vector3(-2, -0.24, -1.2), Vector3(4, 0.24, 2.4))]
+			return [AABB(Vector3(-1, -0.24, -1.2), Vector3(2, 0.24, 2.4))]
 		Kind.MARKISE_OFFEN:
 			return [AABB(Vector3(-1.1, 0.18, -0.05), Vector3(2.2, 0.14, 1.1))]
 		Kind.DACHABSCHLUSS:
-			return [AABB(Vector3(-2, -0.3, -1.2), Vector3(4, 0.3, 2.4))]
+			return [AABB(Vector3(-1, -0.3, -1.2), Vector3(2, 0.3, 2.4))]
 		Kind.EINFAMILIENHAUS:
 			return [AABB(Vector3(-2.5, 0, -2), Vector3(5, 3, 4))]
 		Kind.GEPARKTES_AUTO:
@@ -103,6 +148,10 @@ static func get_collision_boxes(kind: Kind) -> Array[AABB]:
 			return [AABB(Vector3(-1, 0, -0.08), Vector3(2, 1.3, 0.16))]
 		Kind.ZAUN_MIT_LUECKE:
 			return [AABB(Vector3(-1, ZAUN_LUECKE, -0.08), Vector3(2, 1.3 - ZAUN_LUECKE, 0.16))]
+		Kind.STRASSEN_SEGMENT:
+			return [AABB(Vector3(-2, -0.4, -3), Vector3(4, 0.4, 6))]
+		Kind.MAUERSTUECK:
+			return [AABB(Vector3(-1, 0, -0.35), Vector3(2, 0.55, 0.7))]
 		Kind.GARTENTOR:
 			return [AABB(Vector3(-0.6, 0, -0.06), Vector3(1.2, 1.4, 0.12))]
 		Kind.KIRCHTURM:
@@ -150,6 +199,8 @@ static func _build(kind: Kind, surface: SurfaceTool) -> void:
 		Kind.FISCHGRAETE: _fischgraete(surface)
 		Kind.GANZER_FISCH: _ganzer_fisch(surface)
 		Kind.FUTTERNAPF: _futternapf(surface)
+		Kind.STRASSEN_SEGMENT: _strassen_segment(surface)
+		Kind.MAUERSTUECK: _mauerstueck(surface)
 
 ## Geschoss eines Wohnblocks: 4 m breit, 3 m hoch, Front auf z = 0.
 static func _geschoss_segment(surface: SurfaceTool) -> void:
@@ -167,22 +218,17 @@ static func _geschoss_segment(surface: SurfaceTool) -> void:
 		MeshBuilder.add_box(surface, Vector3(offset, 1.03, -0.02), Vector3(1.1, 0.08, 0.22),
 			Palette.BETON)
 
-## Balkonband mit Metallgelaender; Ursprung auf der Balkonoberkante.
+## Balkonband mit Metallgelaender, 2-m-Modul; Ursprung auf der Oberkante.
 static func _balkonband(surface: SurfaceTool) -> void:
-	MeshBuilder.add_box(surface, Vector3(0, -0.12, 0), Vector3(4, 0.24, 2.4), Palette.BETON)
+	MeshBuilder.add_box(surface, Vector3(0, -0.12, 0), Vector3(2, 0.24, 2.4), Palette.BETON)
 	var front := 1.14
-	MeshBuilder.add_box(surface, Vector3(0, 0.9, front), Vector3(4, 0.06, 0.06), Palette.METALL)
-	MeshBuilder.add_box(surface, Vector3(0, 0.45, front), Vector3(4, 0.04, 0.04), Palette.METALL)
-	var post := -1.9
-	while post <= 1.9:
+	MeshBuilder.add_box(surface, Vector3(0, 0.9, front), Vector3(2, 0.06, 0.06), Palette.METALL)
+	MeshBuilder.add_box(surface, Vector3(0, 0.45, front), Vector3(2, 0.04, 0.04), Palette.METALL)
+	var post := -0.9
+	while post <= 0.91:
 		MeshBuilder.add_box(surface, Vector3(post, 0.45, front), Vector3(0.05, 0.9, 0.05),
 			Palette.METALL)
-		post += 0.38
-	for side in [-1.0, 1.0]:
-		MeshBuilder.add_box(surface, Vector3(side * 1.97, 0.9, front * 0.5),
-			Vector3(0.06, 0.06, 2.3), Palette.METALL)
-		MeshBuilder.add_box(surface, Vector3(side * 1.97, 0.45, 0.0),
-			Vector3(0.05, 0.9, 0.05), Palette.METALL)
+		post += 0.36
 
 ## Offene Markise: gestreiftes Tuch auf zwei Armen - im Spiel eine Plattform.
 static func _markise_offen(surface: SurfaceTool) -> void:
@@ -212,15 +258,12 @@ static func _markise_geschlossen(surface: SurfaceTool) -> void:
 		MeshBuilder.add_box(surface, Vector3(side * 1.12, 0.45, 0.02),
 			Vector3(0.06, 0.3, 0.3), Palette.METALL_DUNKEL)
 
-## Dachabschluss mit Attika; Ursprung auf der Dachoberkante.
+## Dachabschluss mit Attika, 2-m-Modul; Ursprung auf der Dachoberkante.
 static func _dachabschluss(surface: SurfaceTool) -> void:
-	MeshBuilder.add_box(surface, Vector3(0, -0.15, 0), Vector3(4, 0.3, 2.4), Palette.BETON)
-	MeshBuilder.add_box(surface, Vector3(0, 0.18, 1.1), Vector3(4, 0.36, 0.2), Palette.PUTZ_HELL)
-	MeshBuilder.add_box(surface, Vector3(0, 0.37, 1.1), Vector3(4.1, 0.06, 0.28),
+	MeshBuilder.add_box(surface, Vector3(0, -0.15, 0), Vector3(2, 0.3, 2.4), Palette.BETON)
+	MeshBuilder.add_box(surface, Vector3(0, 0.16, 1.1), Vector3(2, 0.32, 0.2), Palette.PUTZ_HELL)
+	MeshBuilder.add_box(surface, Vector3(0, 0.33, 1.1), Vector3(2, 0.06, 0.28),
 		Palette.PUTZ_SCHATTEN)
-	for side in [-1.0, 1.0]:
-		MeshBuilder.add_box(surface, Vector3(side * 1.9, 0.18, 0.0),
-			Vector3(0.2, 0.36, 2.4), Palette.PUTZ_HELL)
 
 ## Einfamilienhaus mit rotem Ziegelvordach.
 static func _einfamilienhaus(surface: SurfaceTool) -> void:
@@ -463,3 +506,21 @@ static func _ganzer_fisch(surface: SurfaceTool) -> void:
 static func _futternapf(surface: SurfaceTool) -> void:
 	MeshBuilder.add_cylinder(surface, Vector3(0, 0.08, 0), 0.19, 0.28, 0.16, 12, Palette.NAPF)
 	MeshBuilder.add_cylinder(surface, Vector3(0, 0.16, 0), 0.22, 0.22, 0.04, 12, Palette.FUTTER)
+
+
+## Strassenstueck mit Bordstein, 4-m-Modul; Ursprung auf der Fahrbahn.
+static func _strassen_segment(surface: SurfaceTool) -> void:
+	MeshBuilder.add_box(surface, Vector3(0, -0.2, 0), Vector3(4, 0.4, 6), Palette.ASPHALT)
+	# Gehsteig vorne und hinten
+	for z in [-2.55, 2.55]:
+		MeshBuilder.add_box(surface, Vector3(0, -0.04, z), Vector3(4, 0.12, 0.9),
+			Palette.BETON)
+	# Mittellinie
+	MeshBuilder.add_box(surface, Vector3(0, 0.005, 0), Vector3(1.6, 0.02, 0.12),
+		Palette.LACK_WEISS)
+
+## Niedrige Gartenmauer, 2-m-Modul - zum Darueberspringen.
+static func _mauerstueck(surface: SurfaceTool) -> void:
+	MeshBuilder.add_box(surface, Vector3(0, 0.26, 0), Vector3(2, 0.52, 0.7), Palette.PUTZ_WARM)
+	MeshBuilder.add_box(surface, Vector3(0, 0.54, 0), Vector3(2.1, 0.06, 0.8),
+		Palette.PUTZ_SCHATTEN)

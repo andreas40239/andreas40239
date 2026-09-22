@@ -23,6 +23,8 @@ const GROUPS := [
 	{"name": "Vegetation", "kinds": [
 		AssetKit.Kind.KIEFER, AssetKit.Kind.ZYPRESSE,
 		AssetKit.Kind.OLIVENBAUM, AssetKit.Kind.OLEANDERBUSCH]},
+	{"name": "Untergrund", "kinds": [
+		AssetKit.Kind.STRASSEN_SEGMENT, AssetKit.Kind.MAUERSTUECK]},
 	{"name": "Landmarken und Futter", "kinds": [
 		AssetKit.Kind.KIRCHTURM, AssetKit.Kind.TANKSTELLE,
 		AssetKit.Kind.FISCHGRAETE, AssetKit.Kind.GANZER_FISCH,
