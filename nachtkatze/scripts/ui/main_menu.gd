@@ -17,6 +17,10 @@ func _ready() -> void:
 	%ZurueckVonLevels.pressed.connect(_show_main)
 	%ZurueckVonEinstellungen.pressed.connect(_show_main)
 
+	%MusikStueckButton.pressed.connect(_next_track)
+	_update_track_label()
+	Music.track_changed.connect(func(_index): _update_track_label())
+
 	music_toggle.button_pressed = SaveGame.music_on
 	sound_toggle.button_pressed = SaveGame.sound_on
 	music_toggle.toggled.connect(SaveGame.set_music_on)
@@ -39,6 +43,13 @@ func _show_settings() -> void:
 	main_panel.visible = false
 	level_panel.visible = false
 	settings_panel.visible = true
+
+## Durch die drei Stuecke schalten (GDD Abschnitt 11).
+func _next_track() -> void:
+	Music.next_track()
+
+func _update_track_label() -> void:
+	%MusikStueckButton.text = "♪  " + Music.track_name(Music.current_track)
 
 ## Je Level eine Schaltflaeche; noch gesperrte Levels sind nicht anwaehlbar.
 func _build_level_list() -> void:

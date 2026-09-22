@@ -46,6 +46,8 @@ enum Kind {
 	# Untergrund
 	STRASSEN_SEGMENT,
 	MAUERSTUECK,
+	# Kletterbares
+	REGENRINNE,
 }
 
 const MATERIAL_PATH := "res://assets/materials/toon_material.tres"
@@ -62,10 +64,15 @@ const MODULE_WIDTH := {
 	Kind.ZAUN_MIT_LUECKE: 2.0,
 	Kind.STRASSEN_SEGMENT: 4.0,
 	Kind.MAUERSTUECK: 2.0,
+	Kind.REGENRINNE: 3.0,
 }
+
+## Bauteile, die nach oben statt zur Seite gekachelt werden.
+const VERTICAL_MODULES := [Kind.REGENRINNE]
 
 static var _mesh_cache := {}
 static var _material: ShaderMaterial = null
+static var _background_material: ShaderMaterial = null
 
 ## Gemeinsames Toon-Material. Auf Renderern ohne light()-Unterstuetzung
 ## (Compatibility) wird der Ersatzpfad im Shader eingeschaltet.
@@ -75,18 +82,29 @@ static func get_material() -> ShaderMaterial:
 		configure_material()
 	return _material
 
+## Material fuer die Parallax-Staffeln: derselbe Shader, aber entsaettigt und
+## blaustichig, damit der Hintergrund zuruecktritt (GDD Abschnitt 9).
+static func get_background_material() -> ShaderMaterial:
+	if _background_material == null:
+		_background_material = get_material().duplicate() as ShaderMaterial
+		_background_material.set_shader_parameter("tint", Color(0.86, 0.90, 1.0))
+		_background_material.set_shader_parameter("shadow_level", 0.72)
+	return _background_material
+
 static func configure_material() -> void:
 	if _material == null:
 		_material = load(MATERIAL_PATH)
 	var needs_fallback := RenderingServer.get_rendering_device() == null
 	_material.set_shader_parameter("fallback_sun", needs_fallback)
+	if _background_material != null:
+		_background_material.set_shader_parameter("fallback_sun", needs_fallback)
 
 ## Sonnenrichtung und -farbe fuer den Ersatzpfad nachfuehren (Tageszeiten).
 static func set_sun(direction: Vector3, color: Color, energy: float = 0.85) -> void:
-	var material := get_material()
-	material.set_shader_parameter("fallback_sun_direction", direction.normalized())
-	material.set_shader_parameter("fallback_sun_color", color)
-	material.set_shader_parameter("fallback_sun_energy", energy)
+	for material in [get_material(), get_background_material()]:
+		material.set_shader_parameter("fallback_sun_direction", direction.normalized())
+		material.set_shader_parameter("fallback_sun_color", color)
+		material.set_shader_parameter("fallback_sun_energy", energy)
 
 ## Mesh eines Bauteils, wahlweise mehrfach aneinandergereiht.
 ## Ergebnisse werden zwischengespeichert, gleiche Teile teilen sich ihr Mesh.
@@ -104,9 +122,12 @@ static func get_mesh(kind: Kind, tiles: int = 1) -> ArrayMesh:
 		var base := get_mesh(kind, 1)
 		var width := module_width(kind)
 		var surface := MeshBuilder.create()
+		var vertical := VERTICAL_MODULES.has(kind)
 		for i in tiles:
-			var offset := (float(i) - float(tiles - 1) * 0.5) * width
-			surface.append_from(base, 0, Transform3D(Basis(), Vector3(offset, 0, 0)))
+			var step := float(i) * width if vertical \
+				else (float(i) - float(tiles - 1) * 0.5) * width
+			var offset := Vector3(0, step, 0) if vertical else Vector3(step, 0, 0)
+			surface.append_from(base, 0, Transform3D(Basis(), offset))
 		mesh = surface.commit()
 	_mesh_cache[key] = mesh
 	return mesh
@@ -201,6 +222,7 @@ static func _build(kind: Kind, surface: SurfaceTool) -> void:
 		Kind.FUTTERNAPF: _futternapf(surface)
 		Kind.STRASSEN_SEGMENT: _strassen_segment(surface)
 		Kind.MAUERSTUECK: _mauerstueck(surface)
+		Kind.REGENRINNE: _regenrinne(surface)
 
 ## Geschoss eines Wohnblocks: 4 m breit, 3 m hoch, Front auf z = 0.
 static func _geschoss_segment(surface: SurfaceTool) -> void:
@@ -524,3 +546,17 @@ static func _mauerstueck(surface: SurfaceTool) -> void:
 	MeshBuilder.add_box(surface, Vector3(0, 0.26, 0), Vector3(2, 0.52, 0.7), Palette.PUTZ_WARM)
 	MeshBuilder.add_box(surface, Vector3(0, 0.54, 0), Vector3(2.1, 0.06, 0.8),
 		Palette.PUTZ_SCHATTEN)
+
+
+## Regenrinne, 3-m-Modul zum Stapeln; Ursprung am Fuss (GDD Abschnitt 2:
+## kletterbares Element). Der warme Lichtakzent kommt von der Kletterzone.
+static func _regenrinne(surface: SurfaceTool) -> void:
+	MeshBuilder.add_cylinder(surface, Vector3(0, 1.5, 0), 0.075, 0.075, 3.0, 8,
+		Palette.METALL)
+	# Schellen, die das Rohr an der Wand halten
+	for y in [0.35, 1.5, 2.65]:
+		MeshBuilder.add_box(surface, Vector3(0, y, -0.1), Vector3(0.2, 0.07, 0.22),
+			Palette.METALL_DUNKEL)
+	# Auslauf unten
+	MeshBuilder.add_cylinder(surface, Vector3(0, 0.12, 0.06), 0.1, 0.085, 0.3, 8,
+		Palette.METALL_DUNKEL, Basis(Vector3.RIGHT, deg_to_rad(18.0)))

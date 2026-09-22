@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Resource" path="res://resources/levels/level_greybox.tres" id="data"]
 [ext_resource type="Script" path="res://scripts/levels/level.gd" id="level"]
@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="hud"]
 [ext_resource type="Script" path="res://scripts/player/follow_camera.gd" id="camera"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_background.tscn" id="parallax"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/car.tscn" id="car"]
 
 [sub_resource type="Environment" id="Environment_level"]
@@ -210,10 +211,6 @@ solid = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 6, -0.8)
 kind = 7
 solid = false
-[node name="Kirchturm" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, -30)
-kind = 22
-solid = false
 [node name="Tankstelle" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 0, -9)
 kind = 23
@@ -221,6 +218,23 @@ solid = false
 [node name="Einfamilienhaus" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -8)
 kind = 5
+solid = false
+[node name="RegenrinneA" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.4, 0, -0.55)
+kind = 29
+solid = false
+[node name="RegenrinneB" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.6, 3, -0.55)
+kind = 29
+solid = false
+[node name="RegenrinneC" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.6, 0, -0.55)
+kind = 29
+tiles = 2
+solid = false
+[node name="RegenrinneD" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.6, 6, -0.55)
+kind = 29
 solid = false
 
 [node name="Kletterzonen" type="Node3D" parent="."]
@@ -234,12 +248,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.6, 4.5, -0.4)
 height = 3.0
 exit_direction = -1
 exit_offset = Vector3(1.2, 0.45, 0)
-[node name="Strommast" parent="Kletterzonen" instance=ExtResource("climb")]
+[node name="Regenrinne3" parent="Kletterzonen" instance=ExtResource("climb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.6, 3, -0.4)
 height = 6.0
 exit_direction = 1
 exit_offset = Vector3(1.2, 0.45, 0)
-[node name="Balkongitter" parent="Kletterzonen" instance=ExtResource("climb")]
+[node name="Regenrinne4" parent="Kletterzonen" instance=ExtResource("climb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.6, 7.5, -0.4)
 height = 3.0
 exit_direction = 1
@@ -303,6 +317,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 6.7, 0)
 kind = 1
 [node name="Futternapf" parent="." instance=ExtResource("bowl")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.5, 9, 0)
+
+[node name="Hintergrund" parent="." instance=ExtResource("parallax")]
+target_path = NodePath("../Camera3D")
 
 [node name="Player" parent="." instance=ExtResource("player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)

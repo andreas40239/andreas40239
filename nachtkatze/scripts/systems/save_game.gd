@@ -10,6 +10,8 @@ const SAVE_PATH := "user://nachtkatze.cfg"
 var completed_levels: Array[int] = []
 var music_on: bool = true
 var sound_on: bool = true
+## Gewaehltes Hintergrundstueck (Index in MusicPlayer.TRACKS).
+var music_track: int = 0
 
 func _ready() -> void:
 	load_game()
@@ -52,6 +54,11 @@ func set_music_on(value: bool) -> void:
 	save_game()
 	audio_changed.emit()
 
+func set_music_track(index: int) -> void:
+	music_track = index
+	save_game()
+	audio_changed.emit()
+
 func set_sound_on(value: bool) -> void:
 	sound_on = value
 	apply_audio()
@@ -79,10 +86,12 @@ func load_game() -> void:
 		completed_levels.append(int(value))
 	music_on = bool(config.get_value("audio", "musik", true))
 	sound_on = bool(config.get_value("audio", "sound", true))
+	music_track = int(config.get_value("audio", "stueck", 0))
 
 func save_game() -> void:
 	var config := ConfigFile.new()
 	config.set_value("fortschritt", "abgeschlossen", completed_levels)
 	config.set_value("audio", "musik", music_on)
 	config.set_value("audio", "sound", sound_on)
+	config.set_value("audio", "stueck", music_track)
 	config.save(SAVE_PATH)

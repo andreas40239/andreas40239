@@ -71,6 +71,9 @@ func _run_all() -> void:
 	await _test_save_and_progress()
 	await _test_menu_screens()
 	await _test_asset_kit()
+	await _test_regenrinnen()
+	await _test_parallax_hintergrund()
+	await _test_musik()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -286,7 +289,7 @@ func _test_camera_follows_fall() -> void:
 		"Kamera hat nach der Landung aufgeschlossen (%.2f m Abstand)" % settled)
 
 	# Herunterklettern zaehlt genauso als Fallen.
-	var zone: ClimbZone = level.get_node("Kletterzonen/Strommast")
+	var zone: ClimbZone = level.get_node("Kletterzonen/Regenrinne3")
 	player.global_position = Vector3(zone.global_position.x, zone.get_top_y() - 0.3, 0.0)
 	await _wait(0.3)
 	PlayerInput.set_touch_move(Vector2(0.0, -1.0))
@@ -765,6 +768,97 @@ func _outward_normal_ratio(mesh: ArrayMesh) -> float:
 		if direction.length() < 0.001 or normals[i].dot(direction.normalized()) > 0.0:
 			outward += 1
 	return float(outward) / float(vertices.size())
+
+## GDD Abschnitt 2: kletterbare Elemente muessen auch sichtbar sein.
+func _test_regenrinnen() -> void:
+	for path in [LEVEL_PATH, TUTORIAL_PATH]:
+		var level := await _spawn_level(path)
+		var zones := level.get_node("Kletterzonen")
+		var welt := level.get_node("Welt")
+		var without_pipe: Array[String] = []
+		for child in zones.get_children():
+			var zone := child as ClimbZone
+			var found := false
+			for piece_node in welt.get_children():
+				var piece := piece_node as AssetPiece
+				if piece == null or piece.kind != AssetKit.Kind.REGENRINNE:
+					continue
+				var same_column: bool = absf(piece.global_position.x - zone.global_position.x) < 0.4
+				var covers: bool = piece.global_position.y <= zone.global_position.y + 0.1 \
+					and piece.global_position.y + 3.0 * piece.tiles >= zone.get_top_y() - 0.1
+				if same_column and covers:
+					found = true
+			if not found:
+				without_pipe.append(zone.name)
+		_check(without_pipe.is_empty(),
+			"%s: jede Kletterzone hat eine Regenrinne %s"
+				% [path.get_file(), str(without_pipe)])
+		await _despawn(level)
+
+## GDD Abschnitt 8: zwei bis drei Parallax-Staffeln.
+func _test_parallax_hintergrund() -> void:
+	var level := await _spawn_level()
+	var background := level.get_node_or_null("Hintergrund") as ParallaxBackground3D
+	_check(background != null, "Level hat einen Parallax-Hintergrund")
+	if background == null:
+		await _despawn(level)
+		return
+	var meshes: Array[MeshInstance3D] = []
+	for child in background.get_children():
+		if child is MeshInstance3D:
+			meshes.append(child)
+	_check(meshes.size() == ParallaxBackground3D.LAYERS.size() * 3,
+		"Drei Staffeln zu je drei Kopien (%d Netze)" % meshes.size())
+	var empty := 0
+	for mesh_instance in meshes:
+		if mesh_instance.mesh == null or mesh_instance.mesh.get_faces().is_empty():
+			empty += 1
+	_check(empty == 0, "Alle Staffeln haben Geometrie (%d leer)" % empty)
+
+	# Staffeln muessen mitwandern, sonst laeuft der Hintergrund aus.
+	var player: Player = level.get_node("Player")
+	var before := meshes[0].global_position.x
+	player.global_position = Vector3(400.0, 0.4, 0.0)
+	await _wait(0.3)
+	var moved: float = absf(meshes[0].global_position.x - before)
+	_check(moved > 100.0,
+		"Der Hintergrund wandert mit der Kamera mit (%.0f m)" % moved)
+	# Und er bleibt hinter der Spielebene.
+	var nearest := 0.0
+	for layer in ParallaxBackground3D.LAYERS:
+		nearest = minf(nearest, layer["z"])
+	_check(nearest < -20.0, "Die Staffeln liegen hinter der Spielebene")
+	await _despawn(level)
+
+## GDD Abschnitt 11: drei selbst erzeugte Stuecke, im Menue umschaltbar.
+func _test_musik() -> void:
+	_check(Music.track_count() == 3, "Drei Hintergrundstuecke (%d)" % Music.track_count())
+	var broken: Array[String] = []
+	for index in Music.track_count():
+		var path: String = Music.TRACKS[index]["pfad"]
+		var stream := load(path) as AudioStreamWAV
+		if stream == null:
+			broken.append(path)
+			continue
+		# Schleife muss gesetzt sein, sonst bricht die Musik nach einmal ab.
+		if stream.loop_mode != AudioStreamWAV.LOOP_FORWARD:
+			broken.append("%s (keine Schleife)" % path.get_file())
+		if stream.get_length() < 20.0:
+			broken.append("%s (zu kurz)" % path.get_file())
+	_check(broken.is_empty(), "Alle Stuecke laden und laufen in Schleife %s" % str(broken))
+
+	var previous := SaveGame.music_track
+	Music.play_track(0, false)
+	await get_tree().process_frame
+	_check(Music.current_track == 0, "Erstes Stueck laeuft")
+	Music.next_track()
+	await get_tree().process_frame
+	_check(Music.current_track == 1, "Weiterschalten wechselt das Stueck")
+	_check(SaveGame.music_track == 1, "Die Wahl landet im Spielstand")
+	_check(Music.track_name(2).contains("Nachtstreifen"),
+		"Stuecke haben Namen: %s" % Music.track_name(2))
+	SaveGame.set_music_track(previous)
+	Music.play_track(previous, false)
 
 # --- Hilfen -----------------------------------------------------------------
 

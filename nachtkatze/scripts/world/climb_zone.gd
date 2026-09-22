@@ -52,12 +52,15 @@ func _apply() -> void:
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(width, height, 1.0)
 	collision.shape = shape
+	# Schmaler Lichtakzent neben dem Bauteil - das Rohr selbst kommt aus dem
+	# Asset-Kit (GDD Abschnitt 8: kletterbare Elemente einheitlich markiert).
 	var box_mesh := BoxMesh.new()
-	box_mesh.size = Vector3(width, height, 0.35)
+	box_mesh.size = Vector3(width * 0.22, height, 0.1)
 	mesh_instance.mesh = box_mesh
+	mesh_instance.position = Vector3(0, 0, 0.16)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.98, 0.80, 0.45)
+	material.albedo_color = Color(1.0, 0.86, 0.55)
 	material.emission_enabled = true
-	material.emission = Color(0.9, 0.6, 0.2)
-	material.emission_energy_multiplier = 0.4
+	material.emission = Color(1.0, 0.72, 0.32)
+	material.emission_energy_multiplier = 0.45
 	mesh_instance.set_surface_override_material(0, material)

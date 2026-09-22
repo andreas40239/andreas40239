@@ -111,8 +111,14 @@ custom_minimum_size = Vector2(0, 62)
 text = "Sound"
 theme_override_font_sizes/font_size = 30
 
+[node name="MusikStueckButton" type="Button" parent="UI/Root/EinstellungenPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 62)
+text = "Musikstück"
+theme_override_font_sizes/font_size = 26
+
 [node name="Hinweis" type="Label" parent="UI/Root/EinstellungenPanel"]
-text = "Töne folgen in Meilenstein 7; die Schalter stummen schon die Audio-Busse."
+text = "Antippen wechselt das Stück. Soundeffekte folgen in Meilenstein 7."
 horizontal_alignment = 1
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 17

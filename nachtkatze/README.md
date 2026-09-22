@@ -3,8 +3,9 @@
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
 Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab (Bewegungsprototyp,
 Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern) und aus
-**Meilenstein 5** das Asset-Kit samt Toon-Shader - beide Levels sind
-daraus gebaut. Offen bleibt aus Meilenstein 5 der Parallax-Hintergrund.
+**Meilenstein 5** Asset-Kit, Toon-Shader und Parallax-Hintergrund - beide
+Levels sind daraus gebaut. Dazu drei selbst erzeugte Musikstuecke, die im
+Menue umschaltbar sind.
 
 | | |
 |---|---|
@@ -126,6 +127,46 @@ auf, sobald die Katze den jeweiligen Bereich betritt.
   kuerzer als die Karosserie. Wer rechtzeitig springt, kommt sicher
   darueber: das Zeitfenster ist rund 0,3 s breit statt 0,1 s.
 
+## Parallax-Hintergrund (GDD Abschnitt 8)
+
+Drei Staffeln in unterschiedlicher Tiefe, alle prozedural: Bergsilhouette
+(150 m hinten), ferne Stadt mit dem angestrahlten Kirchturm (62 m) und
+naehere Wohnbloecke (26 m). Den Versatz macht die Tiefe selbst; damit der
+Hintergrund nie ausgeht, wandern je drei Kopien einer Staffel mit der Kamera
+mit und rasten auf ihrer Breite ein. Je weiter hinten, desto blasser und
+blaustichiger - Luftperspektive statt Nebel.
+
+Die Fenster der Haeuser leuchten ueber denselben Alphakanal wie im Asset-Kit,
+sind also nachts von allein hell.
+
+## Musik (GDD Abschnitt 11)
+
+Drei Stuecke, selbst erzeugt und ohne Samples: das mediterrane Zupfinstrument
+entsteht mit dem Karplus-Strong-Verfahren, Bass und Flaechen aus einfachen
+Schwingungen.
+
+| Stueck | Tageszeit | Charakter |
+|---|---|---|
+| Gassenlied | Tag | heiter, 112 bpm, Dur |
+| Abendwind | Dämmerung | ruhiger, 88 bpm, phrygisch gefaerbt |
+| Nachtstreifen | Nacht | zurueckhaltend, 68 bpm, sparsam |
+
+Im Menue unter Einstellungen wechselt ein Antippen das Stueck; die Wahl
+landet im Spielstand. Gespielt wird auf dem Bus `Music`, den der
+Musikschalter stummt.
+
+Neu erzeugen (schreibt nach `assets/musik/`):
+
+```
+python3 nachtkatze/tools/musik_erzeugen.py
+```
+
+Die Stuecke laufen als Schleife und sind an beiden Enden auf null gefahren,
+damit die Naht nicht klickt. Beim Import komprimiert Godot sie mit QOA -
+aus 5 MB Rohdaten wird rund 1 MB im Paket.
+
+![Einstellungen mit Stueckwahl](../docs/bilder/menu_03_einstellungen.png)
+
 ## Levels aus dem Kit
 
 Beide Levels bestehen aus Modulen des Asset-Kits: Strassenstuecke zu 4 m,
@@ -133,6 +174,10 @@ Geschoss-Segmente zu 4 m, Balkone und Daecher zu 2 m. Die Bauteile werden
 ueber `tiles` aneinandergereiht, Mesh und Kollision entstehen daraus
 automatisch. Die spielrelevanten Masse sind dabei gleich geblieben: 3 m je
 Geschoss, Dachluecken von 1,5 m und 3,2 m, dieselben Kletterhoehen.
+
+An jeder Kletterzone steht eine Regenrinne aus dem Kit - das kletterbare
+Element ist damit auch sichtbar und nicht nur ein Lichtstreifen. Ein Test
+prueft, dass keine Kletterzone ohne Rohr bleibt.
 
 Nur was die Katze traegt oder aufhaelt, hat Kollision. Balkongelaender,
 Dachattika und alle Zierbauteile stehen ausserhalb der Spielebene oder sind
@@ -197,8 +242,9 @@ Kletterzonen beider Levels, Kantengriff, die schwerste Dachluecke, Futter,
 Treffer mit Unverwundbarkeit, die Zustandsautomaten von Hund, Revierkatze und
 Auto, HUD, Levelziel, Game Over, das Tutorial, das Weglaufen vor Gegnern,
 den Sprung ueber ein Auto samt Timing-Spielraum, Levelkatalog, Speicherstand,
-die Menues und das Asset-Kit (darunter, ob die Normalen nach aussen zeigen).
-Exit-Code 0 heisst alles gruen (aktuell 107 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+die Menues, das Asset-Kit (darunter, ob die Normalen nach aussen zeigen),
+die Regenrinnen an den Kletterzonen, den Parallax-Hintergrund und die drei
+Musikstuecke. Exit-Code 0 heisst alles gruen (aktuell 120 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -214,7 +260,7 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
 ```
 
-Ergebnis: rund 24 MB, `org.nachtkatze.prototyp` in Version 0.4.0,
+Ergebnis: rund 25 MB, `org.nachtkatze.prototyp` in Version 0.5.0,
 minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
@@ -248,7 +294,7 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Asset-Kit (GDD Abschnitt 8)
 
-27 Bauteile, alle prozedural erzeugt - wie es GDD Abschnitt 15 vorsieht.
+30 Bauteile, alle prozedural erzeugt - wie es GDD Abschnitt 15 vorsieht.
 Es gibt keine Modelldateien und keine Texturen: `AssetKit` baut die Meshes
 aus Kisten, Zylindern, Kegeln, Kuppeln und Prismen zusammen, jede Flaeche
 mit eigener Normale, damit die Kanten hart bleiben.
@@ -262,6 +308,7 @@ mit eigener Normale, damit die Kanten hart bleiben.
 | Vegetation | Kiefer, Zypresse, Olivenbaum, Oleanderbusch |
 | Landmarken | Kirchturm mit Kuppel, Tankstelle mit gruenem Leuchtband |
 | Interaktiv | Fischgraete, ganzer Fisch, Futternapf |
+| Untergrund | Strassen-Segment, Mauerstueck, Regenrinne |
 
 ![Asset-Kit: Wohnblock](../docs/bilder/kit_0_wohnblock.png)
 ![Asset-Kit: Strasse](../docs/bilder/kit_2_strasse.png)
@@ -302,5 +349,6 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Aus Meilenstein 5 fehlt noch der Parallax-Hintergrund. Danach
-Meilenstein 7 (Ton) und Meilenstein 8 (Levels 1 bis 10).
+Meilenstein 7 (Soundeffekte und Ambient je Tageszeit) und Meilenstein 8
+(Levels 1 bis 10). Die drei Tageszeit-Voreinstellungen stehen bereit, die
+Levels 1 bis 10 koennen sie ueber ihre LevelData waehlen.
