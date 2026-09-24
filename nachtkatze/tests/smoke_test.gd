@@ -1,5 +1,6 @@
 extends Node
-## Kopflose Funktionspruefung fuer Meilenstein 1 und 2.
+## Kopflose Funktionspruefung der Spielmechanik (Meilenstein 1-8).
+## Die Pruefung aller Level 1-10 steht in tests/level_test.gd.
 ##
 ## Start:  godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ## Beendet sich mit Exit-Code 0 (alles gruen) oder 1 (mindestens ein Fehler).
@@ -15,6 +16,8 @@ var _failures: Array[String] = []
 var _checks := 0
 var _finished := false
 var _last_check := "(noch keine)"
+## Alle Geraeusche, die Sfx gespielt hat (Meilenstein 7).
+var _heard: Array[StringName] = []
 
 func _ready() -> void:
 	# Erst einen Frame abwarten: waehrend _ready baut der Baum noch auf und
@@ -27,10 +30,13 @@ func _ready() -> void:
 	var saved_progress := SaveGame.completed_levels.duplicate()
 	var saved_music := SaveGame.music_on
 	var saved_sound := SaveGame.sound_on
+	var saved_unlocked := SaveGame.all_unlocked
+	Sfx.sound_played.connect(func(sound_name): _heard.append(sound_name))
 	await _run_all()
 	SaveGame.completed_levels = saved_progress
 	SaveGame.music_on = saved_music
 	SaveGame.sound_on = saved_sound
+	SaveGame.all_unlocked = saved_unlocked
 	SaveGame.save_game()
 	SaveGame.apply_audio()
 	print("")
@@ -74,6 +80,14 @@ func _run_all() -> void:
 	await _test_regenrinnen()
 	await _test_parallax_hintergrund()
 	await _test_musik()
+	await _test_sound_files()
+	await _test_cat_sounds()
+	await _test_enemy_sounds()
+	await _test_ui_sounds_and_ambient()
+	await _test_balancieren()
+	await _test_car_street_section()
+	await _test_night_view()
+	await _test_test_mode()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -505,7 +519,7 @@ func _test_car_is_jumpable() -> void:
 ## GDD Abschnitt 12: Levels werden nacheinander freigeschaltet.
 func _test_level_catalog() -> void:
 	_check(Game.catalog != null, "Levelkatalog ist geladen")
-	_check(Game.level_count() >= 2, "Katalog kennt Tutorial und Graubox (%d)" % Game.level_count())
+	_check(Game.level_count() == 11, "Katalog kennt Tutorial und Level 1-10 (%d)" % Game.level_count())
 	var all_present := true
 	for index in Game.level_count():
 		var data := Game.catalog.get_level(index)
@@ -556,7 +570,7 @@ func _test_menu_screens() -> void:
 	var menu: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
 	get_tree().root.add_child(menu)
 	await get_tree().process_frame
-	var list: VBoxContainer = menu.get_node("UI/Root/LevelPanel/LevelListe")
+	var list: GridContainer = menu.get_node("UI/Root/LevelPanel/LevelListe")
 	_check(list.get_child_count() == Game.level_count(),
 		"Levelauswahl listet alle %d Levels" % Game.level_count())
 	if list.get_child_count() >= 2:
@@ -859,6 +873,283 @@ func _test_musik() -> void:
 		"Stuecke haben Namen: %s" % Music.track_name(2))
 	SaveGame.set_music_track(previous)
 	Music.play_track(previous, false)
+
+# --- Meilenstein 7: Sound ---------------------------------------------------
+
+## GDD Abschnitt 11: alle Effekte und drei Ambient-Schleifen sind vorhanden.
+func _test_sound_files() -> void:
+	var missing: Array[String] = []
+	for sound_name in Sfx.SOUNDS:
+		if not Sfx.has_sound(sound_name):
+			missing.append(String(sound_name))
+	_check(missing.is_empty(), "Alle %d Soundeffekte laden %s" % [Sfx.SOUNDS.size(), str(missing)])
+	var motor := load("res://assets/sfx/motor.wav") as AudioStreamWAV
+	_check(motor != null and motor.loop_mode == AudioStreamWAV.LOOP_FORWARD,
+		"Motorgeraeusch laeuft in Schleife")
+	var broken: Array[String] = []
+	for time_of_day in Sfx.AMBIENT:
+		var path: String = Sfx.AMBIENT_DIR + Sfx.AMBIENT[time_of_day] + ".wav"
+		var stream := load(path) as AudioStreamWAV
+		if stream == null or stream.loop_mode != AudioStreamWAV.LOOP_FORWARD \
+				or stream.get_length() < 15.0:
+			broken.append(path.get_file())
+	_check(broken.is_empty(), "Ambient je Tageszeit laedt und laeuft in Schleife %s" % str(broken))
+	var ambient_bus := AudioServer.get_bus_index("Ambient")
+	_check(ambient_bus > 0 and AudioServer.get_bus_send(ambient_bus) == &"SFX",
+		"Ambient-Bus muendet in SFX - der Sound-Schalter stummt beides")
+
+## Katze: Pfoten, Landung, Kratzen, Knuspern, Miauen, Schnurren.
+func _test_cat_sounds() -> void:
+	var level := await _spawn_level()
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	player.global_position = Vector3(16.0, 0.4, 0.0)
+	await _wait(0.2)
+	_heard.clear()
+	PlayerInput.set_touch_move(Vector2.RIGHT)
+	await _wait(1.2)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	_check(_heard.count(&"pfote") >= 3, "Weiche Pfotenschritte beim Laufen (%d)" % _heard.count(&"pfote"))
+
+	_heard.clear()
+	player.global_position = Vector3(16.0, 4.0, 0.0)
+	player.velocity = Vector3.ZERO
+	await _wait(1.0)
+	_check(_heard.has(&"landung"), "Landung nach einem Sturz ist hoerbar")
+
+	_heard.clear()
+	var zone: ClimbZone = level.get_node("Kletterzonen/Regenrinne1")
+	player.global_position = Vector3(zone.global_position.x, 0.4, 0.0)
+	await _wait(0.2)
+	PlayerInput.set_touch_move(Vector2(0.0, 1.0))
+	await _wait(1.0)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	_check(_heard.count(&"kratzen") >= 2, "Kratzen beim Klettern (%d)" % _heard.count(&"kratzen"))
+
+	_heard.clear()
+	var food: Node3D = level.get_node("Futter/Graete1")
+	player.global_position = food.global_position
+	await _wait(0.2)
+	_check(_heard.has(&"knuspern"), "Knuspern beim Fressen")
+
+	_heard.clear()
+	player.global_position = Vector3(16.0, 0.4, 0.0)
+	player.is_invulnerable = false
+	player.take_damage(1, Vector3(18.0, 0.4, 0.0))
+	_check(_heard.has(&"miau"), "Kurzes Miauen bei Treffer")
+
+	_heard.clear()
+	player.win()
+	_check(_heard.has(&"schnurren"), "Schnurren im Ziel")
+	await _despawn(level)
+
+## Hunde klaeffen bzw. knurren als Warnung, Revierkatzen fauchen und kaempfen,
+## Autos hupen und haben einen Motor.
+func _test_enemy_sounds() -> void:
+	var level := await _spawn_level(LEVEL_PATH, true)
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var small_dog: Dog = level.get_node("Gegner/KleinerHund")
+	var big_dog: Dog = level.get_node("Gegner/GrosserHund")
+	_heard.clear()
+	small_dog._enter(Dog.State.WARNUNG, 0.5)
+	big_dog._enter(Dog.State.WARNUNG, 0.5)
+	_check(_heard.has(&"klaeffen"), "Kleiner Hund klaefft als Warnung")
+	_check(_heard.has(&"knurren"), "Grosser Hund knurrt als Warnung")
+	small_dog._enter(Dog.State.BELLEN_NACH_OBEN, 0.5)
+	_check(_heard.has(&"bellen"), "Hund bellt nach oben")
+
+	_heard.clear()
+	var cat: TerritoryCat = level.get_node("Gegner/Revierkatze")
+	cat._enter(TerritoryCat.State.WARNUNG, 0.5)
+	cat._enter(TerritoryCat.State.ANGRIFF, 0.5)
+	_check(_heard.has(&"fauchen") and _heard.has(&"kampf"),
+		"Revierkatze faucht als Warnung und kaempft beim Angriff")
+
+	_heard.clear()
+	var car: Car = level.get_node("Gegner/Auto")
+	player.global_position = Vector3(20.0, 0.4, 0.0)
+	car.warning_time = 0.4
+	car.restart_cycle(0.1)
+	await _wait(0.3)
+	var engine := car.get_node_or_null("Motor") as AudioStreamPlayer3D
+	_check(_heard.has(&"hupe"), "Auto hupt, wenn es sich ankuendigt")
+	_check(engine != null and engine.playing, "Motorgeraeusch laeuft waehrend der Durchfahrt")
+	car.restart_cycle(5.0)
+	await get_tree().process_frame
+	_check(engine != null and not engine.playing, "Motor verstummt, sobald das Auto weg ist")
+	await _despawn(level)
+
+## Oberflaeche: Tastenklick, Level geschafft, Game Over; Ambient je Tageszeit.
+func _test_ui_sounds_and_ambient() -> void:
+	_heard.clear()
+	var button := Button.new()
+	get_tree().root.add_child(button)
+	await get_tree().process_frame
+	button.pressed.emit()
+	_check(_heard.has(&"klick"), "Menue-Schaltflaechen klicken")
+	button.free()
+
+	var level := await _spawn_level()
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	_check(Sfx.is_ambient_playing() and Sfx.ambient_name == "tag",
+		"Im Tag-Level laufen Voegel und Verkehr (%s)" % Sfx.ambient_name)
+	_heard.clear()
+	Game.complete_level()
+	_check(_heard.has(&"geschafft"), "Level geschafft hat eine Tonfolge")
+	await _despawn(level)
+
+	var level2 := await _spawn_level()
+	level2.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	_heard.clear()
+	Game.fail_level()
+	_check(_heard.has(&"game_over"), "Game Over hat eine Tonfolge")
+	await _despawn(level2)
+
+	var dusk := await _spawn_level("res://scenes/levels/level_04.tscn")
+	_check(Sfx.ambient_name == "daemmerung", "Daemmerung: Schwalben und Kirchenglocke")
+	await _despawn(dusk)
+	var night := await _spawn_level("res://scenes/levels/level_07.tscn")
+	_check(Sfx.ambient_name == "nacht", "Nacht: Grillen und ferner Motorroller")
+	await _despawn(night)
+
+	var menu: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
+	get_tree().root.add_child(menu)
+	await get_tree().process_frame
+	_check(not Sfx.is_ambient_playing(), "Im Menue ist nur Musik zu hoeren")
+	menu.free()
+	await get_tree().process_frame
+
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	SaveGame.set_sound_on(false)
+	_check(AudioServer.is_bus_mute(sfx_bus), "Der Sound-Schalter stummt den SFX-Bus")
+	SaveGame.set_sound_on(true)
+	_check(not AudioServer.is_bus_mute(sfx_bus), "Und schaltet ihn wieder ein")
+
+# --- Meilenstein 8: neue Elemente der Level 1-10 ------------------------------
+
+## GDD Abschnitt 2: Balancieren auf Stromleitungen (ab Level 5).
+func _test_balancieren() -> void:
+	var level := await _spawn_level("res://scenes/levels/level_05.tscn")
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var wires := level.get_node("Leitungen").get_children()
+	_check(wires.size() >= 2, "Level 5 hat Leitungen zum Balancieren (%d)" % wires.size())
+	var wire: BalanceWire = wires[0]
+	var start_x := wire.global_position.x - 2.0
+	player.global_position = Vector3(start_x, wire.height_at(start_x) + 1.2, 0.0)
+	player.velocity = Vector3.ZERO
+	await _wait(0.8)
+	_check(player.state == Player.State.BALANCE,
+		"Katze landet auf der Leitung und balanciert (Zustand %d)" % player.state)
+	var feet := player.global_position.y - 0.275
+	_check(absf(feet - wire.height_at(player.global_position.x)) < 0.05,
+		"Pfoten auf der Leitung (%.2f / %.2f)" % [feet, wire.height_at(player.global_position.x)])
+
+	# Ueber den Mast hinweg auf die naechste Leitung.
+	var before_x := player.global_position.x
+	PlayerInput.set_touch_move(Vector2.RIGHT)
+	await _wait(3.0)
+	var speed := (player.global_position.x - before_x) / 3.0
+	_check(player.state == Player.State.BALANCE and player.global_position.x > wire.global_position.x + 4.0,
+		"Balanciert ueber den Mast auf die naechste Leitung (x = %.1f)" % player.global_position.x)
+	_check(speed < Player.RUN_SPEED * 0.8,
+		"Auf der Leitung langsamer als am Boden (%.2f m/s)" % speed)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+
+	# Springen geht, danach landet sie wieder auf der Leitung.
+	PlayerInput.press_jump()
+	await _wait(0.2)
+	PlayerInput.release_jump()
+	_check(player.state == Player.State.AIR and player.velocity.y > 0.0, "Absprung von der Leitung")
+	await _wait(1.2)
+	_check(player.state == Player.State.BALANCE, "Nach dem Sprung wieder auf der Leitung")
+
+	# Nach unten: loslassen und auf die Strasse fallen.
+	PlayerInput.set_touch_move(Vector2(0.0, -1.0))
+	await _wait(0.2)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	await _wait(1.5)
+	_check(player.is_on_floor() and player.global_position.y < 1.0,
+		"Nach unten druecken laesst die Katze fallen (y = %.2f)" % player.global_position.y)
+
+	# Den Mast hochklettern fuehrt auf die Leitung.
+	var mast: ClimbZone = level.get_node("Kletterzonen/Mast")
+	player.global_position = Vector3(mast.global_position.x, 0.4, 0.0)
+	await _wait(0.3)
+	PlayerInput.set_touch_move(Vector2(0.0, 1.0))
+	await _wait(mast.height / 2.0 + 1.0)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	await _wait(0.8)
+	_check(player.state == Player.State.BALANCE, "Der Strommast fuehrt auf die Leitung")
+
+	# Treffer auf der Leitung: sie faellt herunter.
+	player.is_invulnerable = false
+	player.take_damage(1, player.global_position + Vector3(1.0, 0.0, 0.0))
+	await _wait(0.1)
+	_check(player.state != Player.State.BALANCE and is_zero_approx(player.visual.rotation.z),
+		"Ein Treffer wirft die Katze von der Leitung")
+	await _despawn(level)
+
+## Autos fahren nur auf ihrem Strassenabschnitt (Level 4 ff.).
+func _test_car_street_section() -> void:
+	var level := await _spawn_level("res://scenes/levels/level_04.tscn", true)
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var car: Car = null
+	for enemy in level.get_node("Gegner").get_children():
+		if enemy is Car:
+			car = enemy
+		else:
+			enemy.queue_free()
+	player.global_position = Vector3(car.street_max_x + 12.0, 0.4, 0.0)
+	car.restart_cycle(0.1)
+	await _wait(0.6)
+	_check(car.state == Car.State.WARTEN,
+		"Ausserhalb seines Abschnitts wartet das Auto (Zustand %d)" % car.state)
+	player.global_position = Vector3(car.street_max_x - 3.0, 0.4, 0.0)
+	await _wait(0.8)
+	_check(car.state == Car.State.WARNUNG and car.global_position.x >= car.street_min_x - 0.01
+			and car.global_position.x <= car.street_max_x + 0.01,
+		"Auf dem Abschnitt kuendigt es sich an, innerhalb der Strasse (x = %.1f)" % car.global_position.x)
+	player.global_position = Vector3(car.street_max_x + 12.0, 0.4, 0.0)
+	await _wait(3.5)
+	_check(car.state == Car.State.WARTEN,
+		"Am Abschnittsende verschwindet es wieder (Zustand %d)" % car.state)
+	await _despawn(level)
+
+## Eingeschraenkte Sicht bei Nacht (ab Level 7).
+func _test_night_view() -> void:
+	var day := await _spawn_level("res://scenes/levels/level_03.tscn")
+	_check(day.get_node_or_null("Nachtsicht") == null, "Tagsueber volle Sicht")
+	await _despawn(day)
+	var level := await _spawn_level("res://scenes/levels/level_07.tscn")
+	var view := level.get_node_or_null("Nachtsicht") as NightView
+	_check(view != null and view.radius > 0.0, "Level 7 schraenkt die Sicht ein")
+	if view != null:
+		await get_tree().process_frame
+		var center := view.get_center()
+		_check(center.x > 0.3 and center.x < 0.7 and center.y > 0.2 and center.y < 0.8,
+			"Der helle Bereich folgt der Katze (%.2f, %.2f)" % [center.x, center.y])
+	await _despawn(level)
+
+## Testmodus in den Einstellungen: alle Level zum Ausprobieren frei.
+func _test_test_mode() -> void:
+	SaveGame.reset_progress()
+	_check(not SaveGame.is_unlocked(5), "Ohne Testmodus ist Level 5 gesperrt")
+	SaveGame.set_all_unlocked(true)
+	_check(SaveGame.is_unlocked(10), "Testmodus schaltet alle Level frei")
+	SaveGame.all_unlocked = false
+	SaveGame.load_game()
+	_check(SaveGame.all_unlocked, "Testmodus uebersteht das Neuladen")
+	SaveGame.set_all_unlocked(false)
+	_check(not SaveGame.is_unlocked(5), "Und laesst sich wieder abschalten")
 
 # --- Hilfen -----------------------------------------------------------------
 

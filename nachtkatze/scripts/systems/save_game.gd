@@ -12,6 +12,8 @@ var music_on: bool = true
 var sound_on: bool = true
 ## Gewaehltes Hintergrundstueck (Index in MusicPlayer.TRACKS).
 var music_track: int = 0
+## Testmodus: alle Level anwaehlbar (Einstellungen, fuer Playtests).
+var all_unlocked: bool = false
 
 func _ready() -> void:
 	load_game()
@@ -24,7 +26,12 @@ func is_completed(index: int) -> bool:
 
 ## Levels werden nacheinander freigeschaltet (GDD Abschnitt 12).
 func is_unlocked(index: int) -> bool:
-	return index <= 0 or is_completed(index - 1)
+	return all_unlocked or index <= 0 or is_completed(index - 1)
+
+func set_all_unlocked(value: bool) -> void:
+	all_unlocked = value
+	save_game()
+	progress_changed.emit()
 
 func mark_completed(index: int) -> void:
 	if index < 0 or is_completed(index):
@@ -65,7 +72,7 @@ func set_sound_on(value: bool) -> void:
 	save_game()
 	audio_changed.emit()
 
-## Schaltet die Busse stumm. Toene selbst kommen in Meilenstein 7 dazu.
+## Schaltet die Busse stumm; das Ambient haengt am Bus "SFX".
 func apply_audio() -> void:
 	_mute_bus("Music", not music_on)
 	_mute_bus("SFX", not sound_on)
@@ -87,10 +94,12 @@ func load_game() -> void:
 	music_on = bool(config.get_value("audio", "musik", true))
 	sound_on = bool(config.get_value("audio", "sound", true))
 	music_track = int(config.get_value("audio", "stueck", 0))
+	all_unlocked = bool(config.get_value("fortschritt", "alle_offen", false))
 
 func save_game() -> void:
 	var config := ConfigFile.new()
 	config.set_value("fortschritt", "abgeschlossen", completed_levels)
+	config.set_value("fortschritt", "alle_offen", all_unlocked)
 	config.set_value("audio", "musik", music_on)
 	config.set_value("audio", "sound", sound_on)
 	config.set_value("audio", "stueck", music_track)

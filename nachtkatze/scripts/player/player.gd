@@ -6,6 +6,7 @@ class_name Player
 ## automatisches Festhalten an Kanten, gesperrte Z-Achse.
 ## Meilenstein 2: Lebenspunkte, Treffer mit Unverwundbarkeit und Rueckstoss,
 ## Fressen (Heilung), Levelziel und Neustart.
+## Meilenstein 8: Balancieren auf Stromleitungen (ab Level 5).
 
 signal health_changed(current: int, maximum: int)
 signal damaged(amount: int)
@@ -13,7 +14,7 @@ signal healed(amount: int)
 signal died()
 signal state_changed(new_state: State)
 
-enum State { IDLE, RUN, AIR, CLIMB, HANG, MANTLE, HURT, DEAD, VICTORY }
+enum State { IDLE, RUN, AIR, CLIMB, HANG, MANTLE, HURT, DEAD, VICTORY, BALANCE }
 
 # --- Metriken aus dem GDD (1 Godot-Einheit = 1 m) ---------------------------
 const RUN_SPEED := 4.0
@@ -45,12 +46,26 @@ const MANTLE_TIME := 0.25
 ## Sperre nach dem Loslassen, damit nicht sofort wieder gegriffen wird.
 const GRAB_COOLDOWN := 0.35
 
+# --- Balancieren (GDD Abschnitt 2) ----------------------------------------
+## Auf der Leitung geht die Katze vorsichtiger.
+const BALANCE_SPEED := 2.8
+## Wie weit die Pfoten beim Aufsetzen neben der Leitung liegen duerfen.
+const BALANCE_CATCH := 0.12
+const BALANCE_WOBBLE := 0.09
+
 # --- Treffer (GDD Abschnitt 3) ---------------------------------------------
 const INVULNERABLE_TIME := 1.0
 const HURT_TIME := 0.3
 const KNOCKBACK_SPEED := 3.5
 const KNOCKBACK_LIFT := 3.0
 const BLINK_INTERVAL := 0.08
+
+# --- Geraeusche (GDD Abschnitt 11) -----------------------------------------
+## Schrittabstand bei voller Laufgeschwindigkeit.
+const STEP_INTERVAL := 0.27
+const SCRATCH_INTERVAL := 0.32
+## Ab dieser Fallgeschwindigkeit ist die Landung hoerbar.
+const LANDING_SOUND_SPEED := 3.0
 
 @export var max_health: int = 3
 ## Tutorial-Modus: Lebenspunkte fallen nie unter 1 (GDD Abschnitt 7).
@@ -78,6 +93,11 @@ var _climb_zones: Array[Node] = []
 var _ledge_zones: Array[Node] = []
 var _active_climb_zone: Node = null
 var _active_ledge_zone: Node = null
+var _balance_wires: Array[Node] = []
+var _active_wire: Node = null
+var _balance_time := 0.0
+## Nach absichtlichem Fallenlassen kurz nicht wieder auf die Leitung setzen.
+var _balance_drop_timer := 0.0
 
 var _climb_blocked_timer := 0.0
 var _mantle_from := Vector3.ZERO
@@ -88,6 +108,9 @@ var _spawn_position := Vector3.ZERO
 ## Letzte Position mit sicherem Boden unter den Pfoten - Ziel nach einem Absturz.
 var _last_safe_position := Vector3.ZERO
 var _safe_position_timer := 0.0
+
+var _step_timer := 0.0
+var _scratch_timer := 0.0
 
 func _ready() -> void:
 	add_to_group("player")
@@ -115,6 +138,8 @@ func _physics_process(delta: float) -> void:
 			_process_hurt(delta)
 		State.DEAD, State.VICTORY:
 			_process_locked(delta)
+		State.BALANCE:
+			_process_balance(delta, move_input)
 		_:
 			_process_ground_and_air(delta, move_input)
 
@@ -142,10 +167,19 @@ func _process_ground_and_air(delta: float, move_input: Vector2) -> void:
 	if _jump_buffer_timer > 0.0 and _coyote_timer > 0.0:
 		_jump()
 
+	var fall_speed := -velocity.y
+	var feet_before := global_position.y - _half_height()
 	move_and_slide()
 
+	if not is_on_floor() and _try_start_balance(feet_before):
+		return
+
 	if is_on_floor():
+		if not on_floor and fall_speed > LANDING_SOUND_SPEED:
+			Sfx.play(&"landung", clampf((fall_speed - 8.0) * 0.6, -6.0, 3.0))
+			_step_timer = STEP_INTERVAL
 		_set_state(State.RUN if absf(velocity.x) > 0.1 else State.IDLE)
+		_update_steps(delta)
 	else:
 		_set_state(State.AIR)
 
@@ -180,6 +214,7 @@ func _process_climb(delta: float, move_input: Vector2) -> void:
 
 	var y_before := global_position.y
 	move_and_slide()
+	_update_scratching(delta)
 
 	# Haengt die Katze unter einem Vorsprung fest, zieht sie sich trotzdem hoch,
 	# sobald sie nah genug am oberen Ende ist.
@@ -194,6 +229,48 @@ func _process_climb(delta: float, move_input: Vector2) -> void:
 	# Unten angekommen und weiter nach unten: loslassen.
 	if is_on_floor() and move_input.y <= 0.0:
 		_stop_climbing()
+
+## Auf einer Stromleitung: nur links/rechts, Hoehe folgt dem Durchhang.
+func _process_balance(delta: float, move_input: Vector2) -> void:
+	if _active_wire == null or not is_instance_valid(_active_wire):
+		_leave_balance()
+		return
+	_coyote_timer = COYOTE_TIME
+	if _jump_buffer_timer > 0.0:
+		_leave_balance()
+		_jump()
+		move_and_slide()
+		return
+	# Nach unten druecken: absichtlich fallen lassen.
+	if move_input.y < -0.6:
+		_balance_drop_timer = GRAB_COOLDOWN
+		_leave_balance()
+		velocity.y = -1.0
+		return
+
+	var target := move_input.x * BALANCE_SPEED
+	var rate := GROUND_ACCEL if not is_zero_approx(move_input.x) else GROUND_FRICTION
+	velocity.x = move_toward(velocity.x, target, rate * delta)
+	if not is_zero_approx(move_input.x):
+		facing = signf(move_input.x)
+		visual.rotation.y = 0.0 if facing > 0.0 else PI
+	velocity.y = 0.0
+
+	var next_x := global_position.x + velocity.x * delta
+	if not _active_wire.covers(next_x):
+		# Am Mast geht es auf der naechsten Leitung weiter, sonst faellt sie.
+		var next_wire := _wire_at(next_x, _active_wire.height_at(global_position.x))
+		if next_wire == null:
+			_leave_balance()
+			return
+		_active_wire = next_wire
+	global_position.x = next_x
+	global_position.y = _active_wire.height_at(next_x) + _half_height()
+
+	# Leichtes Schwanken zeigt, dass es wackelig ist.
+	_balance_time += delta
+	visual.rotation.z = sin(_balance_time * 5.0) * BALANCE_WOBBLE
+	_update_steps(delta * 0.8)
 
 func _process_hang(_delta: float, move_input: Vector2) -> void:
 	velocity = Vector3.ZERO
@@ -269,6 +346,8 @@ func _try_start_climb(move_input: Vector2) -> bool:
 	_climb_blocked_timer = 0.0
 	velocity = Vector3.ZERO
 	_set_state(State.CLIMB)
+	_scratch_timer = SCRATCH_INTERVAL
+	Sfx.play(&"kratzen")
 	return true
 
 func _try_grab_ledge() -> bool:
@@ -282,7 +361,40 @@ func _try_grab_ledge() -> bool:
 	global_position = _active_ledge_zone.get_hang_point()
 	velocity = Vector3.ZERO
 	_set_state(State.HANG)
+	Sfx.play(&"kratzen", -3.0)
 	return true
+
+## Setzt die Katze auf eine Leitung, wenn sie von oben darauf faellt.
+func _try_start_balance(feet_before: float) -> bool:
+	if velocity.y > 0.0 or _balance_drop_timer > 0.0 or _balance_wires.is_empty():
+		return false
+	var feet := global_position.y - _half_height()
+	for wire in _balance_wires:
+		if not is_instance_valid(wire) or not wire.covers(global_position.x):
+			continue
+		var wire_y: float = wire.height_at(global_position.x)
+		if feet_before >= wire_y - BALANCE_CATCH and feet <= wire_y + BALANCE_CATCH:
+			_active_wire = wire
+			global_position.y = wire_y + _half_height()
+			velocity.y = 0.0
+			_balance_time = 0.0
+			_set_state(State.BALANCE)
+			Sfx.play(&"pfote", 2.0)
+			return true
+	return false
+
+## Anschlussleitung an einer Stelle, auf etwa gleicher Hoehe.
+func _wire_at(x: float, near_y: float) -> Node:
+	for wire in _balance_wires:
+		if is_instance_valid(wire) and wire != _active_wire and wire.covers(x) \
+				and absf(wire.height_at(x) - near_y) < 0.3:
+			return wire
+	return null
+
+func _leave_balance() -> void:
+	_active_wire = null
+	visual.rotation.z = 0.0
+	_set_state(State.AIR)
 
 func _stop_climbing() -> void:
 	_active_climb_zone = null
@@ -295,6 +407,7 @@ func _start_mantle(target: Vector3) -> void:
 	_mantle_progress = 0.0
 	velocity = Vector3.ZERO
 	_set_state(State.MANTLE)
+	Sfx.play(&"kratzen", -2.0, 1.15)
 
 func _nearest_zone(zones: Array[Node]) -> Node:
 	var best: Node = null
@@ -307,6 +420,26 @@ func _nearest_zone(zones: Array[Node]) -> Node:
 			best_distance = distance
 			best = zone
 	return best
+
+## Weiche Pfotenschritte im Takt der Laufgeschwindigkeit.
+func _update_steps(delta: float) -> void:
+	var speed_ratio := absf(velocity.x) / RUN_SPEED
+	if speed_ratio < 0.25:
+		_step_timer = minf(_step_timer, STEP_INTERVAL * 0.5)
+		return
+	_step_timer -= delta * speed_ratio
+	if _step_timer <= 0.0:
+		_step_timer = STEP_INTERVAL
+		Sfx.play(&"pfote")
+
+## Kratzen der Krallen, solange die Katze klettert.
+func _update_scratching(delta: float) -> void:
+	if absf(velocity.y) < 0.4:
+		return
+	_scratch_timer -= delta
+	if _scratch_timer <= 0.0:
+		_scratch_timer = SCRATCH_INTERVAL
+		Sfx.play(&"kratzen", -2.0)
 
 func _lock_z_axis() -> void:
 	# GDD Abschnitt 8: nur eine Spielebene, Z-Achse der Figur gesperrt.
@@ -326,6 +459,7 @@ func _update_timers(delta: float) -> void:
 	_jump_buffer_timer = maxf(_jump_buffer_timer - delta, 0.0)
 	_hurt_timer = maxf(_hurt_timer - delta, 0.0)
 	_grab_cooldown_timer = maxf(_grab_cooldown_timer - delta, 0.0)
+	_balance_drop_timer = maxf(_balance_drop_timer - delta, 0.0)
 	if is_invulnerable:
 		_invulnerable_timer -= delta
 		_blink_timer -= delta
@@ -351,6 +485,7 @@ func take_damage(amount: int = 1, source_position: Vector3 = Vector3.ZERO) -> vo
 		return
 	var minimum := 1 if no_fail else 0
 	health = maxi(health - amount, minimum)
+	Sfx.play(&"miau")
 	health_changed.emit(health, max_health)
 	damaged.emit(amount)
 	_start_invulnerability()
@@ -385,6 +520,8 @@ func _apply_knockback(source_position: Vector3) -> void:
 		direction = signf(delta_x) if not is_zero_approx(delta_x) else -facing
 	_active_climb_zone = null
 	_active_ledge_zone = null
+	_active_wire = null
+	visual.rotation.z = 0.0
 	_grab_cooldown_timer = GRAB_COOLDOWN
 	velocity = Vector3(direction * KNOCKBACK_SPEED, KNOCKBACK_LIFT, 0.0)
 
@@ -421,10 +558,13 @@ func win() -> void:
 	_invulnerable_timer = 9999.0
 	visual.visible = true
 	_set_state(State.VICTORY)
+	Sfx.play(&"schnurren")
 
 func _set_state(new_state: State) -> void:
 	if state == new_state:
 		return
+	if state == State.BALANCE:
+		visual.rotation.z = 0.0
 	state = new_state
 	state_changed.emit(new_state)
 
@@ -435,10 +575,13 @@ func _on_zone_entered(area: Area3D) -> void:
 		_climb_zones.append(area)
 	elif area.is_in_group("ledge") and not _ledge_zones.has(area):
 		_ledge_zones.append(area)
+	elif area.is_in_group("balance") and not _balance_wires.has(area):
+		_balance_wires.append(area)
 
 func _on_zone_exited(area: Area3D) -> void:
 	_climb_zones.erase(area)
 	_ledge_zones.erase(area)
+	_balance_wires.erase(area)
 	if area == _active_climb_zone and state == State.CLIMB:
 		_stop_climbing()
 	if area == _active_ledge_zone and state == State.HANG:

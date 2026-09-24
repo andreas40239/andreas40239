@@ -45,6 +45,7 @@ func _on_body_entered(body: Node3D) -> void:
 		player.heal_full()
 	else:
 		player.heal(1)
+	Sfx.play(&"knuspern", 2.0 if kind == Kind.GANZER_FISCH else 0.0)
 	collected.emit(kind)
 	set_deferred("monitoring", false)
 	queue_free()

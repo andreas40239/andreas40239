@@ -129,6 +129,11 @@ func _on_hit_player() -> void:
 func _enter(new_state: State, duration: float) -> void:
 	state = new_state
 	_timer = duration
+	# Buckel und Fauchen als Warnung, Kampfgeraeusch beim Angriffssprung.
+	if new_state == State.WARNUNG:
+		Sfx.play_at(&"fauchen", global_position)
+	elif new_state == State.ANGRIFF:
+		Sfx.play_at(&"kampf", global_position)
 	if new_state != State.WARNUNG:
 		_set_warning_visible(false)
 		if visual != null:

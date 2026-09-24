@@ -170,6 +170,7 @@ func _notices_player() -> bool:
 func _enter(new_state: State, duration: float) -> void:
 	state = new_state
 	_timer = duration
+	_play_state_sound(new_state)
 	if new_state != State.WARNUNG:
 		_set_warning_visible(false)
 	if visual != null:
@@ -177,9 +178,22 @@ func _enter(new_state: State, duration: float) -> void:
 		var lying := new_state == State.SCHLAFEN
 		visual.scale = Vector3(1.0, 0.55, 1.0) if lying else Vector3.ONE
 
+## Warnung: der kleine Hund klaefft, der grosse knurrt (GDD Abschnitt 4).
+## Bellen nach oben klingt beim kleinen Hund heller.
+func _play_state_sound(new_state: State) -> void:
+	match new_state:
+		State.WARNUNG:
+			Sfx.play_at(&"klaeffen" if dog_size == DogSize.KLEIN else &"knurren", global_position)
+		State.BELLEN_NACH_OBEN:
+			Sfx.play_at(&"bellen", global_position, 0.0, _bark_pitch())
+
+func _bark_pitch() -> float:
+	return 1.3 if dog_size == DogSize.KLEIN else 0.8
+
 ## Nach einem Treffer laesst der Hund von der Katze ab.
 func _on_hit_player() -> void:
 	if state != State.SCHLAFEN:
+		Sfx.play_at(&"bellen", global_position, 0.0, _bark_pitch())
 		_enter(State.RUECKKEHR, 0.0)
 
 ## Ein schlafender Hund tut niemandem weh - die Katze klettert ueber ihn hinweg.

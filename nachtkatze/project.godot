@@ -6,7 +6,7 @@ config_version=5
 [application]
 
 config/name="Nachtkatze"
-config/description="Stilisierter 2.5D-Plattformer mit einer Streunerkatze (Meilenstein 1-4 und 6; Grafik-Meilenstein 5 folgt spaeter)."
+config/description="Stilisierter 2.5D-Plattformer mit einer Streunerkatze (Meilenstein 1-4 und 6-8; Grafik-Meilenstein 5 in Arbeit)."
 run/main_scene="res://scenes/ui/title_screen.tscn"
 config/features=PackedStringArray("4.3", "Mobile")
 config/icon="res://icon.svg"
@@ -17,6 +17,7 @@ SaveGame="*res://scripts/systems/save_game.gd"
 Game="*res://scripts/systems/game.gd"
 PlayerInput="*res://scripts/systems/player_input.gd"
 Music="*res://scripts/systems/music_player.gd"
+Sfx="*res://scripts/systems/sound_player.gd"
 
 [audio]
 

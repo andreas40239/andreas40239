@@ -99,6 +99,10 @@ static func configure_material() -> void:
 	if _background_material != null:
 		_background_material.set_shader_parameter("fallback_sun", needs_fallback)
 
+## Leuchtkraft von Fenstern, Laternen und Leuchtband je Tageszeit.
+static func set_emission(strength: float) -> void:
+	get_material().set_shader_parameter("emission_strength", strength)
+
 ## Sonnenrichtung und -farbe fuer den Ersatzpfad nachfuehren (Tageszeiten).
 static func set_sun(direction: Vector3, color: Color, energy: float = 0.85) -> void:
 	for material in [get_material(), get_background_material()]:

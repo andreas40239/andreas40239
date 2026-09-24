@@ -8,6 +8,8 @@ extends Node3D
 var _time := 0.0
 
 func _ready() -> void:
+	# Im Menue nur Musik, das Ambient gehoert zu den Levels.
+	Sfx.stop_ambient()
 	PlayerInput.reset()
 
 func _process(delta: float) -> void:

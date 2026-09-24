@@ -25,3 +25,10 @@ enum TimeOfDay { TAG, DAEMMERUNG, NACHT }
 @export_range(0, 10) var territory_cats: int = 0
 @export_range(0, 10) var cars: int = 0
 @export_range(0.0, 3.0, 0.05) var food_density: float = 1.0
+
+@export_group("Sicht")
+## Eingeschraenkte Sicht bei Nacht (ab Level 7): Radius des hellen Bereichs um
+## die Katze als Anteil der Bildhoehe. 0 = volle Sicht.
+@export_range(0.0, 1.0, 0.01) var view_radius: float = 0.0
+## Wie dunkel es ausserhalb dieses Bereichs wird.
+@export_range(0.0, 1.0, 0.01) var view_darkness: float = 0.78

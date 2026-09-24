@@ -1,11 +1,12 @@
 # Nachtkatze - Godot-Projekt
 
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
-Dieser Stand deckt **Meilenstein 1 bis 4 und 6** ab (Bewegungsprototyp,
-Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern) und aus
-**Meilenstein 5** Asset-Kit, Toon-Shader und Parallax-Hintergrund - beide
-Levels sind daraus gebaut. Dazu drei selbst erzeugte Musikstuecke, die im
-Menue umschaltbar sind.
+Dieser Stand deckt **Meilenstein 1 bis 4 und 6 bis 8** ab (Bewegungsprototyp,
+Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern, Sound,
+Level 1 bis 10) und aus **Meilenstein 5** Asset-Kit, Toon-Shader und
+Parallax-Hintergrund - alle Levels sind daraus gebaut. Die gezeichneten
+Grafik-Assets fuer Meilenstein 5 stehen noch aus; die Levels lassen sich
+trotzdem schon durchspielen und testen.
 
 | | |
 |---|---|
@@ -28,7 +29,8 @@ Tutorials - Erklaerungen laufen ohne ein einziges Wort.
 
 1. Godot 4.3 oeffnen, Ordner `nachtkatze/` als Projekt importieren.
 2. F5 druecken - es startet das Startbild, danach Hauptmenue, Tutorial und
-   als zweites Level die Graubox-Spielwiese.
+   die Level 1 bis 10. Die Graubox-Spielwiese laesst sich direkt aus
+   `scenes/levels/level_greybox.tscn` starten.
 
 Am Rechner laesst sich die Katze mit Pfeiltasten (laufen und klettern),
 Leertaste (springen) und Escape (Pause) steuern. Auf dem Geraet gilt die
@@ -66,8 +68,8 @@ rechts. Greifen und Klettern brauchen keine eigene Taste.
 **Meilenstein 3 - Gegner**
 
 Jeder Angriff wird angekuendigt: waehrend der Warnzeit (0,7 s) steht der
-Gegner still und zeigt ein Ausrufezeichen ueber dem Kopf. Ton kommt in
-Meilenstein 7 dazu, bis dahin ist die Warnung rein sichtbar.
+Gegner still und zeigt ein Ausrufezeichen ueber dem Kopf; seit Meilenstein 7
+ist die Warnung auch zu hoeren (Klaeffen, Knurren, Fauchen, Hupe).
 
 - **Kleiner Hund:** schnell, jagt in kurzen Sprints, kleiner Wahrnehmungsradius
 - **Grosser Hund:** langsam, grosser Radius, breiterer Angriffsbereich
@@ -105,9 +107,9 @@ auf, sobald die Katze den jeweiligen Bereich betritt.
   Levelauswahl und Einstellungen
 - Levelauswahl: Levels werden nacheinander freigeschaltet, geschaffte Levels
   sind mit einem Haken markiert
-- Einstellungen: Musik und Sound getrennt schaltbar. Die Audio-Busse `Music`
-  und `SFX` sind angelegt und werden schon stummgeschaltet; Toene kommen in
-  Meilenstein 7 dazu.
+- Einstellungen: Musik und Sound getrennt schaltbar (stummen die Busse
+  `Music` bzw. `SFX`), Wahl des Musikstuecks und ein Testmodus, der alle
+  Level zum Ausprobieren freischaltet
 - Pausenmenue mit Weiter, Neustart und Zurueck zum Menue; nach dem Sieg
   zusaetzlich eine Menue-Schaltflaeche
 - Gespeichert wird per `ConfigFile` unter `user://nachtkatze.cfg`:
@@ -126,6 +128,106 @@ auf, sobald die Katze den jeweiligen Bereich betritt.
 - Autos sind flach (0,68 m Schadenshoehe) und ihr Schadensbereich ist
   kuerzer als die Karosserie. Wer rechtzeitig springt, kommt sicher
   darueber: das Zeitfenster ist rund 0,3 s breit statt 0,1 s.
+
+**Meilenstein 7 - Sound**
+
+Alle Geraeusche sind synthetisiert (`tools/sfx_erzeugen.py`, reines Python
+ohne Zusatzpakete) und dienen als Platzhalter: laut GDD Abschnitt 15 koennen
+sie spaeter durch lizenzfreie Aufnahmen ersetzt werden - gleiche Dateinamen
+in `assets/sfx/` bzw. `assets/ambient/` genuegen.
+
+| Quelle | Geraeusche |
+|---|---|
+| Katze | weiche Pfotenschritte im Lauftakt, Kratzen beim Klettern und Hochziehen, Landung nach einem Sturz, Knuspern beim Fressen, kurzes Miauen bei Treffer, Schnurren im Ziel |
+| Hunde | Klaeffen (klein) bzw. Knurren (gross) als Warnung, Bellen nach oben und nach einem Treffer |
+| Revierkatzen | Fauchen als Warnung, Kampfgeraeusch beim Angriffssprung |
+| Autos | Hupe zur Ankuendigung, Motor als Schleife waehrend der Durchfahrt |
+| Oberflaeche | Tastenklick, Tonfolge fuer "Geschafft" und fuer "Game Over" |
+
+Ambient je Tageszeit laeuft als nahtlose Schleife, solange ein Level offen
+ist; im Menue ist nur Musik zu hoeren:
+
+| Tageszeit | Ambient |
+|---|---|
+| Tag | Voegel, entfernter Verkehr |
+| Daemmerung | Schwalben, Kirchenglocke |
+| Nacht | Grillen, ferner Motorroller |
+
+Technik: Autoload `Sfx` (`scripts/systems/sound_player.gd`). Katze und
+Oberflaeche klingen ohne Raumposition, Gegner und Autos raeumlich von ihrer
+Stelle aus - ein Hund am Bildrand ist leiser als einer direkt neben der
+Katze. Das Ambient laeuft auf einem eigenen Bus `Ambient`, der in `SFX`
+muendet; der Sound-Schalter stummt damit beides. Abgemischt wird ueber die
+Tabelle `VOLUMES` im Autoload.
+
+**Meilenstein 8 - Level 1 bis 10**
+
+Alle Level entstehen mit `tools/level_erzeugen.py` aus dem Asset-Kit, die
+Werte folgen GDD Abschnitt 6. Jedes Level hat eine `LevelData`-Ressource
+(`resources/levels/level_XX.tres`) und steht im Levelkatalog.
+
+| Level | Name | Tageszeit | Stockwerke | Hunde (klein/gross) | Katzen | Autos | Futter | Neu |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Erste Streifzuege | Tag | 2 | 1 / 0 | 0 | 0 | viel | Hunde |
+| 2 | Durch die Zaunluecke | Tag | 2 | 2 / 0 | 0 | 0 | viel | Zaunluecken |
+| 3 | Revier ueber der Gasse | Tag | 3 | 1 / 1 | 1 | 0 | mittel | Revierkatzen, grosser Hund |
+| 4 | Scheinwerfer im Abendrot | Daemmerung | 3 | 1 / 1 | 1 | 1 | mittel | fahrende Autos |
+| 5 | Auf dem Drahtseil | Daemmerung | 3 | 1 / 1 | 2 | 1 | mittel | Balancieren auf Leitungen |
+| 6 | Weite Spruenge | Daemmerung | 4 | 1 / 1 | 2 | 2 | mittel | Dachluecken 2,6 und 3 m |
+| 7 | Laternen in der Nacht | Nacht | 4 | 1 / 1 | 2 | 2 | wenig | eingeschraenkte Sicht |
+| 8 | Alles auf einmal | Nacht | 4 | 2 / 1 | 2 | 2 | wenig | kombinierte Gefahren |
+| 9 | Hohe Fassaden | Nacht | 5 | 2 / 1 | 3 | 3 | wenig | hohe Fassaden |
+| 10 | Blick auf den Kirchturm | Nacht | 5 | 2 / 1 | 3 | 3 | wenig | laengste Kletterpassage, Kirchturm am Ziel |
+
+Aufbau nach den Regeln aus GDD Abschnitt 5:
+
+- Erste Haelfte: Haeuserzeilen mit Hunden auf der Strasse, Revierkatzen auf
+  den Daechern und Autos auf freien Strassenstuecken. Darueber fuehrt immer
+  eine Route ueber Balkone und Daecher.
+- Zweite Haelfte: Klettern und Springen mit Futter als Belohnung, zum Schluss
+  das Zielhaus mit versetzten Balkonen bis zur Dachterrasse. Dort steht der
+  Futternapf unter einer Laterne; die Anzahl Stockwerke bestimmt die Hoehe
+  des Ziels (Level 1: 6 m, Level 10: 15 m).
+- Futter liegt sicher auf Balkonen (haelt den Fluss) und mutig vor Hunden
+  oder mitten im Revier einer Katze - dort meist der ganze Fisch.
+- Balkone sind sichere Ruhepunkte: kein Hund reicht hinauf, keine Katze
+  hat dort ihr Revier.
+
+Der Generator prueft jedes Level, bevor er es schreibt: Jede Kletterzone
+endet auf einer Flaeche und hat keinen Balkon im Weg. Das Ziel muss ueber
+Laufen, Springen (mit Sicherheitsabschlag auf die Sprungweite), Klettern und
+Balancieren erreichbar sein, und zwar auch dann, wenn man die Strasse in
+Hundenaehe meidet (Fassadenroute). Autos duerfen nicht durch Zaeune,
+geparkte Autos oder Masten fahren. Er schaetzt ausserdem die Spielzeit; alle
+Level liegen zwischen etwa 35 und 55 Sekunden reiner Laufzeit, dazu kommen
+Warten auf Gegner und Umwege zum Futter.
+
+Neu im Spiel:
+
+- **Balancieren (ab Level 5):** Strommasten mit durchhaengenden Leitungen.
+  Am ersten Mast klettert die Katze hinauf; faellt sie von oben auf eine
+  Leitung, balanciert sie darauf - langsamer (2,8 m/s) und leicht
+  schwankend, ueber die Masten hinweg auf die naechste Leitung. Springen
+  geht, nach unten druecken laesst sie fallen, ein Treffer wirft sie
+  herunter. Die Hunde darunter bellen nur nach oben.
+- **Eingeschraenkte Sicht (ab Level 7):** nachts bleibt um die Katze ein
+  heller Bereich, nach aussen wird es nachtblau. Radius und Dunkelheit
+  stehen in der `LevelData` (`view_radius`, `view_darkness`).
+- **Tageszeiten:** Daemmerung in Orange-Violett mit tiefer Sonne und ersten
+  Laternen, Nacht in dunklem Blaugrau mit Natriumdampf-Laternen, Glow und
+  staerker leuchtenden Fenstern. Hoechstens sechs echte Lichtquellen je Level.
+- **Autos auf Abschnitten:** jedes Auto faehrt nur auf seinem freien
+  Strassenstueck (`street_min_x`, `street_max_x`) und wartet, solange die
+  Katze woanders ist.
+- **Testmodus:** in den Einstellungen "Alle Level offen (Test)" - so laesst
+  sich jedes Level direkt anspielen, ohne die vorigen zu schaffen.
+- Die Graubox-Spielwiese bleibt als Testlevel im Projekt, steht aber nicht
+  mehr in der Levelauswahl.
+
+![Level 4 - Daemmerung](../docs/bilder/level_04_a_start.png)
+![Level 5 - Leitungen ueber der Hundestrasse](../docs/bilder/level_05_b_uebersicht.png)
+![Level 7 - Nacht mit eingeschraenkter Sicht](../docs/bilder/level_07_a_start.png)
+![Level 10 - Ziel mit Kirchturm](../docs/bilder/level_10_c_ziel.png)
 
 ## Parallax-Hintergrund (GDD Abschnitt 8)
 
@@ -169,7 +271,7 @@ aus 5 MB Rohdaten wird rund 1 MB im Paket.
 
 ## Levels aus dem Kit
 
-Beide Levels bestehen aus Modulen des Asset-Kits: Strassenstuecke zu 4 m,
+Alle Levels bestehen aus Modulen des Asset-Kits: Strassenstuecke zu 4 m,
 Geschoss-Segmente zu 4 m, Balkone und Daecher zu 2 m. Die Bauteile werden
 ueber `tiles` aneinandergereiht, Mesh und Kollision entstehen daraus
 automatisch. Die spielrelevanten Masse sind dabei gleich geblieben: 3 m je
@@ -185,7 +287,7 @@ als `solid = false` gesetzt, damit sie den Weg nicht verstellen.
 
 ![Graubox aus dem Kit](../docs/bilder/03_daecher.png)
 
-## Levelaufbau der Graubox (Spielwiese nach dem Tutorial)
+## Levelaufbau der Graubox (Testlevel)
 
 | Abschnitt | Inhalt |
 |---|---|
@@ -227,15 +329,19 @@ scripts/   GDScript nach Zustaendigkeit (player, world, items, ui, systems,
            enemies, assets)
 assets/    Toon-Shader und das gemeinsame Material
 resources/ Levelparameter als .tres
-tests/     Kopflose Funktionspruefung
-tools/     Entwicklerwerkzeug fuer Bilder aus dem Level
+tests/     Kopflose Funktionspruefung (Mechanik und alle Level)
+tools/     Generatoren fuer Level, Musik und Geraeusche, Bilder aus dem Level
 ```
 
 ## Tests
 
 ```
 godot --headless --path nachtkatze --fixed-fps 60 res://tests/smoke_test.tscn
+godot --headless --path nachtkatze --fixed-fps 60 res://tests/level_test.tscn
 ```
+
+`--fixed-fps 60` laesst die Physik ohne Warten auf die Uhr laufen - beide
+Laeufe brauchen so nur wenige Sekunden.
 
 Prueft Metriken, Laufen, Sprunghoehe, Kameraverhalten beim Fallen, alle
 Kletterzonen beider Levels, Kantengriff, die schwerste Dachluecke, Futter,
@@ -244,7 +350,12 @@ Auto, HUD, Levelziel, Game Over, das Tutorial, das Weglaufen vor Gegnern,
 den Sprung ueber ein Auto samt Timing-Spielraum, Levelkatalog, Speicherstand,
 die Menues, das Asset-Kit (darunter, ob die Normalen nach aussen zeigen),
 die Regenrinnen an den Kletterzonen, den Parallax-Hintergrund und die drei
-Musikstuecke. Exit-Code 0 heisst alles gruen (aktuell 120 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+Musikstuecke, alle Soundeffekte samt Ausloesern und das Ambient je
+Tageszeit, das Balancieren, die Nachtsicht, die Autoabschnitte und den
+Testmodus. Der Level-Test misst jedes Level 1-10 gegen die Tabelle aus GDD
+Abschnitt 6 (Tageszeit, Hunde, Katzen, Autos, Futterdichte, Zielhoehe), zaehlt
+die Lichtquellen, klettert jede Kletterzone hinauf und beendet das Level am
+Napf. Exit-Code 0 heisst alles gruen (aktuell 166 und 174 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -257,10 +368,10 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 `export_presets.cfg` im Projekt.
 
 ```
-godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m2-debug.apk
+godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m8-debug.apk
 ```
 
-Ergebnis: rund 25 MB, `org.nachtkatze.prototyp` in Version 0.5.0,
+Ergebnis: rund 26 MB, `org.nachtkatze.prototyp` in Version 0.8.0,
 minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
@@ -273,16 +384,31 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
   --resolution 1280x720 res://tools/screenshot.tscn
 ```
 
+Fuer die Level 1-10 (Start, Uebersicht, Ziel; optional nur einzelne Nummern)
+besser mit dem echten Mobile-Renderer - nur der zeigt Laternenlicht. Ohne
+Grafikkarte geht das mit dem Software-Vulkan von Mesa (`mesa-vulkan-drivers`):
+
+```
+xvfb-run godot --rendering-driver vulkan --rendering-method mobile \
+  --path nachtkatze --resolution 1280x720 res://tools/screenshot.tscn -- levels 4 7
+```
+
+Levels neu erzeugen (nach Aenderungen am Generator):
+
+```
+python3 nachtkatze/tools/level_erzeugen.py
+```
+
 ## Bewusste Vereinfachungen
 
-- Gegner sind noch Graubox-Kisten ohne Animationen; die Zustandsautomaten und
-  Warnzeiten stimmen aber schon. Animationen und Ton folgen in Meilenstein 5
-  und 7.
-- Die Grafik ist bewusst Graubox. Asset-Kit, Toon-Shader und Parallax-
-  Hintergrund kommen in Meilenstein 5; die drei Tageszeiten sind als
-  Lichtvoreinstellung schon angelegt und ueber `LevelData` umschaltbar.
-- Start- und Hauptmenue, Levelauswahl und Speichern sind Meilenstein 6.
-- Ton fehlt komplett (Meilenstein 7); die Audio-Busse kommen dort dazu.
+- Katze und Gegner sind noch einfache Formen ohne Animationen; die
+  Zustandsautomaten und Warnzeiten stimmen aber schon. Modelle und
+  Animationen kommen mit den Grafik-Assets aus Meilenstein 5. Das
+  Balancieren zeigt sich bis dahin nur durch leichtes Schwanken.
+- Soundeffekte und Ambient sind synthetische Platzhalter (siehe
+  Meilenstein 7).
+- Die Levelwerte sind Startwerte aus dem GDD. Laengen, Gegnerpositionen und
+  Futter werden nach dem Spieltest im Generator angepasst.
 - Die Levels rendern ohne Schlagschatten. Je nach Renderer beschattete sich
   die Katze selbst und wurde fast schwarz. Der Toon-Shader stuft stattdessen
   das Sonnenlicht; echte Schatten und LightmapGI sind spaeter dran.
@@ -349,6 +475,6 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Meilenstein 7 (Soundeffekte und Ambient je Tageszeit) und Meilenstein 8
-(Levels 1 bis 10). Die drei Tageszeit-Voreinstellungen stehen bereit, die
-Levels 1 bis 10 koennen sie ueber ihre LevelData waehlen.
+Spieltest der Level 1 bis 10 und Balancing im Generator, danach die
+Grafik-Assets aus Meilenstein 5 und Meilenstein 9 (Performancetest auf dem
+Zielgeraet, Feinschliff).

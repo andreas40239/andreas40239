@@ -24,12 +24,17 @@ enum State { WARTEN, WARNUNG, FAHREN }
 ## Pause zwischen zwei Durchfahrten.
 @export var pause_time: float = 8.0
 @export var warning_time: float = 1.0
+## Strassenabschnitt, auf dem das Auto faehrt (Weltkoordinaten). Liegt die
+## Katze ausserhalb, wartet es. Beide 0 = ganze Strasse.
+@export var street_min_x: float = 0.0
+@export var street_max_x: float = 0.0
 
 var state: State = State.WARTEN
 
 var _timer := 0.0
 var _travelled := 0.0
 var _player: Player = null
+var _engine: AudioStreamPlayer3D = null
 
 @onready var visual: Node3D = get_node_or_null("Visual")
 @onready var headlight: Node3D = get_node_or_null("Visual/Scheinwerfer")
@@ -41,6 +46,9 @@ func _ready() -> void:
 	collision_mask = 2     # Spieler
 	monitoring = true
 	_player = get_tree().get_first_node_in_group("player") as Player
+	_engine = Sfx.make_loop_player(&"motor")
+	_engine.name = "Motor"
+	add_child(_engine)
 	_enter(State.WARTEN, pause_time)
 
 func _physics_process(delta: float) -> void:
@@ -52,6 +60,9 @@ func _physics_process(delta: float) -> void:
 		State.WARTEN:
 			_set_visible(false)
 			if _timer <= 0.0:
+				if not _player_on_street():
+					_timer = 0.5
+					return
 				_place_ahead_of_player()
 				_enter(State.WARNUNG, warning_time)
 		State.WARNUNG:
@@ -66,7 +77,7 @@ func _physics_process(delta: float) -> void:
 			position.x += float(drive_direction) * step
 			_travelled += step
 			_damage_on_contact()
-			if _travelled >= travel_length:
+			if _travelled >= travel_length or not _inside_street(position.x):
 				_enter(State.WARTEN, pause_time)
 
 ## Setzt den Durchfahrtszyklus neu an.
@@ -79,9 +90,24 @@ func _damage_on_contact() -> void:
 		if player != null:
 			player.take_damage(damage, global_position)
 
+func _has_street_limits() -> bool:
+	return not is_equal_approx(street_min_x, street_max_x)
+
+func _inside_street(x: float) -> bool:
+	return not _has_street_limits() or (x >= street_min_x - 0.01 and x <= street_max_x + 0.01)
+
+## Faehrt nur, wenn die Katze auf seinem Abschnitt unterwegs ist.
+func _player_on_street() -> bool:
+	if _player == null or not _has_street_limits():
+		return true
+	return _player.global_position.x > street_min_x + 1.0 \
+		and _player.global_position.x < street_max_x - 1.0
+
 func _place_ahead_of_player() -> void:
 	var reference_x := _player.global_position.x if _player != null else 0.0
 	position.x = reference_x - float(drive_direction) * spawn_distance
+	if _has_street_limits():
+		position.x = clampf(position.x, street_min_x, street_max_x)
 	# Scheinwerfer zeigen in Fahrtrichtung.
 	if headlight != null:
 		headlight.position.x = absf(headlight.position.x) * float(drive_direction)
@@ -98,3 +124,10 @@ func _set_visible(value: bool) -> void:
 func _enter(new_state: State, duration: float) -> void:
 	state = new_state
 	_timer = duration
+	# Warnung: Scheinwerfer, Motor und Hupe kuendigen das Auto an.
+	if _engine != null:
+		if new_state == State.WARNUNG:
+			_engine.play()
+			Sfx.play_at(&"hupe", global_position)
+		elif new_state == State.WARTEN:
+			_engine.stop()

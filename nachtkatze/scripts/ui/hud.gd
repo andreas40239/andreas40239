@@ -77,6 +77,7 @@ func hide_hint(kind: HintOverlay.Hint = HintOverlay.Hint.KEIN) -> void:
 func _toggle_pause() -> void:
 	if Game.is_level_finished:
 		return
+	Sfx.play(&"klick")
 	var paused := not get_tree().paused
 	get_tree().paused = paused
 	pause_panel.visible = paused

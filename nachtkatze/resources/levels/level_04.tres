@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/level_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+scene_path = "res://scenes/levels/level_04.tscn"
+display_name = "4 · Scheinwerfer im Abendrot"
+time_of_day = 1
+max_health = 3
+start_health = 3
+no_fail = false
+small_dogs = 1
+big_dogs = 1
+territory_cats = 1
+cars = 1
+food_density = 1
+view_radius = 0
+view_darkness = 0.78

@@ -1,9 +1,18 @@
-[gd_resource type="Resource" script_class="LevelCatalog" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="LevelCatalog" load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/systems/level_catalog.gd" id="1_catalog"]
 [ext_resource type="Resource" path="res://resources/levels/level_00.tres" id="2_level00"]
-[ext_resource type="Resource" path="res://resources/levels/level_greybox.tres" id="3_greybox"]
+[ext_resource type="Resource" path="res://resources/levels/level_01.tres" id="3_level01"]
+[ext_resource type="Resource" path="res://resources/levels/level_02.tres" id="4_level02"]
+[ext_resource type="Resource" path="res://resources/levels/level_03.tres" id="5_level03"]
+[ext_resource type="Resource" path="res://resources/levels/level_04.tres" id="6_level04"]
+[ext_resource type="Resource" path="res://resources/levels/level_05.tres" id="7_level05"]
+[ext_resource type="Resource" path="res://resources/levels/level_06.tres" id="8_level06"]
+[ext_resource type="Resource" path="res://resources/levels/level_07.tres" id="9_level07"]
+[ext_resource type="Resource" path="res://resources/levels/level_08.tres" id="10_level08"]
+[ext_resource type="Resource" path="res://resources/levels/level_09.tres" id="11_level09"]
+[ext_resource type="Resource" path="res://resources/levels/level_10.tres" id="12_level10"]
 
 [resource]
 script = ExtResource("1_catalog")
-levels = Array[Resource]([ExtResource("2_level00"), ExtResource("3_greybox")])
+levels = Array[Resource]([ExtResource("2_level00"), ExtResource("3_level01"), ExtResource("4_level02"), ExtResource("5_level03"), ExtResource("6_level04"), ExtResource("7_level05"), ExtResource("8_level06"), ExtResource("9_level07"), ExtResource("10_level08"), ExtResource("11_level09"), ExtResource("12_level10")])

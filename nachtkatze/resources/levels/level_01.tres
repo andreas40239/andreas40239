@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/level_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+scene_path = "res://scenes/levels/level_01.tscn"
+display_name = "1 · Erste Streifzüge"
+time_of_day = 0
+max_health = 3
+start_health = 3
+no_fail = false
+small_dogs = 1
+big_dogs = 0
+territory_cats = 0
+cars = 0
+food_density = 1.5
+view_radius = 0
+view_darkness = 0.78

@@ -40,6 +40,10 @@ func _ready() -> void:
 		await _capture_menus()
 		get_tree().quit()
 		return
+	if OS.get_cmdline_user_args().has("levels"):
+		await _capture_levels()
+		get_tree().quit()
+		return
 	var tutorial := OS.get_cmdline_user_args().has("tutorial")
 	var shots: Array = TUTORIAL_SHOTS if tutorial else SHOTS
 	var level: Node = load(TUTORIAL_PATH if tutorial else LEVEL_PATH).instantiate()
@@ -81,6 +85,43 @@ func _ready() -> void:
 
 	get_tree().quit()
 
+
+## Level 1-10: je eine Spielansicht am Start, eine Uebersicht und die Spielansicht
+## am Ziel. Aufruf mit "-- levels", optional mit Nummern ("-- levels 4 7").
+func _capture_levels() -> void:
+	var numbers: Array[int] = []
+	for arg in OS.get_cmdline_user_args():
+		if arg.is_valid_int():
+			numbers.append(int(arg))
+	if numbers.is_empty():
+		numbers.assign(range(1, 11))
+	for number in numbers:
+		var level: Node = load("res://scenes/levels/level_%02d.tscn" % number).instantiate()
+		get_tree().root.add_child(level)
+		await get_tree().physics_frame
+		var camera: Camera3D = level.get_node("Camera3D")
+		var player: Node3D = level.get_node("Player")
+		for i in 40:
+			await get_tree().physics_frame
+		await _save_frame("level_%02d_a_start" % number)
+		# Spielansicht am Ziel: Katze neben den Napf setzen.
+		var bowl: Node3D = level.get_node("Futternapf")
+		player.global_position = bowl.global_position + Vector3(-1.5, 0.4, 0.0)
+		for i in 90:
+			await get_tree().physics_frame
+		await _save_frame("level_%02d_c_ziel" % number)
+		# Uebersicht ueber die erste Haelfte.
+		camera.set_physics_process(false)
+		player.set_physics_process(false)
+		var night_view := level.get_node_or_null("Nachtsicht") as CanvasLayer
+		if night_view != null:
+			night_view.visible = false
+		camera.global_position = Vector3(bowl.global_position.x * 0.42, 7.0, 44.0)
+		camera.rotation = Vector3.ZERO
+		camera.fov = 60.0
+		await _save_frame("level_%02d_b_uebersicht" % number)
+		level.free()
+		await get_tree().process_frame
 
 ## Startbild und Hauptmenue aufnehmen (GDD Abschnitt 12).
 func _capture_menus() -> void:

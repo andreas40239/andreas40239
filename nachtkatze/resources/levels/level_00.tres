@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_data")
 scene_path = "res://scenes/levels/level_00_tutorial.tscn"
-display_name = "Level 0 - Tutorial"
+display_name = "0 · Tutorial"
 time_of_day = 0
 max_health = 3
 start_health = 3
