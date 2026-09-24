@@ -47,6 +47,10 @@ var overlay_holder: Control
 var preview_node: Node2D
 
 const AI_NAMES := ["Beep", "Zippy", "Rusty"]
+const DRAMA_NAME := "Ace"
+# Below this level one robot plays the "so close!" showman, so even the very
+# first levels have tension instead of the old purely random opening shots.
+const DRAMA_MAX_LEVEL := 10
 
 # ------------------------------------------------------------------ setup
 
@@ -113,9 +117,17 @@ func _start_level() -> void:
 		var is_h := i < humans
 		var nm := "Player %d" % (i + 1)
 		if not is_h:
-			nm = AI_NAMES[ai_i % AI_NAMES.size()]
 			t.ai_tier = G.ai_tier(level, ai_i)
 			t.personality = randi_range(0, 3)
+			# Every robot duels its own human, so with two players nobody is
+			# ignored: robot 1 takes player 1, robot 2 takes player 2.
+			t.target_seat = ai_i % maxi(1, humans)
+			if ai_i == 0 and level <= DRAMA_MAX_LEVEL:
+				t.drama = true
+				t.personality = 0  # unrestricted aim: it needs the full arc range
+				nm = DRAMA_NAME
+			else:
+				nm = AI_NAMES[ai_i % AI_NAMES.size()]
 			ai_i += 1
 		add_child(t)
 		t.setup(i, i, is_h, nm)
@@ -235,6 +247,7 @@ func _do_fire() -> void:
 	confirm_bar.visible = false
 	_arc_visible = false
 	hint_label.visible = false
+	tk.shots_taken += 1
 	var n := G.shot_count(tk.seat, tk.is_human)
 	pending_shots = 0
 	var first: Projectile = null
@@ -282,8 +295,14 @@ func _resolve_explosion(pos: Vector2, direct_tank, shooter: Tank) -> void:
 	A.play("explosion", clampf(1.15 - radius / 200.0, 0.6, 1.1))
 	A.haptic(60)
 	cam.shake(minf(4.0 + radius * 0.06, 10.0))
+	var dealt_any := false
+	var closest = null
+	var closest_d := 1e18
 	for tk in alive_tanks():
 		var d: float = tk.center().distance_to(pos)
+		if tk != shooter and d < closest_d:
+			closest_d = d
+			closest = tk
 		var is_direct: bool = (tk == direct_tank)
 		if is_direct:
 			d = 0.0
@@ -299,6 +318,7 @@ func _resolve_explosion(pos: Vector2, direct_tank, shooter: Tank) -> void:
 		if dmg <= 0.0:
 			continue
 		tk.hp = maxf(0.0, tk.hp - dmg)
+		dealt_any = true
 		tk.hurt_flash()
 		if tk != shooter:
 			shooter.damage_dealt += dmg
@@ -307,6 +327,9 @@ func _resolve_explosion(pos: Vector2, direct_tank, shooter: Tank) -> void:
 				Color(1.0, 0.35, 0.3) if is_direct else Color(1.0, 0.7, 0.3))
 		if tk.hp <= 0.0:
 			_kill_tank(tk)
+	# A harmless shot that landed right next to someone still deserves a gasp.
+	if not dealt_any and closest != null and closest_d < radius * 2.4:
+		_spawn_popup(closest.position + Vector2(0, -74), "So close!", Color(1.0, 0.95, 0.5))
 
 func _kill_tank(tk: Tank) -> void:
 	tk.alive = false
@@ -578,14 +601,14 @@ func _on_power_changed(v: float) -> void:
 func _update_preview() -> void:
 	var tk := current_tank()
 	var res := Sim.trace(tk.barrel_tip(), tk.angle, tk.power, eff_wind(),
-			terrain, tanks, tk, 1.0 / 30.0, 1.1)  # short, approximate preview
+			terrain, tanks, tk, Sim.DT, 1.2)  # preview matches the real flight
 	_preview_pts = res["points"]
 	preview_node.queue_redraw()
 
 func _compute_arc() -> void:
 	var tk := current_tank()
 	var res := Sim.trace(tk.barrel_tip(), tk.angle, tk.power, eff_wind(),
-			terrain, tanks, tk, 1.0 / 60.0, 10.0)  # exact full path
+			terrain, tanks, tk)  # exact full path at the shell.s own timestep
 	_arc_pts = res["points"]
 	preview_node.queue_redraw()
 
@@ -695,6 +718,7 @@ func _toggle_row(box: VBoxContainer, text: String, value: bool, on_change: Calla
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 20)
 	var l := UIKit.label(text, 28)
+	l.custom_minimum_size = Vector2(250, 0)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_child(l)
@@ -716,7 +740,7 @@ func _slider_row(box: VBoxContainer, text: String, key: String) -> void:
 	l.custom_minimum_size = Vector2(130, 0)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_child(l)
-	var s := UIKit.hslider(0.0, 1.0, G.settings[key], 330)
+	var s := UIKit.hslider(0.0, 1.0, G.settings[key], 280)
 	s.step = 0.05
 	s.value_changed.connect(func(v: float) -> void:
 		G.settings[key] = v
@@ -725,30 +749,59 @@ func _slider_row(box: VBoxContainer, text: String, key: String) -> void:
 	row.add_child(s)
 	box.add_child(row)
 
+func _music_row(box: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	var l := UIKit.label("Song", 26)
+	l.custom_minimum_size = Vector2(130, 0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	row.add_child(l)
+	var name_l := UIKit.label(A.track_name(), 26, UIKit.COL_PRIMARY)
+	name_l.custom_minimum_size = Vector2(190, 0)
+	row.add_child(name_l)
+	var b := UIKit.button("Next song", UIKit.COL_PRIMARY, 24, Vector2(180, 64))
+	b.pressed.connect(func() -> void:
+		name_l.text = A.next_track())
+	row.add_child(b)
+	box.add_child(row)
+
 func _show_pause_panel() -> void:
 	if state == S.ENDED:
 		return
 	get_tree().paused = true
 	var dim := _dim_panel()
 	dim.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
-	var box := _center_box(dim, 700.0)
+	var box := _center_box(dim, 1000.0)
 	box.add_child(UIKit.label("Paused", 44))
-	_slider_row(box, "Sounds", "sfx")
-	_slider_row(box, "Music", "music")
-	_toggle_row(box, "Wind", not G.settings["wind_off"], func() -> bool:
+	# Two columns keep every setting on screen: a single tall list overflowed
+	# the bottom of the display and put the buttons out of reach.
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 34)
+	cols.alignment = BoxContainer.ALIGNMENT_CENTER
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 12)
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 12)
+	cols.add_child(left)
+	cols.add_child(right)
+	box.add_child(cols)
+	_slider_row(left, "Sounds", "sfx")
+	_slider_row(left, "Music", "music")
+	_music_row(left)
+	_toggle_row(right, "Wind", not G.settings["wind_off"], func() -> bool:
 		G.settings["wind_off"] = not G.settings["wind_off"]
 		cloud.set_wind(eff_wind())
 		if state == S.AIM:
 			_update_preview()
 		return not G.settings["wind_off"])
-	_toggle_row(box, "Turn timer (30s)", G.settings["timer_on"], func() -> bool:
+	_toggle_row(right, "Turn timer (30s)", G.settings["timer_on"], func() -> bool:
 		G.settings["timer_on"] = not G.settings["timer_on"]
 		timer_left = 30.0
 		return G.settings["timer_on"])
-	_toggle_row(box, "Vibration", G.settings["haptics"], func() -> bool:
+	_toggle_row(right, "Vibration", G.settings["haptics"], func() -> bool:
 		G.settings["haptics"] = not G.settings["haptics"]
 		return G.settings["haptics"])
-	_toggle_row(box, "Screen shake", G.settings["shake"], func() -> bool:
+	_toggle_row(right, "Screen shake", G.settings["shake"], func() -> bool:
 		G.settings["shake"] = not G.settings["shake"]
 		return G.settings["shake"])
 	box.add_child(UIKit.vspace())
@@ -913,7 +966,7 @@ class PreviewLine extends Node2D:
 		if battle.state == battle.S.AIM and battle.current_i >= 0 \
 				and battle.current_tank().is_human:
 			var pts: PackedVector2Array = battle._preview_pts
-			for i in range(0, pts.size(), 2):
+			for i in range(0, pts.size(), 12):
 				var a := 1.0 - float(i) / float(maxi(1, pts.size()))
 				draw_circle(pts[i], 5.0, Color(1, 1, 1, 0.35 + 0.45 * a))
 		if battle.state == battle.S.CONFIRM and battle._arc_visible:

@@ -114,3 +114,87 @@ static func vspace(h := 16.0) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size = Vector2(0, h)
 	return c
+
+# --- Icon drawing (used by the picture-based player select) -----------
+
+# Geometric player symbols: 0 circle, 1 triangle, 2 square, 3 star.
+static func draw_symbol(ci: CanvasItem, c: Vector2, s: float, which: int, col: Color) -> void:
+	match which:
+		0:
+			ci.draw_circle(c, s, col)
+		1:
+			ci.draw_colored_polygon(PackedVector2Array([
+				c + Vector2(0, -s), c + Vector2(s, s * 0.8), c + Vector2(-s, s * 0.8)]), col)
+		2:
+			ci.draw_rect(Rect2(c - Vector2(s * 0.85, s * 0.85), Vector2(s * 1.7, s * 1.7)), col)
+		_:
+			var pts := PackedVector2Array()
+			for i in range(10):
+				var a := -PI / 2.0 + TAU * float(i) / 10.0
+				var rr := s * 1.2 if i % 2 == 0 else s * 0.5
+				pts.append(c + Vector2(cos(a), sin(a)) * rr)
+			ci.draw_colored_polygon(pts, col)
+
+static func _rrect(ci: CanvasItem, r: Rect2, rad: float, col: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = col
+	sb.set_corner_radius_all(int(rad))
+	ci.draw_style_box(sb, r)
+
+# A small cartoon tank icon. `robot` swaps the happy face for a robot face
+# with an antenna, so kids can tell players from computer opponents at a glance.
+static func draw_mini_tank(ci: CanvasItem, c: Vector2, s: float, col: Color,
+		robot: bool, sym: int = -1) -> void:
+	# Ground shadow.
+	var shadow := PackedVector2Array()
+	for i in range(16):
+		var a := TAU * float(i) / 16.0
+		shadow.append(c + Vector2(cos(a) * 30.0 * s, 20.0 * s + sin(a) * 6.0 * s))
+	ci.draw_colored_polygon(shadow, Color(0, 0, 0, 0.13))
+	# Barrel (behind the hull).
+	var pivot := c + Vector2(0, -8.0 * s)
+	var dirv := Vector2(0.72, -0.69)
+	ci.draw_line(pivot, pivot + dirv * 34.0 * s, Color(0.36, 0.42, 0.52), 8.0 * s)
+	ci.draw_circle(pivot + dirv * 34.0 * s, 4.5 * s, Color(0.36, 0.42, 0.52))
+	# Tracks + wheels.
+	_rrect(ci, Rect2(c.x - 27.0 * s, c.y + 4.0 * s, 54.0 * s, 15.0 * s), 7.0 * s, Color(0.32, 0.33, 0.4))
+	for i in range(4):
+		ci.draw_circle(Vector2(c.x - 18.0 * s + float(i) * 12.5 * s, c.y + 11.5 * s),
+				4.2 * s, Color(0.62, 0.63, 0.7))
+	# Hull.
+	_rrect(ci, Rect2(c.x - 25.0 * s, c.y - 6.0 * s, 50.0 * s, 13.0 * s), 6.0 * s, col)
+	# Turret dome.
+	var dome := PackedVector2Array()
+	dome.append(pivot + Vector2(14.0 * s, 2.0 * s))
+	for i in range(16):
+		var a := PI * float(i) / 15.0
+		dome.append(pivot + Vector2(cos(a) * 14.0 * s, -sin(a) * 14.0 * s + 2.0 * s))
+	dome.append(pivot + Vector2(-14.0 * s, 2.0 * s))
+	ci.draw_colored_polygon(dome, col.lightened(0.12))
+	if robot:
+		# Antenna with a blinking bulb.
+		ci.draw_line(pivot + Vector2(-2.0 * s, -13.0 * s), pivot + Vector2(-6.0 * s, -25.0 * s),
+				Color(0.45, 0.48, 0.55), 2.5 * s)
+		ci.draw_circle(pivot + Vector2(-6.0 * s, -26.0 * s), 3.6 * s, Color(1.0, 0.45, 0.35))
+		# Square "screen" eyes.
+		for ex in [-5.5, 5.5]:
+			ci.draw_rect(Rect2(pivot.x + ex * s - 3.6 * s, pivot.y - 8.0 * s,
+					7.2 * s, 6.0 * s), Color(0.95, 0.98, 1.0))
+			ci.draw_rect(Rect2(pivot.x + ex * s - 1.6 * s, pivot.y - 6.6 * s,
+					3.2 * s, 3.2 * s), Color(0.15, 0.6, 0.8))
+		# Straight robot mouth.
+		ci.draw_line(pivot + Vector2(-5.0 * s, -0.5 * s), pivot + Vector2(5.0 * s, -0.5 * s),
+				Color(0.25, 0.3, 0.4), 2.2 * s)
+	else:
+		# Happy round eyes + smile.
+		for ex in [-5.5, 5.5]:
+			ci.draw_circle(pivot + Vector2(ex * s, -5.0 * s), 4.3 * s, Color.WHITE)
+			ci.draw_circle(pivot + Vector2((ex + 0.8) * s, -5.0 * s), 2.1 * s, Color(0.15, 0.15, 0.25))
+		ci.draw_arc(pivot + Vector2(0, -2.0 * s), 4.8 * s, 0.35, PI - 0.35, 12,
+				Color(0.25, 0.1, 0.1), 2.0 * s)
+	# Colour-blind-friendly badge above the tank.
+	if sym >= 0:
+		var bc := c + Vector2(0, -34.0 * s)
+		ci.draw_circle(bc, 11.0 * s, col)
+		ci.draw_arc(bc, 11.0 * s, 0, TAU, 20, Color(1, 1, 1, 0.9), 2.0 * s)
+		draw_symbol(ci, bc, 6.0 * s, sym, Color.WHITE)

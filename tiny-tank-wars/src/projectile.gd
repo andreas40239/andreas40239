@@ -12,6 +12,7 @@ var shooter
 var done := false
 var _left_start := false
 var _t := 0.0
+var _acc := 0.0
 var _trail := PackedVector2Array()
 
 func launch(from: Vector2, angle_deg: float, power: float, p_wind: float,
@@ -26,36 +27,44 @@ func launch(from: Vector2, angle_deg: float, power: float, p_wind: float,
 func _physics_process(delta: float) -> void:
 	if done:
 		return
-	# Substeps keep fast shells from tunneling through hilltops.
-	var steps := 3
-	var dt := delta / float(steps)
-	for s in range(steps):
-		vel.x += wind * Sim.WIND_ACCEL * dt
-		vel.y += Sim.GRAVITY * dt
-		position += vel * dt
-		_t += dt
-		if not _left_start and position.distance_to(shooter.center()) > Sim.TANK_RADIUS + 14.0:
-			_left_start = true
-		for tk in tanks:
-			if not tk.alive:
-				continue
-			if tk == shooter and not _left_start:
-				continue
-			if position.distance_to(tk.center()) <= Sim.TANK_RADIUS:
-				_finish(position, tk, false)
-				return
-		if position.y >= terrain.ground_y(position.x):
-			position.y = terrain.ground_y(position.x)
-			_finish(position, null, false)
-			return
-		if position.x < -300.0 or position.x > terrain.WORLD_W + 300.0 \
-				or position.y > 1500.0 or _t > 12.0:
-			_finish(position, null, true)
+	# Advance in fixed Sim.DT steps so the flight matches the predicted arc
+	# exactly, whatever the frame rate. Clamped so a long stall cannot make
+	# this loop spiral.
+	_acc = minf(_acc + delta, 0.25)
+	while _acc >= Sim.DT:
+		_acc -= Sim.DT
+		if _step(Sim.DT):
 			return
 	_trail.append(position)
 	if _trail.size() > 14:
 		_trail.remove_at(0)
 	queue_redraw()
+
+# One integration step. Returns true once the shell has resolved.
+func _step(dt: float) -> bool:
+	vel.x += wind * Sim.WIND_ACCEL * dt
+	vel.y += Sim.GRAVITY * dt
+	position += vel * dt
+	_t += dt
+	if not _left_start and position.distance_to(shooter.center()) > Sim.TANK_RADIUS + 14.0:
+		_left_start = true
+	for tk in tanks:
+		if not tk.alive:
+			continue
+		if tk == shooter and not _left_start:
+			continue
+		if position.distance_to(tk.center()) <= Sim.TANK_RADIUS:
+			_finish(position, tk, false)
+			return true
+	if position.y >= terrain.ground_y(position.x):
+		position.y = terrain.ground_y(position.x)
+		_finish(position, null, false)
+		return true
+	if position.x < -300.0 or position.x > terrain.WORLD_W + 300.0 \
+			or position.y > 1500.0 or _t > 12.0:
+		_finish(position, null, true)
+		return true
+	return false
 
 func _finish(pos: Vector2, tk, lost: bool) -> void:
 	done = true

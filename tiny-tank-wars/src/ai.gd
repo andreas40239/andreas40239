@@ -2,19 +2,21 @@
 # trajectory simulation a player could reason about, no cheating.
 class_name AI
 
+# How far from its target the "drama" robot lands its shot, by how many
+# shots it has already taken. The first seven land close enough to be scary
+# but outside the 40 px blast radius, so they do no damage at all. From the
+# eighth shot on the gap closes and the hits start to hurt.
+const DRAMA_MISS := [95.0, 88.0, 82.0, 75.0, 68.0, 60.0, 52.0, 34.0, 26.0, 18.0, 10.0]
+const DRAMA_MISS_ROUNDS := 7  # shots that must stay harmless, however close
+const DRAMA_SAFE_GAP := 48.0  # a guaranteed miss keeps at least this much room
+
 # Returns {"angle": float, "power": float}
 static func choose_shot(tank, all_tanks: Array, terrain, wind: float) -> Dictionary:
-	var enemies := []
-	for t in all_tanks:
-		if t.alive and t != tank:
-			enemies.append(t)
-	if enemies.is_empty():
+	var target = pick_target(tank, all_tanks)
+	if target == null:
 		return {"angle": 90.0, "power": 50.0}
-	# Nearest enemy is the target.
-	var target = enemies[0]
-	for e in enemies:
-		if absf(e.global_position.x - tank.global_position.x) < absf(target.global_position.x - tank.global_position.x):
-			target = e
+	if tank.drama:
+		return _drama(tank, target, terrain, all_tanks, wind)
 	match tank.ai_tier:
 		0:
 			return _rookie(tank)
@@ -24,6 +26,34 @@ static func choose_shot(tank, all_tanks: Array, terrain, wind: float) -> Diction
 			return _cadet(tank, target, terrain, all_tanks, wind)
 		_:
 			return _veteran(tank, target, terrain, all_tanks, wind)
+
+# Each robot is assigned its own human to duel (tank.target_seat). With two
+# players that means one robot per player, so nobody feels ignored. Robots
+# only fall back to another tank once their human is out.
+static func pick_target(tank, all_tanks: Array):
+	var enemies := []
+	var humans := []
+	for t in all_tanks:
+		if t.alive and t != tank:
+			enemies.append(t)
+			if t.is_human:
+				humans.append(t)
+	if enemies.is_empty():
+		return null
+	if not humans.is_empty():
+		for h in humans:
+			if h.seat == tank.target_seat:
+				return h
+		return _nearest(tank, humans)
+	return _nearest(tank, enemies)
+
+static func _nearest(tank, candidates: Array):
+	var best = candidates[0]
+	for c in candidates:
+		if absf(c.global_position.x - tank.global_position.x) \
+				< absf(best.global_position.x - tank.global_position.x):
+			best = c
+	return best
 
 static func _apply_personality(tank, shot: Dictionary) -> Dictionary:
 	match tank.personality:
@@ -88,30 +118,7 @@ static func _cadet(tank, target, terrain, all_tanks: Array, wind: float) -> Dict
 	return shot
 
 static func _veteran(tank, target, terrain, all_tanks: Array, wind: float) -> Dictionary:
-	var start: Vector2 = tank.center()
-	var tpos: Vector2 = target.center()
-	var best := {"angle": 60.0, "power": 60.0}
-	var best_err := 1e18
-	var toward_right: bool = tpos.x > start.x
-	# Coarse grid search over arcs toward the target (respects terrain because
-	# the simulation stops at hills).
-	for ai in range(14):
-		var ang := 22.0 + float(ai) * 4.6   # 22..82
-		if not toward_right:
-			ang = 180.0 - ang
-		if tank.personality == 1 and (ang if toward_right else 180.0 - ang) < 55.0:
-			continue
-		if tank.personality == 2 and (ang if toward_right else 180.0 - ang) > 50.0:
-			continue
-		for pi_ in range(16):
-			var pw := 25.0 + float(pi_) * 5.0  # 25..100
-			var res := Sim.trace(start, ang, pw, wind, terrain, all_tanks, tank, 1.0 / 30.0)
-			var err: float = res["impact"].distance_to(tpos)
-			if res["tank"] == target:
-				err = 0.0
-			if err < best_err:
-				best_err = err
-				best = {"angle": ang, "power": pw}
+	var best := _search(tank, target, terrain, all_tanks, wind, 0.0)
 	var key := "vet_t%d" % target.idx
 	if not tank.ai_memory.has(key):
 		# First shot is a deliberate ranging shot: +-5% error (GDD 11).
@@ -119,3 +126,78 @@ static func _veteran(tank, target, terrain, all_tanks: Array, wind: float) -> Di
 		best["angle"] = clampf(best["angle"] + randf_range(-6.0, 6.0), 5.0, 175.0)
 		best["power"] = clampf(best["power"] * randf_range(0.95, 1.05) + randf_range(-3.0, 3.0), 15.0, 100.0)
 	return best
+
+# The star robot: a crack shot that keeps *just* missing, then slowly closes
+# in. Built on the same search as the Veteran, but asked to land at a chosen
+# distance from the target instead of on top of it.
+static func _drama(tank, target, terrain, all_tanks: Array, wind: float) -> Dictionary:
+	var i: int = tank.shots_taken
+	var want: float = 0.0 if i >= DRAMA_MISS.size() else DRAMA_MISS[i]
+	# Only the opening shots are forced to stay harmless. After that the
+	# schedule walks the impact inside the blast radius on purpose, so the
+	# damage ramps up shot by shot instead of staying a permanent tease.
+	return _search(tank, target, terrain, all_tanks, wind, want, i < DRAMA_MISS_ROUNDS)
+
+# Grid-search angle/power for the shot whose predicted impact lands closest
+# to `want` pixels from the target (0 = hit it). Terrain is respected because
+# a blocked shot simply impacts the hillside and scores badly.
+#
+# Two passes: a cheap coarse sweep to rank the field, then a full-resolution
+# re-check of the best handful. The fine pass matters - it runs at the same
+# Sim.DT the real shell flies at, so a planned near miss really does miss.
+static func _search(tank, target, terrain, all_tanks: Array, wind: float,
+		want := 0.0, must_miss := false) -> Dictionary:
+	var tpos: Vector2 = target.center()
+	var toward_right: bool = tpos.x > tank.center().x
+	var coarse := []
+	for ai in range(14):
+		var ang := 22.0 + float(ai) * 4.6   # 22..82
+		if not toward_right:
+			ang = 180.0 - ang
+		var eff_ang: float = ang if toward_right else 180.0 - ang
+		if tank.personality == 1 and eff_ang < 55.0:
+			continue
+		if tank.personality == 2 and eff_ang > 50.0:
+			continue
+		for pi_ in range(16):
+			var pw := 25.0 + float(pi_) * 5.0  # 25..100
+			var res := Sim.trace(tank.barrel_tip_for(ang), ang, pw, wind,
+					terrain, all_tanks, tank, 1.0 / 30.0)
+			var dist: float = res["impact"].distance_to(tpos)
+			if res["tank"] == target:
+				dist = 0.0
+			coarse.append({"err": absf(dist - want), "angle": ang, "power": pw})
+	if coarse.is_empty():
+		return {"angle": 60.0 if toward_right else 120.0, "power": 60.0}
+	coarse.sort_custom(func(a, b): return a["err"] < b["err"])
+	# Re-check the most promising shots at full resolution.
+	var fine := []
+	for i in range(mini(14, coarse.size())):
+		var c: Dictionary = coarse[i]
+		var res := Sim.trace(tank.barrel_tip_for(c["angle"]), c["angle"], c["power"],
+				wind, terrain, all_tanks, tank)
+		var dist: float = res["impact"].distance_to(tpos)
+		if res["tank"] == target:
+			dist = 0.0
+		# A shot promised to miss must still miss after the exact simulation.
+		if must_miss and dist < DRAMA_SAFE_GAP:
+			continue
+		fine.append({"err": absf(dist - want), "angle": c["angle"], "power": c["power"]})
+	if fine.is_empty():
+		# Nothing safe among the best shots: fall back to the coarse pick that
+		# was furthest from the target, which is the safest miss available.
+		var safest: Dictionary = coarse[coarse.size() - 1] if must_miss else coarse[0]
+		return {"angle": safest["angle"], "power": safest["power"]}
+	fine.sort_custom(func(a, b): return a["err"] < b["err"])
+	# Vary which near-miss is chosen so the shots land on different sides
+	# instead of repeating the same arc every round. The tolerance is wide
+	# while missing on purpose and tight once the shots are meant to connect.
+	if want > 0.0:
+		var tol: float = 14.0 if must_miss else 5.0
+		var pool := []
+		for c in fine:
+			if c["err"] <= fine[0]["err"] + tol:
+				pool.append(c)
+		var pick: Dictionary = pool[randi() % pool.size()]
+		return {"angle": pick["angle"], "power": pick["power"]}
+	return {"angle": fine[0]["angle"], "power": fine[0]["power"]}

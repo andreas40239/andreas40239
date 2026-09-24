@@ -23,6 +23,9 @@ var shield_cracked := false
 var ai_tier := 0            # 0 rookie, 1 semi-rookie, 2 cadet, 3 veteran
 var personality := 0        # 0 none, 1 high-archer, 2 straight-shooter, 3 power-player
 var ai_memory := {}
+var drama := false          # the show-off robot that near-misses, then closes in
+var target_seat := -1       # which human seat this robot duels (-1 = any)
+var shots_taken := 0        # fired shots this level, drives the drama schedule
 
 var _t := 0.0
 var _flash := 0.0
@@ -34,7 +37,12 @@ func center() -> Vector2:
 	return global_position + Vector2(0, -16)
 
 func barrel_tip() -> Vector2:
-	var a := deg_to_rad(angle)
+	return barrel_tip_for(angle)
+
+# Where a shell fired at `a_deg` would leave the muzzle. The AI has to aim
+# from here, not from the hull centre, or every shot is a barrel-length off.
+func barrel_tip_for(a_deg: float) -> Vector2:
+	var a := deg_to_rad(a_deg)
 	return center() + Vector2(cos(a), -sin(a)) * 42.0
 
 func setup(p_idx: int, p_seat: int, p_human: bool, p_name: String) -> void:

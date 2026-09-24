@@ -55,15 +55,23 @@ func _show_menu() -> void:
 	play.pressed.connect(_show_mode_select)
 	box.add_child(play)
 	box.add_child(UIKit.vspace(10))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var mute := UIKit.button("Sound: ON" if not G.settings["muted"] else "Sound: OFF",
 			Color(0.5, 0.55, 0.65), 24, Vector2(220, 66))
-	mute.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	mute.pressed.connect(func() -> void:
 		G.settings["muted"] = not G.settings["muted"]
 		mute.text = "Sound: ON" if not G.settings["muted"] else "Sound: OFF"
 		A.refresh_music_volume()
 		G.save_game())
-	box.add_child(mute)
+	row.add_child(mute)
+	# Tap to cycle through the three background songs.
+	var song := UIKit.button("Song: " + A.track_name(), Color(0.55, 0.4, 0.85), 24, Vector2(300, 66))
+	song.pressed.connect(func() -> void:
+		song.text = "Song: " + A.next_track())
+	row.add_child(song)
+	box.add_child(row)
 	box.add_child(UIKit.vspace(8))
 	box.add_child(UIKit.label("No ads. No internet. Just fun!", 20, Color(1, 1, 1, 0.75)))
 
@@ -74,15 +82,16 @@ func _show_mode_select() -> void:
 	screen = root
 	var box := _center_column(root)
 	box.add_child(UIKit.title_label("Who is playing?", 56))
-	box.add_child(UIKit.vspace(16))
-	var labels := ["1 Player  (you vs 3 robots)", "2 Players  (+ 2 robots)",
-			"3 Players  (+ 1 robot)", "4 Players  (no robots)"]
+	box.add_child(UIKit.vspace(10))
+	# Picture-based choice: every card shows all four tanks, so kids can see
+	# at a glance how many are friends (colourful, smiling) and how many are
+	# robots (grey, antenna). No reading required.
 	for i in range(4):
-		var b := UIKit.button(labels[i], UIKit.PLAYER_COLORS[i], 32, Vector2(560, 88))
-		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		var card := ModeCard.new(i + 1)
+		card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		var n := i + 1
-		b.pressed.connect(func() -> void: _show_level_select(n))
-		box.add_child(b)
+		card.pressed.connect(func() -> void: _show_level_select(n))
+		box.add_child(card)
 	box.add_child(UIKit.vspace(10))
 	var back := UIKit.button("Back", Color(0.55, 0.6, 0.7), 28, Vector2(180, 70))
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -164,3 +173,54 @@ class MenuHills extends Control:
 				draw_circle(Vector2(cx + ex, gy - 36), 5, Color.WHITE)
 				draw_circle(Vector2(cx + ex + dirv * 1.5, gy - 36), 2.4, Color(0.15, 0.15, 0.25))
 			draw_arc(Vector2(cx, gy - 30), 6, 0.4, PI - 0.4, 10, Color(0.25, 0.1, 0.1), 2)
+
+# A big picture button for the player-count choice. Draws four tank icons:
+# the first `humans` are colourful player tanks with happy faces, the rest
+# are grey robots. A numeral repeats the count for kids who read numbers.
+class ModeCard extends Button:
+	var humans := 1
+	var _t := 0.0
+
+	func _init(p_humans: int) -> void:
+		humans = p_humans
+		custom_minimum_size = Vector2(660, 126)
+		focus_mode = Control.FOCUS_NONE
+		# A pale card with a coloured rim: every tank colour stays readable,
+		# which a card painted in one of those same colours would not allow.
+		var col: Color = UIKit.PLAYER_COLORS[p_humans - 1]
+		add_theme_stylebox_override("normal", UIKit.style(Color(1, 1, 1, 0.94), 22, col, 6))
+		add_theme_stylebox_override("hover", UIKit.style(Color.WHITE, 22, col, 6))
+		add_theme_stylebox_override("pressed", UIKit.style(col.lightened(0.72), 22, col, 6))
+		pressed.connect(func() -> void: A.click())
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var f := ThemeDB.fallback_font
+		var cy := size.y * 0.5
+		# Big numeral for the number of human players.
+		var accent: Color = UIKit.PLAYER_COLORS[humans - 1].darkened(0.1)
+		var num := str(humans)
+		var nw := f.get_string_size(num, HORIZONTAL_ALIGNMENT_LEFT, -1, 62).x
+		draw_string(f, Vector2(58 - nw * 0.5, cy + 22), num,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 62, accent)
+		# Four tank slots: players first, then robots.
+		for i in range(4):
+			var cx := 172.0 + float(i) * 120.0
+			var is_human := i < humans
+			# Players bob gently so they read as the "alive" ones.
+			var bob: float = sin(_t * 2.4 + float(i) * 0.9) * 2.5 if is_human else 0.0
+			var col: Color = UIKit.PLAYER_COLORS[i] if is_human else Color(0.62, 0.64, 0.70)
+			UIKit.draw_mini_tank(self, Vector2(cx, cy + 12.0 + bob), 0.95, col,
+					not is_human, i if is_human else -1)
+		# "vs" divider between the two groups.
+		if humans < 4:
+			var dx := 172.0 + (float(humans) - 0.5) * 120.0
+			for k in range(5):
+				var y := cy - 28.0 + float(k) * 17.0
+				draw_line(Vector2(dx, y), Vector2(dx, y + 9.0), Color(0.62, 0.66, 0.74), 3.0)
+			var vw := f.get_string_size("vs", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+			draw_string(f, Vector2(dx - vw * 0.5, cy - 36.0), "vs",
+					HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.42, 0.47, 0.57))

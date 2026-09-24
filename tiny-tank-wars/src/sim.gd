@@ -2,6 +2,12 @@
 # the exact Arc Toggle path, the AI and the live projectiles.
 class_name Sim
 
+# The one true integration step. The live projectile advances in exactly
+# these increments, so a traced path is what the shell really flies - that is
+# what makes the Arc Toggle's "exact path" promise true, and keeps shots
+# landing where they were predicted even on a 15 FPS device.
+const DT := 1.0 / 180.0
+
 const GRAVITY := 400.0        # px/s^2
 const SPEED_PER_POWER := 9.0  # 100% power -> 900 px/s
 const WIND_ACCEL := 3.0       # wind unit -> px/s^2
@@ -18,7 +24,7 @@ static func launch_velocity(angle_deg: float, power: float) -> Vector2:
 #   tank:   the Tank hit directly (or null)
 #   lost:   true when the shot left the world and fizzled
 static func trace(start: Vector2, angle_deg: float, power: float, wind: float,
-		terrain, tanks: Array, shooter, dt := 1.0 / 60.0, max_t := 10.0) -> Dictionary:
+		terrain, tanks: Array, shooter, dt := DT, max_t := 10.0) -> Dictionary:
 	var pos := start
 	var vel := launch_velocity(angle_deg, power)
 	var pts := PackedVector2Array()

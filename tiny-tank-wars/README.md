@@ -7,9 +7,16 @@ built with **Godot 4.4 (GDScript)** for Android. Implementation of the
 **No ads. No in-app purchases. No data collection. Completely offline.**
 The only Android permission is `VIBRATE` (optional haptics, toggleable in-game).
 
-## Features (v1)
+## Features (v1.1)
 
 - Turn-based artillery combat for 4 tanks: 1–4 human players (pass-and-play) + AI
+- Picture-based player select: each card shows all four tanks, colourful
+  players first and grey robots after, so pre-readers can choose unaided
+- Three background songs with an in-game switcher (main menu + pause screen)
+- "Ace", a showman robot on levels 1–10: its first seven shots land close but
+  are guaranteed harmless, then the impacts walk inward and start to hurt
+- Every robot duels its own human, so in a two-player game neither player is
+  ignored; robots re-target only when their player is knocked out
 - Procedurally generated static terrain with flat spawn platforms (≥200 px apart)
 - Angle/power aiming with big kid-friendly sliders, barrel drag-aiming,
   dotted trajectory preview and the **Arc Toggle** (exact flight path before launch)
@@ -23,7 +30,13 @@ The only Android permission is `VIBRATE` (optional haptics, toggleable in-game).
 - Progression: damage-ranked upgrade points (3/2/1/0), Upgrade Hangar every
   5 levels: Bigger Boom, Heavy Shells, Multi-Shot (volley), Iron Cover (Lv 20+)
 - Encrypted local save (`user://`), all art drawn in code (vector cartoon
-  style), all sounds procedurally synthesized (≈1 MB total)
+  style), all sounds and music procedurally synthesized (≈2.5 MB total)
+
+### Simulation note
+
+`Sim.DT` is the single integration step shared by the trajectory prediction
+and the live shell, so the Arc Toggle's "exact path" really is exact and shots
+land where they were predicted even at the GDD's 15 FPS floor.
 
 ## Project layout
 
@@ -31,6 +44,8 @@ The only Android permission is `VIBRATE` (optional haptics, toggleable in-game).
   terrain, tanks, AI, camera, UI kit, shared trajectory sim)
 - `assets/audio/` — generated WAV sound effects + music loop
 - `test/smoke.gd` — headless logic test (`godot --headless -s res://test/smoke.gd`)
+- `test/drama_stress.gd` — replays Ace's schedule over 40 random levels to
+  prove the opening shots can never damage anyone
 - `test/shots.gd` — renders screenshots of every screen under Xvfb
 
 ## Building the APK

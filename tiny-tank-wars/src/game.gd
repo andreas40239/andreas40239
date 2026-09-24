@@ -13,6 +13,7 @@ var settings := {
 	"shake": true,
 	"wind_off": false,
 	"timer_on": false,   # default OFF - relaxed for young kids
+	"music_track": 0,    # which background song is playing
 }
 
 var unlocked_level := 1
