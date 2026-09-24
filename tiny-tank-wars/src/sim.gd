@@ -49,6 +49,7 @@ static func trace(start: Vector2, angle_deg: float, power: float, wind: float,
 		# Ground hit.
 		if pos.y >= terrain.ground_y(pos.x):
 			pos.y = terrain.ground_y(pos.x)
+			pts[pts.size() - 1] = pos
 			return {"points": pts, "impact": pos, "tank": null, "lost": false}
 		# Left the world sideways far enough - lost shot.
 		if pos.x < -300.0 or pos.x > terrain.WORLD_W + 300.0 or pos.y > 1500.0:

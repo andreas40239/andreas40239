@@ -11,12 +11,8 @@ func _init() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	var g = load("res://src/game.gd").new()
-	g.name = "G"
-	root.add_child(g)
-	var a = load("res://src/audio.gd").new()
-	a.name = "A"
-	root.add_child(a)
+	var g = root.get_node("G")  # the real autoload; script mode already created it
+	var a = root.get_node("A")
 	var main = load("res://src/main.gd").new()
 	main.name = "Main"
 	root.add_child(main)
@@ -32,6 +28,7 @@ func _run() -> void:
 	for trial in range(TRIALS):
 		var humans := 1 + (trial % 3)          # 1, 2 and 3 player games
 		var level := 1 + (trial % 10)          # every level the showman appears on
+		g.settings["map"] = trial % Terrain.MAPS.size()
 		main._start_battle(humans, level)
 		await process_frame
 		var b = main.screen

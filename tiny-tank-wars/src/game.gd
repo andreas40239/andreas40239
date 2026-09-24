@@ -14,6 +14,8 @@ var settings := {
 	"wind_off": false,
 	"timer_on": false,   # default OFF - relaxed for young kids
 	"music_track": 0,    # which background song is playing
+	"full_path": false,  # aim preview shows the whole flight, not just the start
+	"map": 0,           # chosen battlefield (0 = random rolling hills)
 }
 
 var unlocked_level := 1

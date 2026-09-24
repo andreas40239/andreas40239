@@ -199,5 +199,42 @@ static func _search(tank, target, terrain, all_tanks: Array, wind: float,
 			if c["err"] <= fine[0]["err"] + tol:
 				pool.append(c)
 		var pick: Dictionary = pool[randi() % pool.size()]
-		return {"angle": pick["angle"], "power": pick["power"]}
-	return {"angle": fine[0]["angle"], "power": fine[0]["power"]}
+		if must_miss:
+			return {"angle": pick["angle"], "power": pick["power"]}
+		return _refine(tank, target, terrain, all_tanks, wind, pick, want)
+	return _refine(tank, target, terrain, all_tanks, wind, fine[0], want)
+
+# Nudge the power of a chosen shot until it lands as close to `want` as the
+# exact simulation allows. The search grid moves in 5% power steps, which on
+# a steep lob over a mountain or pillar shifts the landing by ~35 px - wider
+# than a direct hit - so without this the robots could only ever splash.
+static func _refine(tank, target, terrain, all_tanks: Array, wind: float,
+		shot: Dictionary, want: float) -> Dictionary:
+	var best_ang: float = shot["angle"]
+	var best_pw: float = shot["power"]
+	var best_err := _fine_err(tank, target, terrain, all_tanks, wind, best_ang, best_pw, want)
+	var step_pw := 2.5
+	var step_ang := 2.3   # half the grid spacing, so the gap between rows is covered
+	for i in range(8):
+		if best_err < 2.0:
+			break
+		var improved := false
+		for d in [Vector2(0, -step_pw), Vector2(0, step_pw), Vector2(-step_ang, 0), Vector2(step_ang, 0)]:
+			var ang: float = clampf(best_ang + d.x, 5.0, 175.0)
+			var pw: float = clampf(best_pw + d.y, 15.0, 100.0)
+			var e := _fine_err(tank, target, terrain, all_tanks, wind, ang, pw, want)
+			if e < best_err:
+				best_err = e
+				best_ang = ang
+				best_pw = pw
+				improved = true
+		if not improved:
+			step_pw *= 0.5
+			step_ang *= 0.5
+	return {"angle": best_ang, "power": best_pw}
+
+static func _fine_err(tank, target, terrain, all_tanks: Array, wind: float,
+		ang: float, pw: float, want: float) -> float:
+	var res := Sim.trace(tank.barrel_tip_for(ang), ang, pw, wind, terrain, all_tanks, tank)
+	var d: float = 0.0 if res["tank"] == target else res["impact"].distance_to(target.center())
+	return absf(d - want)

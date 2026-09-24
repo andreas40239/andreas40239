@@ -19,7 +19,10 @@ func _ready() -> void:
 		var m: AudioStreamWAV = load("res://assets/audio/%s.wav" % n)
 		m.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		m.loop_begin = 0
-		m.loop_end = m.data.size() / 2  # 16-bit mono
+		# Loop points are in sample frames. The imported data is QOA-compressed,
+		# so its byte count says nothing about length - deriving the end from
+		# it made every song restart after about three seconds.
+		m.loop_end = int(round(m.get_length() * m.mix_rate))
 		streams[n] = m
 	for i in range(SFX_POOL):
 		var p := AudioStreamPlayer.new()

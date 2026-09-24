@@ -7,19 +7,27 @@ built with **Godot 4.4 (GDScript)** for Android. Implementation of the
 **No ads. No in-app purchases. No data collection. Completely offline.**
 The only Android permission is `VIBRATE` (optional haptics, toggleable in-game).
 
-## Features (v1.1)
+## Features (v1.2)
 
 - Turn-based artillery combat for 4 tanks: 1–4 human players (pass-and-play) + AI
+- Animated startup screen (tanks roll in, title drops, firework shells) plus a
+  matching boot splash image
+- Four battlefields picked from picture cards: procedural Rolling Hills and
+  three hand-shaped harder maps (Snowy Peak, Desert Canyon, Rocky Towers),
+  each with its own sky, colours and decorations
+- FIRE shoots on touch; an optional "full flight path" setting (main menu or
+  pause screen) draws the whole exact trajectory with a landing marker
 - Picture-based player select: each card shows all four tanks, colourful
   players first and grey robots after, so pre-readers can choose unaided
-- Three background songs with an in-game switcher (main menu + pause screen)
+- Three background songs with an in-game switcher (main menu + pause screen);
+  Bouncy Blocks and Cloud Picnic are ~80 s sectioned pieces
 - "Ace", a showman robot on levels 1–10: its first seven shots land close but
   are guaranteed harmless, then the impacts walk inward and start to hurt
 - Every robot duels its own human, so in a two-player game neither player is
   ignored; robots re-target only when their player is knocked out
 - Procedurally generated static terrain with flat spawn platforms (≥200 px apart)
 - Angle/power aiming with big kid-friendly sliders, barrel drag-aiming,
-  dotted trajectory preview and the **Arc Toggle** (exact flight path before launch)
+  and a dotted trajectory preview
 - Wind system: none (levels 1–10), fixed per level (11–20), changes every
   8 turns (21+), with an animated cloud face, gust streaks and a Wind-Off toggle
 - AI tiers: Rookie → Semi-Rookie → Cadet → Veteran, with personalities
@@ -35,8 +43,8 @@ The only Android permission is `VIBRATE` (optional haptics, toggleable in-game).
 ### Simulation note
 
 `Sim.DT` is the single integration step shared by the trajectory prediction
-and the live shell, so the Arc Toggle's "exact path" really is exact and shots
-land where they were predicted even at the GDD's 15 FPS floor.
+and the live shell, so the full flight path really is exact and shots land
+where they were predicted even at the GDD's 15 FPS floor.
 
 ## Project layout
 
@@ -46,7 +54,12 @@ land where they were predicted even at the GDD's 15 FPS floor.
 - `test/smoke.gd` — headless logic test (`godot --headless -s res://test/smoke.gd`)
 - `test/drama_stress.gd` — replays Ace's schedule over 40 random levels to
   prove the opening shots can never damage anyone
+- `test/maps_reach.gd` — checks every tank can hit every other tank on each map
 - `test/shots.gd` — renders screenshots of every screen under Xvfb
+
+Tests run in Godot's script mode (`-s`), which still creates the `G` and `A`
+autoloads; tests use those instances (`root.get_node("G")`) rather than
+making their own, or settings they change would never reach the game.
 
 ## Building the APK
 

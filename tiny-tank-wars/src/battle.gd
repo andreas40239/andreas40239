@@ -5,10 +5,11 @@ extends Node2D
 signal exit_to_menu
 signal play_level(level: int)
 
-enum S { SETUP, PASS, AIM, CONFIRM, FLIGHT, RESOLVE, ENDED }
+enum S { SETUP, PASS, AIM, FLIGHT, RESOLVE, ENDED }
 
 var humans := 1
 var level := 1
+var map_id := 0
 
 var state: int = S.SETUP
 var terrain: Terrain
@@ -18,13 +19,16 @@ var current_i := 0
 var turn_count := 0
 var wind := 0.0
 var pending_shots := 0
-var hold_time := 0.0
-var fire_held := false
+# Touches landing in the first moments of a turn are ignored, so a tap that
+# was meant for the previous screen can never fire a shot by accident.
+const FIRE_GUARD := 0.3
+var aim_started_ms := 0
 var timer_left := 30.0
 var aim_touch := -1
 var _preview_pts := PackedVector2Array()
-var _arc_pts := PackedVector2Array()
-var _arc_visible := false
+var _preview_full := false
+var _preview_impact := Vector2.ZERO
+var _preview_lands := false
 
 # HUD nodes
 var hud: CanvasLayer
@@ -35,9 +39,6 @@ var power_slider: VSlider
 var angle_label: Label
 var power_label: Label
 var fire_btn: Button
-var fire_ring: Control
-var confirm_bar: HBoxContainer
-var arc_btn: Button
 var aim_box: Control
 var cloud: WindCloud
 var hint_label: Label
@@ -67,8 +68,9 @@ func _build_world() -> void:
 	sky_layer.layer = -10
 	var sky := TextureRect.new()
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.45, 0.75, 0.98))
-	grad.set_color(1, Color(0.72, 0.90, 1.0))
+	var th := Terrain.theme(map_id)
+	grad.set_color(0, th["sky_top"])
+	grad.set_color(1, th["sky_bot"])
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0, 0)
@@ -83,12 +85,12 @@ func _build_world() -> void:
 	var lay1 := ParallaxLayer.new()
 	lay1.motion_scale = Vector2(0.25, 0.25)
 	lay1.motion_mirroring = Vector2(2400, 0)
-	lay1.add_child(Scenery.new(0))
+	lay1.add_child(Scenery.new(0, th))
 	pbg.add_child(lay1)
 	var lay2 := ParallaxLayer.new()
 	lay2.motion_scale = Vector2(0.5, 0.5)
 	lay2.motion_mirroring = Vector2(2400, 0)
-	lay2.add_child(Scenery.new(1))
+	lay2.add_child(Scenery.new(1, th))
 	pbg.add_child(lay2)
 	# Terrain.
 	terrain = Terrain.new()
@@ -102,7 +104,7 @@ func _build_world() -> void:
 	add_child(cam)
 
 func _start_level() -> void:
-	terrain.generate(level, randi())
+	terrain.generate(level, randi(), map_id)
 	wind = G.roll_wind(level)
 	for t in tanks:
 		t.queue_free()
@@ -192,9 +194,8 @@ func _begin_aim() -> void:
 	state = S.AIM
 	var tk := current_tank()
 	aim_box.visible = true
-	confirm_bar.visible = false
 	fire_btn.visible = true
-	_arc_visible = false
+	aim_started_ms = Time.get_ticks_msec()
 	angle_slider.set_value_no_signal(tk.angle)
 	power_slider.set_value_no_signal(tk.power)
 	_refresh_readouts()
@@ -204,7 +205,6 @@ func _begin_aim() -> void:
 func _begin_ai_turn() -> void:
 	state = S.FLIGHT  # controls hidden while AI thinks
 	aim_box.visible = false
-	confirm_bar.visible = false
 	fire_btn.visible = false
 	preview_node.queue_redraw()
 	var tk := current_tank()
@@ -221,31 +221,18 @@ func _begin_ai_turn() -> void:
 		tk.power = shot["power"]
 		_do_fire())
 
-func _hold_to_confirm() -> void:
-	state = S.CONFIRM
-	A.haptic(40)
-	fire_btn.visible = false
-	confirm_bar.visible = true
-	_arc_visible = false
-	arc_btn.text = "Show Path"
-	_compute_arc()
-	_set_hint()
-
-func _cancel_confirm() -> void:
-	state = S.AIM
-	confirm_bar.visible = false
-	fire_btn.visible = true
-	_arc_visible = false
-	preview_node.queue_redraw()
-	_set_hint()
+func _try_fire() -> void:
+	if state != S.AIM or not current_tank().is_human:
+		return
+	if Time.get_ticks_msec() - aim_started_ms < int(FIRE_GUARD * 1000.0):
+		return
+	_do_fire()
 
 func _do_fire() -> void:
 	var tk := current_tank()
 	state = S.FLIGHT
 	aim_box.visible = false
 	fire_btn.visible = false
-	confirm_bar.visible = false
-	_arc_visible = false
 	hint_label.visible = false
 	tk.shots_taken += 1
 	var n := G.shot_count(tk.seat, tk.is_human)
@@ -489,53 +476,12 @@ func _build_hud() -> void:
 		cam.fly_to(current_tank().position + Vector2(0, -60), 1.15, 0.5))
 	aim_box.add_child(snap_btn)
 
-	# Fire button.
+	# Fire button: fires the moment it is touched.
 	fire_btn = UIKit.button("FIRE!", Color(0.9, 0.25, 0.2), 36, Vector2(170, 120))
 	fire_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	fire_btn.position = Vector2(-200, -150)
-	fire_btn.button_down.connect(func() -> void:
-		if state == S.AIM:
-			fire_held = true
-			hold_time = 0.0)
-	fire_btn.button_up.connect(func() -> void:
-		fire_held = false
-		hold_time = 0.0
-		fire_ring.queue_redraw())
+	fire_btn.button_down.connect(_try_fire)
 	root.add_child(fire_btn)
-	fire_ring = FireRing.new(self)
-	fire_ring.set_anchors_preset(Control.PRESET_FULL_RECT)
-	fire_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fire_btn.add_child(fire_ring)
-
-	# Confirm bar (after hold): Back / Show Path / GO!
-	confirm_bar = HBoxContainer.new()
-	confirm_bar.add_theme_constant_override("separation", 20)
-	confirm_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	confirm_bar.anchor_left = 0.5
-	confirm_bar.anchor_right = 0.5
-	confirm_bar.offset_top = -160
-	confirm_bar.offset_bottom = -40
-	confirm_bar.offset_left = -330
-	confirm_bar.offset_right = 330
-	confirm_bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	var back_btn := UIKit.button("Back", Color(0.55, 0.6, 0.7), 30, Vector2(150, 96))
-	back_btn.pressed.connect(_cancel_confirm)
-	confirm_bar.add_child(back_btn)
-	arc_btn = UIKit.button("Show Path", Color(0.55, 0.4, 0.85), 30, Vector2(230, 96))
-	arc_btn.pressed.connect(func() -> void:
-		_arc_visible = not _arc_visible
-		arc_btn.text = "Hide Path" if _arc_visible else "Show Path"
-		if _arc_visible:
-			_compute_arc()
-		preview_node.queue_redraw())
-	confirm_bar.add_child(arc_btn)
-	var go_btn := UIKit.button("GO!", Color(0.3, 0.75, 0.35), 40, Vector2(190, 96))
-	go_btn.pressed.connect(func() -> void:
-		if state == S.CONFIRM:
-			_do_fire())
-	confirm_bar.add_child(go_btn)
-	confirm_bar.visible = false
-	root.add_child(confirm_bar)
 
 	# Hint label for young players.
 	hint_label = UIKit.label("", 26, Color.WHITE)
@@ -600,16 +546,12 @@ func _on_power_changed(v: float) -> void:
 
 func _update_preview() -> void:
 	var tk := current_tank()
+	_preview_full = G.settings.get("full_path", false)
 	var res := Sim.trace(tk.barrel_tip(), tk.angle, tk.power, eff_wind(),
-			terrain, tanks, tk, Sim.DT, 1.2)  # preview matches the real flight
+			terrain, tanks, tk, Sim.DT, 10.0 if _preview_full else 1.2)
 	_preview_pts = res["points"]
-	preview_node.queue_redraw()
-
-func _compute_arc() -> void:
-	var tk := current_tank()
-	var res := Sim.trace(tk.barrel_tip(), tk.angle, tk.power, eff_wind(),
-			terrain, tanks, tk)  # exact full path at the shell.s own timestep
-	_arc_pts = res["points"]
+	_preview_impact = res["impact"]
+	_preview_lands = _preview_full and not res["lost"]
 	preview_node.queue_redraw()
 
 func _set_hint() -> void:
@@ -618,9 +560,7 @@ func _set_hint() -> void:
 		return
 	match state:
 		S.AIM:
-			hint_label.text = "Move the sliders to aim, then hold FIRE!"
-		S.CONFIRM:
-			hint_label.text = "Tap Show Path to peek, then tap GO!"
+			hint_label.text = "Move the sliders to aim, then tap FIRE!"
 		_:
 			hint_label.visible = false
 
@@ -636,12 +576,6 @@ func _show_big_banner(text: String) -> void:
 # ------------------------------------------------------------------ input
 
 func _process(delta: float) -> void:
-	if fire_held and state == S.AIM:
-		hold_time += delta
-		fire_ring.queue_redraw()
-		if hold_time >= 0.5:
-			fire_held = false
-			_hold_to_confirm()
 	if state == S.AIM and current_tank().is_human and G.settings["timer_on"]:
 		timer_left -= delta
 		timer_label.text = "Time: %d" % maxi(0, int(ceil(timer_left)))
@@ -788,6 +722,11 @@ func _show_pause_panel() -> void:
 	_slider_row(left, "Sounds", "sfx")
 	_slider_row(left, "Music", "music")
 	_music_row(left)
+	_toggle_row(left, "Full flight path", G.settings.get("full_path", false), func() -> bool:
+		G.settings["full_path"] = not G.settings.get("full_path", false)
+		if state == S.AIM:
+			_update_preview()
+		return G.settings["full_path"])
 	_toggle_row(right, "Wind", not G.settings["wind_off"], func() -> bool:
 		G.settings["wind_off"] = not G.settings["wind_off"]
 		cloud.set_wind(eff_wind())
@@ -833,7 +772,6 @@ func _end_level() -> void:
 	state = S.ENDED
 	aim_box.visible = false
 	fire_btn.visible = false
-	confirm_bar.visible = false
 	hint_label.visible = false
 	var survivors := alive_tanks()
 	var victory := false
@@ -960,33 +898,30 @@ func _show_shop(seat_idx: int, next_level: int) -> void:
 
 class PreviewLine extends Node2D:
 	var battle
+	var _t := 0.0
 	func _init(b) -> void:
 		battle = b
 	func _draw() -> void:
-		if battle.state == battle.S.AIM and battle.current_i >= 0 \
-				and battle.current_tank().is_human:
-			var pts: PackedVector2Array = battle._preview_pts
+		if battle.state != battle.S.AIM or battle.current_i < 0 \
+				or not battle.current_tank().is_human:
+			return
+		var pts: PackedVector2Array = battle._preview_pts
+		if battle._preview_full:
+			# Whole flight, evenly dotted, with a target ring where it lands.
+			for i in range(0, pts.size(), 12):
+				draw_circle(pts[i], 4.5, Color(1.0, 0.97, 0.6, 0.9))
+			if battle._preview_lands:
+				var c: Vector2 = battle._preview_impact
+				var pulse: float = 1.0 + 0.12 * sin(_t * 6.0)
+				draw_arc(c, 16.0 * pulse, 0, TAU, 28, Color(1.0, 0.35, 0.3, 0.95), 4.0)
+				draw_arc(c, 7.0 * pulse, 0, TAU, 20, Color(1.0, 0.35, 0.3, 0.95), 3.0)
+		else:
 			for i in range(0, pts.size(), 12):
 				var a := 1.0 - float(i) / float(maxi(1, pts.size()))
 				draw_circle(pts[i], 5.0, Color(1, 1, 1, 0.35 + 0.45 * a))
-		if battle.state == battle.S.CONFIRM and battle._arc_visible:
-			var pts2: PackedVector2Array = battle._arc_pts
-			if pts2.size() >= 2:
-				draw_polyline(pts2, Color(1.0, 0.55, 0.9, 0.95), 5.0)
-				draw_circle(pts2[pts2.size() - 1], 10.0, Color(1.0, 0.4, 0.4, 0.9))
-	func _process(_d: float) -> void:
+	func _process(d: float) -> void:
+		_t += d
 		queue_redraw()
-
-class FireRing extends Control:
-	var battle
-	func _init(b) -> void:
-		battle = b
-	func _draw() -> void:
-		if battle.fire_held and battle.hold_time > 0.02:
-			var frac: float = clampf(battle.hold_time / 0.5, 0.0, 1.0)
-			var c := size / 2.0
-			draw_arc(c, minf(size.x, size.y) * 0.62, -PI / 2.0,
-					-PI / 2.0 + TAU * frac, 28, Color(1, 1, 1, 0.9), 7.0)
 
 class Flash extends Node2D:
 	var radius := 20.0
@@ -1023,8 +958,10 @@ class Popup2D extends Node2D:
 class Scenery extends Node2D:
 	# Parallax layer content: 0 = far mountains, 1 = near hills + clouds.
 	var kind := 0
-	func _init(k: int) -> void:
+	var th: Dictionary
+	func _init(k: int, p_theme: Dictionary) -> void:
 		kind = k
+		th = p_theme
 	func _ready() -> void:
 		queue_redraw()
 	func _draw() -> void:
@@ -1037,7 +974,7 @@ class Scenery extends Node2D:
 				var x := 2400.0 * float(i) / 24.0
 				pts.append(Vector2(x, 430.0 - sin(float(i) * 1.3) * 90.0 - rng.randf_range(0, 40)))
 			pts.append(Vector2(2400, 900))
-			draw_colored_polygon(pts, Color(0.62, 0.78, 0.92))
+			draw_colored_polygon(pts, th["far"])
 			for i in range(4):
 				var cx := rng.randf_range(100, 2300)
 				var cy := rng.randf_range(60, 200)
@@ -1050,4 +987,4 @@ class Scenery extends Node2D:
 				var x := 2400.0 * float(i) / 24.0
 				pts.append(Vector2(x, 520.0 - sin(float(i) * 2.1 + 1.0) * 60.0 - rng.randf_range(0, 30)))
 			pts.append(Vector2(2400, 900))
-			draw_colored_polygon(pts, Color(0.55, 0.8, 0.62))
+			draw_colored_polygon(pts, th["near"])

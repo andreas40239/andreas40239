@@ -7,7 +7,10 @@ config/name="Tiny Tank Wars"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.4")
 boot_splash/bg_color=Color(0.45, 0.75, 0.98, 1)
-boot_splash/show_image=false
+boot_splash/show_image=true
+boot_splash/image="res://splash.png"
+boot_splash/fullsize=true
+boot_splash/use_filter=true
 config/icon="res://icon.png"
 
 [autoload]

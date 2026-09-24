@@ -1,11 +1,19 @@
-# App entry: screen flow Main Menu -> Mode Select -> Level Select -> Battle (GDD 15.3).
+# App entry: screen flow Startup -> Main Menu -> Mode Select -> Level Select -> Battle (GDD 15.3).
 extends Node
 
 var screen: Node = null
 
 func _ready() -> void:
 	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-	_show_menu()
+	_show_startup()
+
+func _show_startup() -> void:
+	_clear()
+	var st := StartupScreen.new()
+	st.set_anchors_preset(Control.PRESET_FULL_RECT)
+	st.done.connect(_show_menu)
+	add_child(st)
+	screen = st
 
 func _clear() -> void:
 	if screen and is_instance_valid(screen):
@@ -71,9 +79,18 @@ func _show_menu() -> void:
 	song.pressed.connect(func() -> void:
 		song.text = "Song: " + A.next_track())
 	row.add_child(song)
+	var path := UIKit.button(_path_text(), Color(0.95, 0.6, 0.2), 24, Vector2(250, 66))
+	path.pressed.connect(func() -> void:
+		G.settings["full_path"] = not G.settings.get("full_path", false)
+		path.text = _path_text()
+		G.save_game())
+	row.add_child(path)
 	box.add_child(row)
 	box.add_child(UIKit.vspace(8))
 	box.add_child(UIKit.label("No ads. No internet. Just fun!", 20, Color(1, 1, 1, 0.75)))
+
+func _path_text() -> String:
+	return "Flight path: FULL" if G.settings.get("full_path", false) else "Flight path: SHORT"
 
 func _show_mode_select() -> void:
 	_clear()
@@ -104,29 +121,44 @@ func _show_level_select(humans: int) -> void:
 	add_child(root)
 	screen = root
 	var box := _center_column(root)
-	box.add_child(UIKit.title_label("Pick a level", 56))
-	box.add_child(UIKit.vspace(10))
-	var cont := UIKit.button("Continue  —  Level %d" % G.unlocked_level, UIKit.COL_GOOD, 34, Vector2(480, 96))
+	box.add_theme_constant_override("separation", 14)
+	box.add_child(UIKit.title_label("Pick a map and a level", 48))
+	# Map picker: picture cards, the chosen one gets a gold frame.
+	var maps := HBoxContainer.new()
+	maps.add_theme_constant_override("separation", 16)
+	maps.alignment = BoxContainer.ALIGNMENT_CENTER
+	var cards: Array = []
+	for i in range(Terrain.MAPS.size()):
+		var card := MapCard.new(i)
+		cards.append(card)
+		card.pressed.connect(func() -> void:
+			G.settings["map"] = card.map_id
+			G.save_game()
+			for c in cards:
+				c.set_selected(c.map_id == card.map_id))
+		maps.add_child(card)
+	for c in cards:
+		c.set_selected(c.map_id == int(G.settings.get("map", 0)))
+	box.add_child(maps)
+	var cont := UIKit.button("Continue  —  Level %d" % G.unlocked_level, UIKit.COL_GOOD, 34, Vector2(480, 90))
 	cont.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	cont.pressed.connect(func() -> void: _start_battle(humans, G.unlocked_level))
 	box.add_child(cont)
-	box.add_child(UIKit.vspace(10))
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(720, 240)
+	scroll.custom_minimum_size = Vector2(720, 176)
 	scroll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var grid := GridContainer.new()
 	grid.columns = 6
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 14)
 	for lv in range(1, G.unlocked_level + 1):
-		var b := UIKit.button(str(lv), UIKit.COL_PRIMARY, 30, Vector2(100, 84))
+		var b := UIKit.button(str(lv), UIKit.COL_PRIMARY, 30, Vector2(100, 80))
 		var target := lv
 		b.pressed.connect(func() -> void: _start_battle(humans, target))
 		grid.add_child(b)
 	scroll.add_child(grid)
 	box.add_child(scroll)
-	box.add_child(UIKit.vspace(8))
-	var back := UIKit.button("Back", Color(0.55, 0.6, 0.7), 28, Vector2(180, 70))
+	var back := UIKit.button("Back", Color(0.55, 0.6, 0.7), 28, Vector2(180, 66))
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(_show_mode_select)
 	box.add_child(back)
@@ -136,6 +168,7 @@ func _start_battle(humans: int, level: int) -> void:
 	var b := Battle.new()
 	b.humans = humans
 	b.level = level
+	b.map_id = int(G.settings.get("map", 0))
 	b.exit_to_menu.connect(_show_menu)
 	b.play_level.connect(func(lv: int) -> void: _start_battle(humans, lv))
 	add_child(b)
@@ -153,7 +186,7 @@ class MenuHills extends Control:
 		pts.append(Vector2(w, h))
 		draw_colored_polygon(pts, Color(0.45, 0.78, 0.4))
 		# Two little decorative tanks.
-		for info in [[w * 0.18, Color(0.92, 0.32, 0.30), 1.0], [w * 0.8, Color(0.28, 0.55, 0.92), -1.0]]:
+		for info in [[w * 0.08, Color(0.92, 0.32, 0.30), 1.0], [w * 0.92, Color(0.28, 0.55, 0.92), -1.0]]:
 			var cx: float = info[0]
 			var col: Color = info[1]
 			var dirv: float = info[2]
@@ -224,3 +257,66 @@ class ModeCard extends Button:
 			var vw := f.get_string_size("vs", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 			draw_string(f, Vector2(dx - vw * 0.5, cy - 36.0), "vs",
 					HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.42, 0.47, 0.57))
+
+# A picture button for one battlefield: a little painting of its skyline in
+# the map's own colours, with its name underneath.
+class MapCard extends Button:
+	var map_id := 0
+	var _h := PackedFloat32Array()
+	var _selected := false
+
+	func _init(p_id: int) -> void:
+		map_id = p_id
+		custom_minimum_size = Vector2(228, 142)
+		focus_mode = Control.FOCUS_NONE
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 7
+		_h = Terrain.heights(map_id, 3, rng, 64)
+		pressed.connect(func() -> void: A.click())
+		set_selected(false)
+
+	func set_selected(v: bool) -> void:
+		_selected = v
+		var border := Color(1.0, 0.78, 0.15) if v else Color(0.75, 0.8, 0.88)
+		var sb := UIKit.style(Color(1, 1, 1, 0.95), 18, border, 7 if v else 3)
+		add_theme_stylebox_override("normal", sb)
+		add_theme_stylebox_override("hover", sb)
+		add_theme_stylebox_override("pressed", UIKit.style(Color(0.93, 0.95, 1.0), 18, border, 7 if v else 3))
+		queue_redraw()
+
+	func _draw() -> void:
+		var th := Terrain.theme(map_id)
+		var r := Rect2(12, 12, size.x - 24, 90)
+		draw_polygon(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end,
+				Vector2(r.position.x, r.end.y)]),
+				PackedColorArray([th["sky_top"], th["sky_top"], th["sky_bot"], th["sky_bot"]]))
+		# World heights ~120..980 px mapped into the picture.
+		var pts := PackedVector2Array()
+		var line := PackedVector2Array()
+		for i in range(_h.size()):
+			var x := r.position.x + r.size.x * float(i) / float(_h.size() - 1)
+			var y := r.position.y + r.size.y * clampf((_h[i] - 120.0) / 860.0, 0.0, 1.0)
+			pts.append(Vector2(x, y))
+			line.append(Vector2(x, y))
+		pts.append(r.end)
+		pts.append(Vector2(r.position.x, r.end.y))
+		draw_colored_polygon(pts, th["dirt"])
+		draw_polyline(line, th["top"], 4.0)
+		# Tiny tanks where the players start on the designed maps.
+		if map_id > 0:
+			for k in range(4):
+				var fx: float = Terrain.SPAWNS[map_id][k]
+				var hi: float = _h[int(fx * float(_h.size() - 1))]
+				var p := Vector2(r.position.x + r.size.x * fx,
+						r.position.y + r.size.y * clampf((hi - 120.0) / 860.0, 0.0, 1.0) - 4.0)
+				draw_circle(p, 4.5, UIKit.PLAYER_COLORS[k])
+		var f := ThemeDB.fallback_font
+		var nm: String = th["name"]
+		var w := f.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		draw_string(f, Vector2(size.x * 0.5 - w * 0.5, size.y - 14), nm,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UIKit.COL_TEXT)
+		if _selected:
+			var c := Vector2(size.x - 20, 20)
+			draw_circle(c, 15, Color(1.0, 0.78, 0.15))
+			draw_polyline(PackedVector2Array([c + Vector2(-7, 0), c + Vector2(-2, 6), c + Vector2(8, -6)]),
+					Color.WHITE, 4.0)

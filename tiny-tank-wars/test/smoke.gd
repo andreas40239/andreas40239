@@ -25,19 +25,18 @@ func check(cond: bool, msg: String) -> void:
 		print("ok: ", msg)
 
 func _setup() -> void:
-	# Autoloads are not auto-instanced with -s, create them manually.
-	var g = load("res://src/game.gd").new()
-	g.name = "G"
-	root.add_child(g)
-	var a = load("res://src/audio.gd").new()
-	a.name = "A"
-	root.add_child(a)
+	var g = root.get_node("G")  # the real autoload; script mode already created it
+	var a = root.get_node("A")
 	audio = a
 	var main = load("res://src/main.gd").new()
 	main.name = "Main"
 	root.add_child(main)
 	await process_frame
-	check(main.screen != null, "main menu built")
+	check(main.screen is StartupScreen, "app opens on the startup screen")
+	await process_frame
+	main.screen.done.emit()
+	await process_frame
+	check(main.screen != null and not (main.screen is StartupScreen), "startup screen leads to the menu")
 	main._show_mode_select()
 	await process_frame
 	main._show_level_select(1)
@@ -85,6 +84,14 @@ func _setup() -> void:
 	check(v2.shield_cracked, "shield cracked after block")
 	# --- Music tracks -------------------------------------------------
 	check(audio.MUSIC_TRACKS.size() == 3, "three music tracks available")
+	# Each song must loop at its real end, not after a few seconds.
+	for n in audio.MUSIC_TRACKS:
+		var m: AudioStreamWAV = audio.streams[n]
+		var loops_at: float = float(m.loop_end) / float(m.mix_rate)
+		check(absf(loops_at - m.get_length()) < 0.05,
+				"%s loops at its end (%.1f s of %.1f s)" % [n, loops_at, m.get_length()])
+	for n in ["music2", "music3"]:
+		check(audio.streams[n].get_length() > 60.0, "%s is a long song (%.0f s)" % [n, audio.streams[n].get_length()])
 	var first_track: String = audio.track_name()
 	var second: String = audio.next_track()
 	check(second != first_track, "next_track switches song (%s -> %s)" % [first_track, second])
@@ -111,6 +118,39 @@ func _setup() -> void:
 	if _got:
 		var err: float = _landed.distance_to(pred["impact"])
 		check(err < 1.0, "live shell lands where predicted (%.2f px off)" % err)
+
+	# --- Fire is instant; the full flight path option ---------------------
+	var human = battle.tanks[0]
+	battle.current_i = 0
+	battle._begin_aim()
+	check(battle.state == battle.S.AIM, "human turn is in aim state")
+	battle._try_fire()
+	check(battle.state == battle.S.AIM, "a touch in the first moment of a turn is ignored")
+	battle.aim_started_ms -= 1000
+	battle._try_fire()
+	check(battle.state == battle.S.FLIGHT, "FIRE shoots immediately, no hold or confirm step")
+	check(not battle.fire_btn.visible, "fire button hidden while the shell flies")
+	# Let that shell land before continuing.
+	var fguard := 0
+	while battle.pending_shots > 0 and fguard < 2000:
+		await physics_frame
+		fguard += 1
+	battle.state = battle.S.AIM
+	battle.current_i = 0
+	g_settings_full(false)
+	battle._update_preview()
+	var short_n: int = battle._preview_pts.size()
+	g_settings_full(true)
+	battle._update_preview()
+	var full_pts: PackedVector2Array = battle._preview_pts
+	check(full_pts.size() > short_n, "full path is longer than the short hint (%d > %d)" % [full_pts.size(), short_n])
+	var exact = Sim.trace(human.barrel_tip(), human.angle, human.power, battle.eff_wind(),
+			battle.terrain, battle.tanks, human)
+	var end_gap: float = full_pts[full_pts.size() - 1].distance_to(exact["impact"])
+	check(end_gap < 0.01, "full path ends exactly where the shell will land (%.2f px)" % end_gap)
+	check(battle._preview_impact.distance_to(exact["impact"]) < 0.01,
+			"landing marker sits on the true impact point")
+	g_settings_full(false)
 
 	# --- Drama robot: seven near misses, then it closes in ---------------
 	var ace = battle.tanks[1]
@@ -204,3 +244,6 @@ func _finish() -> void:
 	check(setup_done, "all setup checks ran to completion")
 	print("SMOKE RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails > 0 else 0)
+
+func g_settings_full(v: bool) -> void:
+	root.get_node("G").settings["full_path"] = v
