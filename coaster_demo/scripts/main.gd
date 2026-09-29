@@ -5,11 +5,14 @@ const P := CoasterTrack.Piece
 const G := 9.81
 const TAP_MAX_MOVE := 24.0
 const TAP_MAX_MS := 450
+const SKY_COLOR := Color(0.62, 0.8, 0.96)
+const GRASS_COLOR := Color(0.33, 0.62, 0.24)
 
 var track: CoasterTrack
 var rig: IsoCameraRig
 var cart: Node3D
 var ride_cam: Camera3D
+var env: Environment
 var cursor_root: Node3D
 var cursor_main: MeshInstance3D
 var cursor_left: MeshInstance3D
@@ -19,7 +22,12 @@ var cursor_arrow: MeshInstance3D
 # UI
 var ui_root: Control
 var build_bar: HBoxContainer
+var action_bar: VBoxContainer
 var ride_bar: HBoxContainer
+var piece_buttons := {}          # Piece -> Button (für die Auswahl-Markierung)
+var fps_label: Label
+var _fps_timer := 0.0
+var _frame_ms_max := 0.0
 var joystick: VirtualJoystick
 var status_label: Label
 var toast_label: Label
@@ -45,8 +53,13 @@ var ride_max_v := 0.0
 var ride_laps := 0
 var third_person := false
 var _look := Vector2.ZERO        # Yaw/Pitch-Versatz des Blicks (Grad)
+var _chase_eye := Vector3.INF    # geglättete Position der Verfolgerkamera
 var _ride_end_timer := -1.0
 var _last_forward := P.STRAIGHT
+var _banked_turns := false       # Tippen aufs Seitenfeld: Schrägkurve statt flacher Kurve
+var _loop_warned := false
+var _ride_piece := -1
+var loop_entry_v := 0.0         # Tempo bei der letzten Looping-Einfahrt
 
 
 func _ready() -> void:
@@ -70,14 +83,14 @@ func _ready() -> void:
 # ------------------------------------------------------------------ Welt ---
 
 func _setup_world() -> void:
-	var env := Environment.new()
+	env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.72, 0.74, 0.77)
+	env.background_color = SKY_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.75, 0.75, 0.8)
-	env.ambient_light_energy = 0.35
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.72, 0.74, 0.77)
+	env.ambient_light_color = Color(0.78, 0.84, 0.92)
+	env.ambient_light_energy = 0.4
+	env.fog_enabled = false   # nur im Fahrmodus (die Iso-Kamera steht weit entfernt)
+	env.fog_light_color = SKY_COLOR
 	env.fog_density = 0.004
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -112,9 +125,10 @@ func _setup_world() -> void:
 
 	var outer := MeshInstance3D.new()
 	var oplane := PlaneMesh.new()
-	oplane.size = Vector2(span * 4, span * 4)
+	oplane.size = Vector2(span * 12, span * 12)
 	var omat := StandardMaterial3D.new()
-	omat.albedo_color = Color(0.36, 0.38, 0.36)
+	omat.albedo_color = GRASS_COLOR
+	omat.roughness = 1.0
 	oplane.material = omat
 	outer.mesh = oplane
 	outer.position = Vector3(span * 0.5, -0.02, span * 0.5)
@@ -229,12 +243,21 @@ func _setup_cart() -> void:
 
 # -------------------------------------------------------------------- UI ---
 
-func _make_button(text: String, cb: Callable, min_w := 104.0) -> Button:
+func _make_button(icon_name: String, tip: String, cb: Callable, btn_size := 80.0) -> Button:
 	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(min_w, 72)
+	b.icon = load("res://icons/%s.svg" % icon_name)
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.tooltip_text = tip
+	b.custom_minimum_size = Vector2(btn_size, btn_size)
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(cb)
+	return b
+
+
+func _piece_button(icon_name: String, type: int) -> Button:
+	var b := _make_button(icon_name, CoasterTrack.PIECE_NAMES[type], _build.bind(type))
+	piece_buttons[type] = b
 	return b
 
 
@@ -244,7 +267,7 @@ func _make_theme() -> Theme:
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0.22, 0.23, 0.25, 0.88)
 	normal.set_corner_radius_all(12)
-	normal.set_content_margin_all(8)
+	normal.set_content_margin_all(12)
 	var hover := normal.duplicate()
 	hover.bg_color = Color(0.3, 0.31, 0.34, 0.92)
 	var pressed := normal.duplicate()
@@ -255,6 +278,10 @@ func _make_theme() -> Theme:
 	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	th.set_color("font_color", "Button", Color(0.95, 0.95, 0.95))
 	th.set_color("font_color", "Label", Color(0.1, 0.1, 0.12))
+	var sel := normal.duplicate()
+	sel.border_color = Color(0.45, 0.95, 0.5)
+	sel.set_border_width_all(4)
+	th.set_stylebox("selected", "Button", sel)
 	return th
 
 
@@ -277,8 +304,8 @@ func _setup_ui() -> void:
 	help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	help_label.offset_left = -520
 	help_label.offset_right = -20
-	help_label.offset_top = 14
-	help_label.offset_bottom = 134
+	help_label.offset_top = 40
+	help_label.offset_bottom = 160
 	help_label.add_theme_font_size_override("font_size", 16)
 	help_label.add_theme_color_override("font_color", Color(0.15, 0.15, 0.18, 0.8))
 	ui_root.add_child(help_label)
@@ -324,23 +351,55 @@ func _setup_ui() -> void:
 	build_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	build_bar.offset_right = -16
 	build_bar.offset_bottom = -16
-	build_bar.add_child(_make_button("Links", _build.bind(P.LEFT)))
-	build_bar.add_child(_make_button("Gerade", _build.bind(P.STRAIGHT)))
-	build_bar.add_child(_make_button("Rechts", _build.bind(P.RIGHT)))
-	build_bar.add_child(_make_button("Hoch", _build.bind(P.UP)))
-	build_bar.add_child(_make_button("Runter", _build.bind(P.DOWN)))
-	build_bar.add_child(_make_button("Zurück", _on_undo))
-	build_bar.add_child(_make_button("Demo", _on_demo, 90))
-	build_bar.add_child(_make_button("Neu", _on_new, 80))
-	var ride_btn := _make_button("FAHREN", _start_ride, 130)
-	var ride_style := StyleBoxFlat.new()
-	ride_style.bg_color = Color(0.85, 0.85, 0.87, 0.95)
-	ride_style.set_corner_radius_all(12)
-	ride_btn.add_theme_stylebox_override("normal", ride_style)
-	ride_btn.add_theme_color_override("font_color", Color(0.1, 0.1, 0.12))
-	ride_btn.add_theme_color_override("font_hover_color", Color(0.1, 0.1, 0.12))
-	build_bar.add_child(ride_btn)
+	build_bar.add_child(_piece_button("left", P.LEFT))
+	build_bar.add_child(_piece_button("straight", P.STRAIGHT))
+	build_bar.add_child(_piece_button("right", P.RIGHT))
+	build_bar.add_child(_piece_button("bank_left", P.BANK_LEFT))
+	build_bar.add_child(_piece_button("bank_right", P.BANK_RIGHT))
+	build_bar.add_child(_piece_button("up", P.UP))
+	build_bar.add_child(_piece_button("down", P.DOWN))
+	build_bar.add_child(_piece_button("steep_down", P.STEEP_DOWN))
+	build_bar.add_child(_piece_button("loop", P.LOOP))
+	build_bar.add_child(_make_button("undo", "Zurück", _on_undo))
 	ui_root.add_child(build_bar)
+
+	# Aktionen rechts: Fahren, Demo-Strecke, Neu
+	action_bar = VBoxContainer.new()
+	action_bar.add_theme_constant_override("separation", 10)
+	action_bar.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	action_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	action_bar.grow_vertical = Control.GROW_DIRECTION_BOTH
+	action_bar.offset_right = -16
+	action_bar.offset_top = -40
+	action_bar.offset_bottom = -40
+	var ride_btn := _make_button("play", "Fahren", _start_ride, 104)
+	var ride_style := StyleBoxFlat.new()
+	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
+	ride_style.set_corner_radius_all(52)
+	ride_style.set_content_margin_all(18)
+	ride_btn.add_theme_stylebox_override("normal", ride_style)
+	var ride_hover := ride_style.duplicate()
+	ride_hover.bg_color = Color(0.6, 0.97, 0.65, 0.95)
+	ride_btn.add_theme_stylebox_override("hover", ride_hover)
+	ride_btn.add_theme_stylebox_override("pressed", ride_hover)
+	action_bar.add_child(ride_btn)
+	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new)]:
+		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		action_bar.add_child(b)
+	ui_root.add_child(action_bar)
+
+	fps_label = Label.new()
+	fps_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fps_label.offset_left = -420
+	fps_label.offset_right = -12
+	fps_label.offset_top = 6
+	fps_label.offset_bottom = 34
+	fps_label.add_theme_font_size_override("font_size", 18)
+	fps_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	fps_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	fps_label.add_theme_constant_override("outline_size", 5)
+	ui_root.add_child(fps_label)
 
 	ride_bar = HBoxContainer.new()
 	ride_bar.add_theme_constant_override("separation", 8)
@@ -349,19 +408,31 @@ func _setup_ui() -> void:
 	ride_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	ride_bar.offset_right = -16
 	ride_bar.offset_bottom = -16
-	ride_bar.add_child(_make_button("Ansicht", _toggle_view, 130))
-	ride_bar.add_child(_make_button("Stopp", _stop_ride, 130))
+	ride_bar.add_child(_make_button("view", "Ansicht 1./3. Person", _toggle_view, 92))
+	ride_bar.add_child(_make_button("stop", "Stopp", _stop_ride, 92))
 	ride_bar.visible = false
 	ui_root.add_child(ride_bar)
 
 	_update_help()
+	_refresh_selection()
+
+
+## Markiert die Teile, die ein Tippen auf die Felder setzen würde.
+func _refresh_selection() -> void:
+	var sel_turns := [P.BANK_LEFT, P.BANK_RIGHT] if _banked_turns else [P.LEFT, P.RIGHT]
+	for type in piece_buttons:
+		var b: Button = piece_buttons[type]
+		if type == _last_forward or type in sel_turns:
+			b.add_theme_stylebox_override("normal", b.get_theme_stylebox("selected"))
+		else:
+			b.remove_theme_stylebox_override("normal")
 
 
 func _update_help() -> void:
 	if riding:
 		help_label.text = "Joystick / Wischen: umschauen\nAnsicht: 1./3. Person"
 	else:
-		help_label.text = "Tippen: grünes Feld = geradeaus, helle Felder = Kurve\n1 Finger: verschieben · 2 Finger: zoomen\nJoystick: Ansicht drehen / kippen"
+		help_label.text = "Tippen: grünes Feld = markiertes Teil, helle Felder = Kurve\n1 Finger: verschieben · 2 Finger: zoomen\nJoystick: Ansicht drehen / kippen"
 
 
 func _show_toast(msg: String, secs := 2.5) -> void:
@@ -371,7 +442,7 @@ func _show_toast(msg: String, secs := 2.5) -> void:
 
 
 func _is_over_ui(pos: Vector2) -> bool:
-	for c in [build_bar, ride_bar, joystick]:
+	for c in [build_bar, action_bar, ride_bar, joystick]:
 		if c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
 	return false
@@ -386,8 +457,13 @@ func _build(type: int) -> void:
 	if err != "":
 		_show_toast(err)
 		return
-	if type == P.STRAIGHT or type == P.UP or type == P.DOWN:
+	if type in [P.STRAIGHT, P.UP, P.DOWN, P.STEEP_DOWN, P.LOOP]:
 		_last_forward = type
+	elif type in [P.LEFT, P.RIGHT]:
+		_banked_turns = false
+	elif type in [P.BANK_LEFT, P.BANK_RIGHT]:
+		_banked_turns = true
+	_refresh_selection()
 	if track.closed:
 		_show_toast("Strecke geschlossen! Jetzt FAHREN drücken", 3.5)
 
@@ -425,13 +501,13 @@ func _update_cursor() -> void:
 	var c := track.cursor_cell
 	var d := track.cursor_dir
 	var y := track.cursor_h * CoasterTrack.LEVEL + 0.08
-	var ok := track.can_place(P.STRAIGHT) == "" or track.can_place(P.UP) == ""
 	cursor_main.position = CoasterTrack.cell_center(c) + Vector3(0, y, 0)
-	cursor_main.material_override = _flat_mat(Color(0.2, 0.85, 0.3, 0.55) if ok else Color(0.9, 0.2, 0.2, 0.55))
 	var lc := c + CoasterTrack.DIRS[(d + 3) % 4]
 	var rc := c + CoasterTrack.DIRS[(d + 1) % 4]
 	cursor_left.position = CoasterTrack.cell_center(lc) + Vector3(0, y, 0)
 	cursor_right.position = CoasterTrack.cell_center(rc) + Vector3(0, y, 0)
+	var ok_fwd := track.can_place(_last_forward) == ""
+	cursor_main.material_override = _flat_mat(Color(0.2, 0.85, 0.3, 0.55) if ok_fwd else Color(0.9, 0.2, 0.2, 0.55))
 	var lok := track.can_place(P.LEFT) == ""
 	var rok := track.can_place(P.RIGHT) == ""
 	cursor_left.visible = lok
@@ -466,9 +542,9 @@ func _on_tap(pos: Vector2) -> void:
 	elif cell == c or cell == c + CoasterTrack.DIRS[d]:
 		_build(_last_forward)
 	elif cell == c + CoasterTrack.DIRS[(d + 3) % 4]:
-		_build(P.LEFT)
+		_build(P.BANK_LEFT if _banked_turns else P.LEFT)
 	elif cell == c + CoasterTrack.DIRS[(d + 1) % 4]:
-		_build(P.RIGHT)
+		_build(P.BANK_RIGHT if _banked_turns else P.RIGHT)
 
 
 # --------------------------------------------------------------- Eingabe ---
@@ -572,13 +648,17 @@ func _start_ride() -> void:
 	ride_laps = 0
 	_look = Vector2.ZERO
 	_ride_end_timer = -1.0
+	_loop_warned = false
+	_ride_piece = -1
 	build_bar.visible = false
+	action_bar.visible = false
 	ride_bar.visible = true
 	status_label.visible = false
 	speed_label.visible = true
 	cursor_root.visible = false
 	_update_ride_cam()
 	ride_cam.make_current()
+	env.fog_enabled = true
 	_update_help()
 	if not track.closed:
 		_show_toast("Strecke offen: Fahrt endet am letzten Teil")
@@ -589,10 +669,12 @@ func _stop_ride() -> void:
 		return
 	riding = false
 	build_bar.visible = true
+	action_bar.visible = true
 	ride_bar.visible = false
 	status_label.visible = true
 	speed_label.visible = false
 	rig.make_current()
+	env.fog_enabled = false
 	_place_cart(track.station_s())
 	_update_cursor()
 	_update_help()
@@ -601,14 +683,34 @@ func _stop_ride() -> void:
 
 func _toggle_view() -> void:
 	third_person = not third_person
+	_chase_eye = Vector3.INF
 	_update_ride_cam()
 
 
-func _update_ride_cam() -> void:
-	var base := Vector3(0, 3.2, 6.5) if third_person else Vector3(0, 1.75, -0.75)
-	var base_pitch := -14.0 if third_person else -6.0
-	ride_cam.position = base
-	ride_cam.rotation_degrees = Vector3(base_pitch + _look.y, _look.x, 0)
+func _update_ride_cam(delta := 0.0) -> void:
+	if third_person and riding:
+		# Verfolgerkamera mit Welt-Oben, weich nachgeführt – bleibt auch im Looping außerhalb
+		var smp := track.sample(ride_s)
+		var piece: Dictionary = track.pieces[smp.piece]
+		var fwd: Vector3 = smp.tangent
+		fwd.y = 0.0
+		if piece.type == P.LOOP or fwd.length() < 0.3:
+			fwd = CoasterTrack.dir_vec3(piece.dir)
+		fwd = fwd.normalized()
+		var target: Vector3 = smp.pos + Vector3.UP * 1.0
+		var eye: Vector3 = smp.pos - fwd * 8.0 + Vector3.UP * 4.0
+		if piece.type == P.LOOP:
+			eye.y = maxf(eye.y, piece.h * CoasterTrack.LEVEL + CoasterTrack.LOOP_RADIUS + 2.0)
+		if delta <= 0.0 or _chase_eye == Vector3.INF:
+			_chase_eye = eye
+		else:
+			_chase_eye = _chase_eye.lerp(eye, 1.0 - exp(-4.0 * delta))
+		var xf := Transform3D(Basis.IDENTITY, _chase_eye).looking_at(target, Vector3.UP)
+		xf.basis = xf.basis * Basis.from_euler(Vector3(deg_to_rad(_look.y), deg_to_rad(_look.x), 0))
+		ride_cam.global_transform = xf
+		return
+	ride_cam.position = Vector3(0, 1.75, -0.75)
+	ride_cam.rotation_degrees = Vector3(-6.0 + _look.y, _look.x, 0)
 
 
 func _physics_ride(dt: float) -> void:
@@ -626,7 +728,15 @@ func _physics_ride(dt: float) -> void:
 				ride_v = maxf(ride_v, 3.0)         # Kettenlift
 			P.STATION:
 				ride_v = move_toward(ride_v, 4.0, 8.0 * h)  # Bremse / Antrieb
+			P.LOOP:
+				# Für den Looping braucht es bei der Einfahrt etwa v² ≥ 5·g·r
+				if smp.piece != _ride_piece:
+					loop_entry_v = ride_v
+					if not _loop_warned and ride_v * ride_v < 5.0 * G * CoasterTrack.LOOP_RADIUS * 0.8:
+						_loop_warned = true
+						_show_toast("Zu langsam für den Looping – mehr Höhe davor bauen!")
 		ride_v = maxf(ride_v, 1.0)                  # Antriebsreifen verhindern Stillstand
+		_ride_piece = smp.piece
 		var prev_s := ride_s
 		ride_s += ride_v * h
 		if track.closed and fposmod(prev_s, track.length) > fposmod(ride_s, track.length):
@@ -643,17 +753,26 @@ func _physics_ride(dt: float) -> void:
 func _place_cart(s: float) -> void:
 	if cart == null or track == null:
 		return
-	var a := track.sample(s - 0.8)
-	var b := track.sample(s + 0.8)
-	var pos: Vector3 = track.sample(s).pos
-	var fwd: Vector3 = (b.pos - a.pos)
-	if fwd.length() < 0.001:
-		fwd = track.sample(s).tangent
-	fwd = fwd.normalized()
-	cart.global_transform = Transform3D(Basis.looking_at(fwd, Vector3.UP), pos)
+	var smp := track.sample(s)
+	cart.global_transform = Transform3D(CoasterTrack.frame_basis(smp.tangent, smp.up), smp.pos)
+
+
+func _update_fps(delta: float) -> void:
+	_frame_ms_max = maxf(_frame_ms_max, delta * 1000.0)
+	_fps_timer -= delta
+	if _fps_timer > 0.0:
+		return
+	_fps_timer = 0.5
+	var fps := Engine.get_frames_per_second()
+	var draws := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	fps_label.text = "%d FPS · max %.0f ms · %d Draw Calls" % [fps, _frame_ms_max, draws]
+	fps_label.add_theme_color_override("font_color",
+		Color(0.6, 1, 0.6) if fps >= 55 else (Color(1, 0.9, 0.4) if fps >= 30 else Color(1, 0.5, 0.45)))
+	_frame_ms_max = 0.0
 
 
 func _process(delta: float) -> void:
+	_update_fps(delta)
 	if _toast_time > 0.0:
 		_toast_time -= delta
 		if _toast_time <= 0.0:
@@ -668,7 +787,7 @@ func _process(delta: float) -> void:
 			_look.y = clampf(_look.y - j.y * 80.0 * delta, -70, 60)
 		elif _touches.is_empty() and not _mouse_left:
 			_look = _look.move_toward(Vector2.ZERO, 60.0 * delta)
-		_update_ride_cam()
+		_update_ride_cam(delta)
 		speed_label.text = "%d km/h\nRunden: %d" % [int(ride_v * 3.6), ride_laps]
 		if _ride_end_timer >= 0.0:
 			_ride_end_timer -= delta

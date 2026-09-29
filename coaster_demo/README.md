@@ -4,9 +4,9 @@ Greybox-Prototyp: Achterbahn in isometrischer Ansicht bauen und anschließend
 selbst mitfahren. Alles besteht aus grauen Platzhalter-Formen – die richtigen
 Grafik-Assets kommen später.
 
-| Bauen | Fahren |
-|---|---|
-| ![Bauen](docs/bauen.png) | ![Fahren](docs/fahren.png) |
+| Bauen | Fahren | Looping |
+|---|---|---|
+| ![Bauen](docs/bauen.png) | ![Fahren](docs/fahren.png) | ![Looping](docs/looping.png) |
 
 ## Steuerung
 
@@ -14,20 +14,30 @@ Grafik-Assets kommen später.
 
 | Geste | Wirkung |
 |---|---|
-| Tippen auf das **grüne Feld** (bzw. das Feld davor) | Teil geradeaus setzen (zuletzt gewählte Art: Gerade / Hoch / Runter) |
-| Tippen auf ein **helles Seitenfeld** | Kurve links / rechts |
+| Tippen auf das **grüne Feld** (bzw. das Feld davor) | Das grün markierte Geradeaus-Teil setzen (Gerade / Hoch / Runter / Steil / Looping) |
+| Tippen auf ein **helles Seitenfeld** | Kurve links / rechts (flach oder geneigt – je nachdem, welche markiert ist) |
 | 1 Finger ziehen | Ansicht verschieben |
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
-| Buttons unten | Links, Gerade, Rechts, Hoch, Runter, Zurück, Demo-Strecke, Neu, FAHREN |
+| Icon-Leiste unten | Kurve links, Gerade, Kurve rechts, Schrägkurve links/rechts, Hoch, Runter, Steile Abfahrt, Looping, Zurück |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
 Strecken können auch getestet werden – die Fahrt endet dann am letzten Teil.
 Kreuzungen sind erlaubt, wenn mindestens eine Höhenstufe Abstand dazwischen ist.
 
+| Teil | Wirkung |
+|---|---|
+| Schrägkurve | 90°-Kurve, 35° zur Innenseite geneigt (Neigung wird weich ein-/ausgeblendet) |
+| Steile Abfahrt | 2 Höhenstufen (4 m) auf einer Zelle, ca. 45° |
+| Looping | 2 Zellen lang, Radius 2,6 m, Ein- und Ausfahrt seitlich versetzt; braucht ca. 41 km/h bei der Einfahrt (sonst Hinweis „zu langsam“) |
+
+Oben rechts steht die **Performance-Anzeige**: FPS (grün ≥ 55, gelb ≥ 30, rot darunter),
+längster Frame der letzten halben Sekunde und Draw Calls.
+
 **Fahrmodus**: Joystick oder Wischen zum Umschauen, *Ansicht* wechselt
-zwischen 1. und 3. Person, *Stopp* zurück zum Bauen.
+zwischen 1. Person und Verfolgerkamera, *Stopp* zurück zum Bauen.
 
 Auf dem Desktop: Linksklick = Tippen/Verschieben, Mausrad = Zoom,
 rechte Maustaste ziehen = Drehen.
@@ -50,6 +60,7 @@ scripts/iso_camera.gd  Isometrische Orthogonal-Kamera
 scripts/joystick.gd    Virtueller Touch-Joystick
 tests/smoke_test.gd    Headless-Test (Bauen, Tap, Schließen, Fahrt)
 tests/screenshots.gd   Rendert Kontroll-Screenshots
+icons/*.svg            Button-Icons (Platzhalter, leicht austauschbar)
 export_presets.cfg     Android-Export (nur arm64-v8a)
 ```
 
@@ -71,5 +82,5 @@ Quellen“ erlauben, öffnen.
 ## Nächste Schritte (Ideen)
 
 - Echte Assets (Schienen, Wagen, Stützen, Umgebung) statt Greybox
-- Mehr Teile: steile Abfahrten, Loopings, Kurven mit Neigung, Booster
+- Mehr Teile: Booster, Korkenzieher, steile Auffahrten, größere Kurvenradien
 - Mehrere Wagen, G-Kräfte-Anzeige, Speichern/Laden von Strecken

@@ -8,7 +8,7 @@ extends Node3D
 
 signal changed
 
-enum Piece { STATION, STRAIGHT, LEFT, RIGHT, UP, DOWN }
+enum Piece { STATION, STRAIGHT, LEFT, RIGHT, UP, DOWN, BANK_LEFT, BANK_RIGHT, STEEP_DOWN, LOOP }
 
 const TILE := 4.0          # Kantenlänge einer Rasterzelle in Metern
 const LEVEL := 2.0         # Höhe einer Höhenstufe in Metern
@@ -16,12 +16,18 @@ const GRID := 24           # Rastergröße (GRID x GRID Zellen)
 const MAX_LEVEL := 8
 const STATION_CELL := Vector2i(6, 12)
 const STATION_LEN := 3
+const BANK_ANGLE := 35.0   # Neigung der Schrägkurven in Grad
+const LOOP_RADIUS := 2.6   # Radius des Loopings in Metern
+const LOOP_LEVELS := 3     # belegte Höhenstufen über dem Looping-Einstieg
+const LOOP_SHIFT := 1.8    # seitlicher Versatz zwischen Ein- und Ausfahrt
 # Richtungen: 0 = +X (Ost), 1 = +Z (Süd), 2 = -X (West), 3 = -Z (Nord)
 const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 
 const PIECE_NAMES := {
 	Piece.STATION: "Station", Piece.STRAIGHT: "Gerade", Piece.LEFT: "Links",
 	Piece.RIGHT: "Rechts", Piece.UP: "Hoch", Piece.DOWN: "Runter",
+	Piece.BANK_LEFT: "Schrägkurve links", Piece.BANK_RIGHT: "Schrägkurve rechts",
+	Piece.STEEP_DOWN: "Steile Abfahrt", Piece.LOOP: "Looping",
 }
 
 var pieces: Array[Dictionary] = []
@@ -32,6 +38,8 @@ var closed := false
 
 # Gebackener Pfad (Mittellinie der Schienen)
 var path_points := PackedVector3Array()
+var path_tan := PackedVector3Array()   # Fahrtrichtung je Punkt
+var path_up := PackedVector3Array()    # Schienen-Normale je Punkt (Neigung, Looping)
 var path_dist := PackedFloat32Array()
 var path_piece := PackedInt32Array()
 var length := 0.0
@@ -77,9 +85,9 @@ static func cell_center(cell: Vector2i) -> Vector3:
 
 static func out_dir_of(type: int, d: int) -> int:
 	match type:
-		Piece.LEFT:
+		Piece.LEFT, Piece.BANK_LEFT:
 			return (d + 3) % 4
-		Piece.RIGHT:
+		Piece.RIGHT, Piece.BANK_RIGHT:
 			return (d + 1) % 4
 	return d
 
@@ -90,7 +98,27 @@ static func out_h_of(type: int, h: int) -> int:
 			return h + 1
 		Piece.DOWN:
 			return h - 1
+		Piece.STEEP_DOWN:
+			return h - 2
 	return h
+
+
+static func is_turn(type: int) -> bool:
+	return type in [Piece.LEFT, Piece.RIGHT, Piece.BANK_LEFT, Piece.BANK_RIGHT]
+
+
+## Zellen, die ein Teil belegt (der Looping ist zwei Zellen lang).
+static func cells_of(type: int, cell: Vector2i, d: int) -> Array[Vector2i]:
+	if type == Piece.LOOP:
+		return [cell, cell + DIRS[d]]
+	return [cell]
+
+
+static func height_range(type: int, h: int) -> Vector2i:
+	if type == Piece.LOOP:
+		return Vector2i(h, h + LOOP_LEVELS)
+	var nh := out_h_of(type, h)
+	return Vector2i(mini(h, nh), maxi(h, nh))
 
 
 static func in_grid(c: Vector2i) -> bool:
@@ -106,13 +134,19 @@ func can_place(type: int) -> String:
 		return "Tiefer geht es nicht"
 	if nh > MAX_LEVEL:
 		return "Maximale Höhe erreicht"
-	if not in_grid(cursor_cell):
-		return "Außerhalb des Baufelds"
-	var next := cursor_cell + DIRS[out_dir_of(type, cursor_dir)]
+	var hr := height_range(type, cursor_h)
+	if hr.y > MAX_LEVEL + LOOP_LEVELS:
+		return "Maximale Höhe erreicht"
+	var cells := cells_of(type, cursor_cell, cursor_dir)
+	for c in cells:
+		if not in_grid(c):
+			return "Außerhalb des Baufelds"
+	var next := cells[cells.size() - 1] + DIRS[out_dir_of(type, cursor_dir)]
 	if not in_grid(next):
 		return "Kein Platz mehr am Rand"
-	if is_blocked(cursor_cell, mini(cursor_h, nh), maxi(cursor_h, nh)):
-		return "Zelle belegt – Zurück drücken"
+	for c in cells:
+		if is_blocked(c, hr.x, hr.y):
+			return "Kein Platz – Zelle belegt"
 	return ""
 
 
@@ -120,10 +154,10 @@ func can_place(type: int) -> String:
 ## Höhenstufe Abstand liegt (Kreuzungen sind mit genug Abstand erlaubt).
 func is_blocked(cell: Vector2i, lo: int, hi: int) -> bool:
 	for p in pieces:
-		if p.cell != cell:
+		if not cell in p.cells:
 			continue
-		var plo: int = mini(p.h, p.out_h)
-		var phi: int = maxi(p.h, p.out_h)
+		var plo: int = p.lo
+		var phi: int = p.hi
 		if lo <= phi + 1 and plo <= hi + 1:
 			return true
 	return false
@@ -152,25 +186,31 @@ func undo() -> bool:
 
 
 func _append(type: int) -> void:
+	var cells := cells_of(type, cursor_cell, cursor_dir)
+	var hr := height_range(type, cursor_h)
 	var p := {
 		"type": type, "cell": cursor_cell, "dir": cursor_dir, "h": cursor_h,
 		"out_dir": out_dir_of(type, cursor_dir), "out_h": out_h_of(type, cursor_h),
+		"cells": cells, "lo": hr.x, "hi": hr.y,
 	}
 	pieces.append(p)
 	cursor_dir = p.out_dir
 	cursor_h = p.out_h
-	cursor_cell = cursor_cell + DIRS[cursor_dir]
+	cursor_cell = cells[cells.size() - 1] + DIRS[cursor_dir]
 
 
 ## Baut eine geschlossene Beispielstrecke.
 func build_demo() -> void:
 	reset()
 	var S := Piece.STRAIGHT
+	var U := Piece.UP
+	var BR := Piece.BANK_RIGHT
 	var seq := [
-		Piece.UP, Piece.UP, Piece.UP, Piece.UP, S, Piece.RIGHT,
-		Piece.DOWN, Piece.DOWN, Piece.RIGHT,
-		Piece.DOWN, Piece.DOWN, S, S, S, S, S, S,
-		Piece.RIGHT, S, S, Piece.RIGHT,
+		U, U, U, U, U, BR,                                  # Lift + Schrägkurve
+		Piece.STEEP_DOWN, Piece.STEEP_DOWN, Piece.DOWN, S,  # First Drop
+		Piece.LOOP, BR,                                     # Looping
+		S, U, U, Piece.STEEP_DOWN, S, S, S, S, BR,          # Camelback
+		S, S, S, S, S, S, BR,                               # zurück zur Station
 	]
 	for t in seq:
 		var err := place(t)
@@ -181,66 +221,115 @@ func build_demo() -> void:
 
 # ------------------------------------------------------------ Geometrie ---
 
-func _piece_samples(p: Dictionary) -> Array[Vector3]:
-	var out: Array[Vector3] = []
+## Liefert Punkte, Normalen (vor dem Glätten) und ob das Teil fix bleibt.
+func _piece_samples(p: Dictionary) -> Dictionary:
+	var pts: Array[Vector3] = []
+	var ups: Array[Vector3] = []
 	var c := cell_center(p.cell)
 	var d := dir_vec3(p.dir)
 	var nd := dir_vec3(p.out_dir)
 	var y0: float = p.h * LEVEL
 	var y1: float = p.out_h * LEVEL
 	var half := TILE * 0.5
-	if p.type == Piece.LEFT or p.type == Piece.RIGHT:
+	var a := c - d * half
+	if is_turn(p.type):
 		var n := 10
 		var pivot := c - d * half + nd * half
+		var banked: bool = p.type == Piece.BANK_LEFT or p.type == Piece.BANK_RIGHT
 		for i in n:
 			var t := float(i) / n * PI * 0.5
 			var pt := pivot - nd * half * cos(t) + d * half * sin(t)
 			pt.y = y0
-			out.append(pt)
+			pts.append(pt)
+			var up := Vector3.UP
+			if banked:
+				var inward := Vector3(pivot.x - pt.x, 0, pivot.z - pt.z).normalized()
+				up += inward * tan(deg_to_rad(BANK_ANGLE))
+			ups.append(up)
+	elif p.type == Piece.LOOP:
+		var lat_dir := d.cross(Vector3.UP)
+		var w := LOOP_SHIFT
+		var r := LOOP_RADIUS
+		for i in 5:  # Einfahrt: seitlich nach innen versetzen
+			var x := TILE * i / 5.0
+			var lat := -w * 0.5 * smoothstep(0.0, 1.0, x / TILE)
+			pts.append(a + d * x + lat_dir * lat + Vector3(0, y0, 0))
+			ups.append(Vector3.UP)
+		var steps := 30
+		for i in steps:  # Kreis
+			var th := TAU * i / steps
+			var lat := -w * 0.5 + w * th / TAU
+			var pt := a + d * (TILE + r * sin(th)) + lat_dir * lat
+			pt.y = y0 + r * (1.0 - cos(th))
+			pts.append(pt)
+			ups.append(d * -sin(th) + Vector3.UP * cos(th))
+		for i in 5:  # Ausfahrt: zurück auf die Mittellinie
+			var x := TILE * i / 5.0
+			var lat := w * 0.5 * (1.0 - smoothstep(0.0, 1.0, x / TILE))
+			pts.append(a + d * (TILE + x) + lat_dir * lat + Vector3(0, y0, 0))
+			ups.append(Vector3.UP)
 	else:
 		var n := 6
-		var a := c - d * half
 		for i in n:
 			var t := float(i) / n
 			var pt := a + d * TILE * t
 			pt.y = lerpf(y0, y1, t)
-			out.append(pt)
-	return out
+			pts.append(pt)
+			ups.append(Vector3.UP)
+	var fixed: bool = p.type == Piece.STATION or p.type == Piece.LOOP
+	return {"pts": pts, "ups": ups, "fixed": fixed}
 
 
 func _build_path() -> void:
 	var pts := PackedVector3Array()
+	var ups := PackedVector3Array()
+	var fixed := PackedByteArray()
 	var owner_piece := PackedInt32Array()
 	for i in pieces.size():
-		for pt in _piece_samples(pieces[i]):
-			pts.append(pt)
+		var smp := _piece_samples(pieces[i])
+		for k in smp.pts.size():
+			pts.append(smp.pts[k])
+			ups.append(smp.ups[k])
+			fixed.append(1 if smp.fixed else 0)
 			owner_piece.append(i)
 	if not closed:
 		var last: Dictionary = pieces[pieces.size() - 1]
-		var end := cell_center(last.cell) + dir_vec3(last.out_dir) * TILE * 0.5
+		var end := cell_center(last.cells[last.cells.size() - 1]) + dir_vec3(last.out_dir) * TILE * 0.5
 		end.y = last.out_h * LEVEL
 		pts.append(end)
+		ups.append(Vector3.UP)
+		fixed.append(1)
 		owner_piece.append(pieces.size() - 1)
+		fixed[0] = 1
 
-	# Höhenverlauf glätten, damit Übergänge Flach<->Steigung weich werden.
+	# Höhe und Neigung glätten, damit Übergänge weich werden.
 	var n := pts.size()
 	for _iter in 6:
-		var ys := PackedFloat32Array()
-		ys.resize(n)
+		var new_pts := pts.duplicate()
+		var new_ups := ups.duplicate()
 		for i in n:
-			var fixed: bool = pieces[owner_piece[i]].type == Piece.STATION
-			if not closed and (i == 0 or i == n - 1):
-				fixed = true
-			if fixed:
-				ys[i] = pts[i].y
+			if fixed[i]:
 				continue
-			var a := pts[(i - 1 + n) % n].y
-			var b := pts[(i + 1) % n].y
-			ys[i] = (a + 2.0 * pts[i].y + b) * 0.25
-		for i in n:
-			pts[i].y = ys[i]
+			var ia := (i - 1 + n) % n
+			var ib := (i + 1) % n
+			new_pts[i].y = (pts[ia].y + 2.0 * pts[i].y + pts[ib].y) * 0.25
+			new_ups[i] = (ups[ia] + 2.0 * ups[i] + ups[ib]) * 0.25
+		pts = new_pts
+		ups = new_ups
+
+	# Tangenten (zentrale Differenz) und orthonormale Normalen
+	var tans := PackedVector3Array()
+	tans.resize(n)
+	for i in n:
+		var prev := pts[(i - 1 + n) % n] if (closed or i > 0) else pts[i]
+		var next := pts[(i + 1) % n] if (closed or i < n - 1) else pts[i]
+		var t := (next - prev).normalized()
+		tans[i] = t
+		ups[i] = _ortho_up(t, ups[i])
 
 	path_points = pts
+	path_tan = tans
+	path_up = ups
 	path_piece = owner_piece
 	path_dist = PackedFloat32Array()
 	path_dist.resize(n)
@@ -254,7 +343,14 @@ func _build_path() -> void:
 	length = acc
 
 
-## Position/Tangente/Teil an Bogenlänge s.
+static func _ortho_up(t: Vector3, up: Vector3) -> Vector3:
+	var side := t.cross(up)
+	if side.length_squared() < 0.000001:
+		side = t.cross(Vector3.RIGHT)
+	return side.normalized().cross(t).normalized()
+
+
+## Position/Tangente/Normale/Teil an Bogenlänge s.
 func sample(s: float) -> Dictionary:
 	var n := path_points.size()
 	if closed:
@@ -287,12 +383,19 @@ func sample(s: float) -> Dictionary:
 	var t := 0.0
 	if seg_end - seg_start > 0.0001:
 		t = clampf((s - seg_start) / (seg_end - seg_start), 0.0, 1.0)
-	var a := path_points[i0]
-	var b := path_points[i1]
-	var tangent := (b - a).normalized()
+	var tangent := path_tan[i0].lerp(path_tan[i1], t).normalized()
 	if tangent == Vector3.ZERO:
 		tangent = Vector3.RIGHT
-	return {"pos": a.lerp(b, t), "tangent": tangent, "piece": path_piece[i0]}
+	var up := _ortho_up(tangent, path_up[i0].lerp(path_up[i1], t))
+	return {
+		"pos": path_points[i0].lerp(path_points[i1], t), "tangent": tangent,
+		"up": up, "piece": path_piece[i0],
+	}
+
+
+## Ausrichtung entlang der Strecke: -Z = Fahrtrichtung, Y = Schienen-Normale.
+static func frame_basis(tangent: Vector3, up: Vector3) -> Basis:
+	return Basis(tangent.cross(up).normalized(), up, -tangent)
 
 
 ## Startposition des Wagens: Mitte der Station.
@@ -310,13 +413,7 @@ func _mat(c: Color) -> StandardMaterial3D:
 
 
 func _frame(i: int) -> Basis:
-	var n := path_points.size()
-	var prev := path_points[(i - 1 + n) % n] if (closed or i > 0) else path_points[i]
-	var next := path_points[(i + 1) % n] if (closed or i < n - 1) else path_points[i]
-	var t := (next - prev).normalized()
-	var side := t.cross(Vector3.UP).normalized()
-	var up := side.cross(t).normalized()
-	return Basis(side, up, -t)
+	return frame_basis(path_tan[i], path_up[i])
 
 
 func _rebuild() -> void:
@@ -380,11 +477,9 @@ func _build_ties_and_supports() -> void:
 	mm.instance_count = count
 	for k in count:
 		var smp := sample(k * 0.8)
-		var t: Vector3 = smp.tangent
-		var side := t.cross(Vector3.UP).normalized()
-		var up := side.cross(t).normalized()
+		var up: Vector3 = smp.up
 		var pos: Vector3 = smp.pos + up * 0.05
-		mm.set_instance_transform(k, Transform3D(Basis(side, up, -t), pos))
+		mm.set_instance_transform(k, Transform3D(frame_basis(smp.tangent, up), pos))
 	_ties.multimesh = mm
 
 	# Stützen: eine pro Teil (Teilmitte), wenn höher als der Boden
@@ -395,6 +490,8 @@ func _build_ties_and_supports() -> void:
 	var acc := {}
 	for i in path_points.size():
 		var pi := path_piece[i]
+		if pieces[pi].type == Piece.LOOP:
+			continue  # Looping trägt sich selbst (Greybox)
 		if not acc.has(pi):
 			acc[pi] = []
 		acc[pi].append(path_points[i])
