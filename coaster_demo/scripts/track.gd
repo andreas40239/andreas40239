@@ -199,6 +199,29 @@ func _append(type: int) -> void:
 	cursor_cell = cells[cells.size() - 1] + DIRS[cursor_dir]
 
 
+## Teiltypen nach der Station (zum Speichern).
+func get_types() -> Array[int]:
+	var out: Array[int] = []
+	for i in range(STATION_LEN, pieces.size()):
+		out.append(pieces[i].type)
+	return out
+
+
+## Baut eine gespeicherte Strecke wieder auf. Gibt false zurück, wenn ein Teil
+## nicht gesetzt werden konnte (die Strecke bleibt dann bis dorthin gebaut).
+func load_types(types: Array) -> bool:
+	reset()
+	for t in types:
+		var type := int(t)
+		if type <= Piece.STATION or type > Piece.LOOP or can_place(type) != "":
+			_rebuild()
+			return false
+		_append(type)
+		closed = cursor_cell == STATION_CELL and cursor_dir == 0 and cursor_h == 0
+	_rebuild()
+	return true
+
+
 ## Baut eine geschlossene Beispielstrecke.
 func build_demo() -> void:
 	reset()

@@ -13,6 +13,9 @@ var rig: IsoCameraRig
 var cart: Node3D
 var ride_cam: Camera3D
 var env: Environment
+var sfx: Sfx
+var save_menu: SaveMenu
+var sound_btn: Button
 var cursor_root: Node3D
 var cursor_main: MeshInstance3D
 var cursor_left: MeshInstance3D
@@ -63,6 +66,8 @@ var loop_entry_v := 0.0         # Tempo bei der letzten Looping-Einfahrt
 
 
 func _ready() -> void:
+	sfx = Sfx.new()
+	add_child(sfx)
 	_setup_world()
 	track = CoasterTrack.new()
 	add_child(track)
@@ -300,12 +305,7 @@ func _setup_ui() -> void:
 	ui_root.add_child(status_label)
 
 	help_label = Label.new()
-	help_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	help_label.offset_left = -520
-	help_label.offset_right = -20
-	help_label.offset_top = 40
-	help_label.offset_bottom = 160
+	help_label.position = Vector2(20, 52)
 	help_label.add_theme_font_size_override("font_size", 16)
 	help_label.add_theme_color_override("font_color", Color(0.15, 0.15, 0.18, 0.8))
 	ui_root.add_child(help_label)
@@ -370,8 +370,8 @@ func _setup_ui() -> void:
 	action_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	action_bar.grow_vertical = Control.GROW_DIRECTION_BOTH
 	action_bar.offset_right = -16
-	action_bar.offset_top = -40
-	action_bar.offset_bottom = -40
+	action_bar.offset_top = -50
+	action_bar.offset_bottom = -50
 	var ride_btn := _make_button("play", "Fahren", _start_ride, 104)
 	var ride_style := StyleBoxFlat.new()
 	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
@@ -383,7 +383,9 @@ func _setup_ui() -> void:
 	ride_btn.add_theme_stylebox_override("hover", ride_hover)
 	ride_btn.add_theme_stylebox_override("pressed", ride_hover)
 	action_bar.add_child(ride_btn)
-	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new)]:
+	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound)
+	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new),
+			_make_button("save", "Speichern & Laden", _open_save_menu), sound_btn]:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		action_bar.add_child(b)
 	ui_root.add_child(action_bar)
@@ -412,6 +414,14 @@ func _setup_ui() -> void:
 	ride_bar.add_child(_make_button("stop", "Stopp", _stop_ride, 92))
 	ride_bar.visible = false
 	ui_root.add_child(ride_bar)
+
+	save_menu = SaveMenu.new()
+	ui_root.add_child(save_menu)
+	save_menu.setup(_make_button)
+	save_menu.save_requested.connect(_on_save_slot)
+	save_menu.load_requested.connect(_on_load_slot)
+	save_menu.closed.connect(_on_save_menu_closed)
+	save_menu.clicked.connect(sfx.play.bind("click"))
 
 	_update_help()
 	_refresh_selection()
@@ -442,6 +452,8 @@ func _show_toast(msg: String, secs := 2.5) -> void:
 
 
 func _is_over_ui(pos: Vector2) -> bool:
+	if save_menu.visible:
+		return true
 	for c in [build_bar, action_bar, ride_bar, joystick]:
 		if c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
@@ -456,7 +468,10 @@ func _build(type: int) -> void:
 	var err := track.place(type)
 	if err != "":
 		_show_toast(err)
+		sfx.play("error", -4.0)
 		return
+	var pitch := {P.LOOP: 0.75, P.STEEP_DOWN: 0.85, P.UP: 1.1}.get(type, 1.0) as float
+	sfx.play("place", 0.0, pitch)
 	if type in [P.STRAIGHT, P.UP, P.DOWN, P.STEEP_DOWN, P.LOOP]:
 		_last_forward = type
 	elif type in [P.LEFT, P.RIGHT]:
@@ -466,21 +481,112 @@ func _build(type: int) -> void:
 	_refresh_selection()
 	if track.closed:
 		_show_toast("Strecke geschlossen! Jetzt FAHREN drücken", 3.5)
+		sfx.play("closed", -2.0, 1.0, 0.0)
 
 
 func _on_undo() -> void:
 	if not track.undo():
 		_show_toast("Nichts zum Zurücknehmen")
+		sfx.play("error", -4.0)
+	else:
+		sfx.play("undo")
 
 
 func _on_demo() -> void:
 	track.build_demo()
 	_show_toast("Demo-Strecke gebaut – FAHREN drücken")
+	sfx.play("closed", -2.0, 1.0, 0.0)
 
 
 func _on_new() -> void:
 	track.reset()
 	_show_toast("Neue Strecke")
+	sfx.play("undo", 0.0, 0.8)
+
+
+func _on_toggle_sound() -> void:
+	sfx.set_muted(not sfx.muted)
+	sound_btn.icon = load("res://icons/%s.svg" % ("sound_off" if sfx.muted else "sound_on"))
+	sfx.play("click")
+	_show_toast("Ton aus" if sfx.muted else "Ton an", 1.2)
+
+
+# ------------------------------------------------------- Speichern/Laden ---
+
+func _open_save_menu() -> void:
+	if riding:
+		return
+	sfx.play("click")
+	joystick.visible = false
+	_touches.clear()
+	_tap_valid = false
+	save_menu.open()
+
+
+func _on_save_menu_closed() -> void:
+	joystick.visible = true
+	sfx.play("click")
+
+
+func _on_save_slot(slot: int) -> void:
+	var thumb := await _capture_thumbnail()
+	SaveSlots.write(slot, track.get_types(), track.length, track.closed, thumb)
+	save_menu.refresh()
+	sfx.play("save", 0.0, 1.0, 0.0)
+
+
+func _on_load_slot(slot: int) -> void:
+	var data := SaveSlots.read(slot)
+	if data.is_empty():
+		return
+	var ok := track.load_types(data.pieces)
+	save_menu.close()
+	sfx.play("load", 0.0, 1.0, 0.0)
+	_show_toast("Platz %d geladen" % (slot + 1) if ok else "Platz %d nur teilweise geladen" % (slot + 1))
+	# Ansicht auf die Strecke zentrieren
+	var aabb := _track_bounds()
+	rig.position = Vector3(aabb.get_center().x, 0, aabb.get_center().z)
+
+
+func _track_bounds() -> AABB:
+	var aabb := AABB(track.path_points[0], Vector3.ZERO)
+	for pt in track.path_points:
+		aabb = aabb.expand(pt)
+	return aabb
+
+
+## Rendert ein kleines Vorschaubild der Strecke (eigene Kamera, ohne UI/Cursor).
+func _capture_thumbnail() -> Image:
+	if DisplayServer.get_name() == "headless":
+		return null  # ohne Renderer (Tests) gibt es kein Bild
+	var vp := SubViewport.new()
+	vp.size = Vector2i(384, 216)
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var cam := Camera3D.new()
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.near = 0.5
+	cam.far = 600.0
+	vp.add_child(cam)
+	add_child(vp)
+	var aabb := _track_bounds()
+	var view := Basis.from_euler(Vector3(deg_to_rad(rig.pitch), deg_to_rad(rig.yaw), 0))
+	cam.global_transform = Transform3D(view, aabb.get_center() + view.z * 200.0)
+	# Ortho-Größe so wählen, dass alle Ecken der Strecken-Box ins Bild passen
+	var half := Vector2.ZERO
+	for i in 8:
+		var p := view.inverse() * (aabb.get_endpoint(i) - aabb.get_center())
+		half = Vector2(maxf(half.x, absf(p.x)), maxf(half.y, absf(p.y)))
+	var aspect := float(vp.size.x) / vp.size.y
+	cam.size = maxf(half.y * 2.0, half.x * 2.0 / aspect) * 1.08 + 2.0
+	cam.current = true
+	var cursor_was := cursor_root.visible
+	cursor_root.visible = false
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var img: Image = vp.get_texture().get_image()
+	cursor_root.visible = cursor_was
+	vp.queue_free()
+	return img
 
 
 func _on_track_changed() -> void:
@@ -539,6 +645,7 @@ func _on_tap(pos: Vector2) -> void:
 	var d := track.cursor_dir
 	if track.closed:
 		_show_toast("Strecke ist geschlossen – FAHREN oder Zurück")
+		sfx.play("error", -4.0)
 	elif cell == c or cell == c + CoasterTrack.DIRS[d]:
 		_build(_last_forward)
 	elif cell == c + CoasterTrack.DIRS[(d + 3) % 4]:
@@ -658,6 +765,8 @@ func _start_ride() -> void:
 	cursor_root.visible = false
 	_update_ride_cam()
 	ride_cam.make_current()
+	sfx.play("bell", -3.0, 1.0, 0.0)
+	sfx.start_ride()
 	env.fog_enabled = true
 	_update_help()
 	if not track.closed:
@@ -674,6 +783,8 @@ func _stop_ride() -> void:
 	status_label.visible = true
 	speed_label.visible = false
 	rig.make_current()
+	sfx.stop_ride()
+	sfx.play("click")
 	env.fog_enabled = false
 	_place_cart(track.station_s())
 	_update_cursor()
@@ -682,6 +793,7 @@ func _stop_ride() -> void:
 
 
 func _toggle_view() -> void:
+	sfx.play("click")
 	third_person = not third_person
 	_chase_eye = Vector3.INF
 	_update_ride_cam()
@@ -736,6 +848,9 @@ func _physics_ride(dt: float) -> void:
 						_loop_warned = true
 						_show_toast("Zu langsam für den Looping – mehr Höhe davor bauen!")
 		ride_v = maxf(ride_v, 1.0)                  # Antriebsreifen verhindern Stillstand
+		if piece.type == P.STATION and _ride_piece >= 0 \
+				and track.pieces[_ride_piece].type != P.STATION and ride_v > 5.0:
+			sfx.play("brake", -2.0)
 		_ride_piece = smp.piece
 		var prev_s := ride_s
 		ride_s += ride_v * h
@@ -788,6 +903,8 @@ func _process(delta: float) -> void:
 		elif _touches.is_empty() and not _mouse_left:
 			_look = _look.move_toward(Vector2.ZERO, 60.0 * delta)
 		_update_ride_cam(delta)
+		var on_chain: bool = _ride_piece >= 0 and track.pieces[_ride_piece].type == P.UP and ride_v < 3.3
+		sfx.update_ride(ride_v, on_chain, delta)
 		speed_label.text = "%d km/h\nRunden: %d" % [int(ride_v * 3.6), ride_laps]
 		if _ride_end_timer >= 0.0:
 			_ride_end_timer -= delta

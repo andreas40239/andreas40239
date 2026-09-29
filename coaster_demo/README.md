@@ -20,7 +20,7 @@ Grafik-Assets kommen später.
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
 | Icon-Leiste unten | Kurve links, Gerade, Kurve rechts, Schrägkurve links/rechts, Hoch, Runter, Steile Abfahrt, Looping, Zurück |
-| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
@@ -32,6 +32,26 @@ Kreuzungen sind erlaubt, wenn mindestens eine Höhenstufe Abstand dazwischen ist
 | Schrägkurve | 90°-Kurve, 35° zur Innenseite geneigt (Neigung wird weich ein-/ausgeblendet) |
 | Steile Abfahrt | 2 Höhenstufen (4 m) auf einer Zelle, ca. 45° |
 | Looping | 2 Zellen lang, Radius 2,6 m, Ein- und Ausfahrt seitlich versetzt; braucht ca. 41 km/h bei der Einfahrt (sonst Hinweis „zu langsam“) |
+
+## Speichern & Laden
+
+Das Disketten-Symbol öffnet das Menü mit **5 Speicherplätzen**. Jeder Platz zeigt
+ein Vorschaubild der Strecke, Datum und Uhrzeit der letzten Speicherung sowie
+Teile, Länge und ob die Strecke geschlossen ist. Überschreiben und Löschen
+müssen mit einem zweiten Tipp bestätigt werden. Gespeichert wird im
+App-Datenverzeichnis (`user://slots/slot_N.json` + `slot_N.png`); die Strecke
+wird dabei als Liste der Teiltypen abgelegt.
+
+![Speichern & Laden](docs/speichern.png)
+
+## Sounds
+
+Bauen (Klacken, Fehler-Brummen, Zurück, Glockenspiel beim Schließen),
+Speichern/Laden, Abfahrtsglocke, Rollgeräusch und Fahrtwind (Lautstärke und
+Tonhöhe folgen dem Tempo), Kettenlift-Klackern auf „Hoch“-Teilen und Bremszischen
+bei der Einfahrt in die Station. Alle Sounds sind synthetische Platzhalter aus
+`tools/make_sounds.py` (`python3 tools/make_sounds.py`, braucht numpy) und können
+durch echte Aufnahmen gleichen Namens in `sounds/` ersetzt werden.
 
 Oben rechts steht die **Performance-Anzeige**: FPS (grün ≥ 55, gelb ≥ 30, rot darunter),
 längster Frame der letzten halben Sekunde und Draw Calls.
@@ -61,6 +81,11 @@ scripts/joystick.gd    Virtueller Touch-Joystick
 tests/smoke_test.gd    Headless-Test (Bauen, Tap, Schließen, Fahrt)
 tests/screenshots.gd   Rendert Kontroll-Screenshots
 icons/*.svg            Button-Icons (Platzhalter, leicht austauschbar)
+sounds/*.wav           Soundeffekte (Platzhalter, *_loop.wav laufen als Schleife)
+scripts/sfx.gd         Sound-Wiedergabe (Einzel-Sounds + tempoabhängige Fahrgeräusche)
+scripts/save_slots.gd  Speicherplätze (JSON + Vorschaubild)
+scripts/save_menu.gd   Speichern/Laden-Menü
+tools/make_sounds.py   Erzeugt die Platzhalter-Sounds
 export_presets.cfg     Android-Export (nur arm64-v8a)
 ```
 
@@ -83,4 +108,4 @@ Quellen“ erlauben, öffnen.
 
 - Echte Assets (Schienen, Wagen, Stützen, Umgebung) statt Greybox
 - Mehr Teile: Booster, Korkenzieher, steile Auffahrten, größere Kurvenradien
-- Mehrere Wagen, G-Kräfte-Anzeige, Speichern/Laden von Strecken
+- Mehrere Wagen, G-Kräfte-Anzeige, Strecken benennen/teilen

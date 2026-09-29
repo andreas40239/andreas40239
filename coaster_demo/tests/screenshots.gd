@@ -28,6 +28,18 @@ func _initialize() -> void:
 	main.rig.zoom_by(0.8)
 	await shot("03_demo_rotated")
 
+	# Speichern/Laden-Menü mit zwei belegten Plätzen (danach wieder löschen)
+	await main._on_save_slot(0)
+	main.track.load_types([1, 1, 4, 4, 2, 5, 5, 6, 1])
+	main.rig.position = Vector3(40, 0, 50)
+	await main._on_save_slot(2)
+	main._open_save_menu()
+	await shot("07_save_menu")
+	main.save_menu.close()
+	for i in 3:
+		SaveSlots.erase(i)
+	main.track.build_demo()
+
 	main._start_ride()
 	for i in 560:
 		main._physics_ride(1.0 / 60.0)

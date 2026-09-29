@@ -97,5 +97,21 @@ func _initialize() -> void:
 	check(main._ride_end_timer >= 0.0, "offene Strecke: Ende erkannt")
 	main._stop_ride()
 
+	# Speichern / Laden
+	track.build_demo()
+	var types := track.get_types()
+	main._open_save_menu()
+	check(main.save_menu.visible, "Menü öffnet")
+	await main._on_save_slot(4)
+	var data := SaveSlots.read(4)
+	check(data.get("pieces", []).size() == types.size() and data.has("saved_text"), "Platz 5 gespeichert (%s)" % data.get("saved_text", "?"))
+	track.reset()
+	main._on_load_slot(4)
+	check(track.closed and track.get_types() == types, "Platz 5 geladen, Strecke identisch")
+	check(not main.save_menu.visible, "Menü nach dem Laden zu")
+	check(not track.load_types([99]), "ungültige Daten werden abgelehnt")
+	SaveSlots.erase(4)
+	check(SaveSlots.read(4).is_empty(), "Platz gelöscht")
+
 	print("FAILS: %d" % fails)
 	quit(1 if fails > 0 else 0)
