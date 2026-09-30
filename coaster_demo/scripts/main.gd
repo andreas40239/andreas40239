@@ -3,6 +3,7 @@ extends Node3D
 
 const P := CoasterTrack.Piece
 const G := 9.81
+const ROLL_FRICTION := 0.08     # Rollreibung in m/s²
 const TAP_MAX_MOVE := 24.0
 const TAP_MAX_MS := 450
 const SKY_COLOR := Color(0.62, 0.8, 0.96)
@@ -93,6 +94,9 @@ var _category_rows: Array[HBoxContainer] = []
 var _category_tabs: Array[Button] = []
 var _loop_warned := false
 var _ride_piece := -1
+var _stuck_time := 0.0
+var _best_s := 0.0              # weitester erreichter Punkt (für die Feststeck-Erkennung)
+var _rollback_warned := false
 var loop_entry_v := 0.0         # Tempo bei der letzten Looping-Einfahrt
 
 
@@ -407,6 +411,8 @@ func _setup_ui() -> void:
 	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
 	ride_style.set_corner_radius_all(52)
 	ride_style.set_content_margin_all(18)
+	ride_style.border_color = Color(0, 0, 0)   # hebt sich auch vor grünem Gras ab
+	ride_style.set_border_width_all(4)
 	ride_btn.add_theme_stylebox_override("normal", ride_style)
 	var ride_hover := ride_style.duplicate()
 	ride_hover.bg_color = Color(0.6, 0.97, 0.65, 0.95)
@@ -1007,6 +1013,9 @@ func _start_ride() -> void:
 	_ride_end_timer = -1.0
 	_loop_warned = false
 	_ride_piece = -1
+	_stuck_time = 0.0
+	_best_s = ride_s
+	_rollback_warned = false
 	build_bar.visible = false
 	action_bar.visible = false
 	ride_bar.visible = true
@@ -1084,57 +1093,90 @@ func _update_ride_cam(delta := 0.0) -> void:
 	ride_cam.global_transform = eye
 
 
+## Fahrphysik ohne Tricks: Schwerkraft (über den ganzen Zug gemittelt), Luftwiderstand
+## und Rollreibung gegen die Fahrtrichtung. Ohne Schwung bleibt der Zug stehen oder
+## rollt rückwärts. Nur Station (Antriebsreifen), Kettenlift und Booster treiben an.
 func _physics_ride(dt: float) -> void:
 	var steps := 4
 	var h := dt / steps
 	for _i in steps:
 		var smp := track.sample(ride_s)
-		var tan: Vector3 = smp.tangent
 		var piece: Dictionary = track.pieces[smp.piece]
-		var a := -G * train.mean_slope(track, ride_s)   # Hangabtrieb, gemittelt über den Zug
-		a -= 0.004 * ride_v * ride_v + 0.08         # Luftwiderstand + Rollreibung
-		ride_v += a * h
+		var probe := train.probe(track, ride_s)
+		var a: float = -G * probe.slope                     # Hangabtrieb, gemittelt über den Zug
+		var dir := signf(ride_v)
+		a -= dir * (0.004 * ride_v * ride_v + ROLL_FRICTION)  # Luftwiderstand + Rollreibung
+		var nv := ride_v + a * h
+		if dir != 0.0 and signf(nv) != dir and absf(G * probe.slope) < ROLL_FRICTION:
+			nv = 0.0   # Reibung hält den Zug auf fast ebener Strecke an, statt ihn umzudrehen
+		elif dir == 0.0 and absf(G * probe.slope) < ROLL_FRICTION:
+			nv = 0.0   # steht und bleibt stehen
+		ride_v = nv
+		var entered: bool = smp.piece != _ride_piece and not in_title
 		match piece.type:
 			P.BOOSTER:
-				if smp.piece != _ride_piece and not in_title:
+				if entered and ride_v > -1.0:
 					sfx.play("boost", 0.0, 1.0, 0.03)
 				ride_v = move_toward(ride_v, maxf(ride_v, 22.0), 30.0 * h)  # Abschuss (~3 g) bis 80 km/h
 			P.BRAKE:
-				if smp.piece != _ride_piece and ride_v > 8.0 and not in_title:
+				if entered and absf(ride_v) > 8.0:
 					sfx.play("brake", -2.0)
-				if ride_v > 6.0:
-					ride_v = move_toward(ride_v, 6.0, 14.0 * h)
+				if absf(ride_v) > 6.0:
+					ride_v = move_toward(ride_v, signf(ride_v) * 6.0, 14.0 * h)
 			P.SPLASH:
-				if smp.piece != _ride_piece and not in_title:
+				if entered and absf(ride_v) > 2.0:
 					_splash()
-				ride_v = move_toward(ride_v, minf(ride_v, 5.0), 16.0 * h)
+				if absf(ride_v) > 5.0:
+					ride_v = move_toward(ride_v, signf(ride_v) * 5.0, 16.0 * h)
 			P.STATION:
-				ride_v = move_toward(ride_v, 4.0, 8.0 * h)  # Bremse / Antrieb
+				ride_v = move_toward(ride_v, 4.0, 8.0 * h)  # Antriebsreifen: bremsen bzw. anschieben
 			P.LOOP:
 				# Für den Looping braucht es bei der Einfahrt etwa v² ≥ 5·g·r
-				if smp.piece != _ride_piece:
+				if smp.piece != _ride_piece and ride_v > 0.0:
 					loop_entry_v = ride_v
 					if not _loop_warned and ride_v * ride_v < 5.0 * G * CoasterTrack.LOOP_RADIUS * 0.8:
 						_loop_warned = true
 						_show_toast("Zu langsam für den Looping – mehr Höhe davor bauen!")
-		if train.any_on(track, ride_s, [P.UP, P.STEEP_UP]):
-			ride_v = maxf(ride_v, 3.0)             # Kettenlift zieht den ganzen Zug
-		ride_v = maxf(ride_v, 1.0)                  # Antriebsreifen verhindern Stillstand
+		if probe.on_lift:
+			ride_v = maxf(ride_v, 3.0)             # Kettenlift mit Rücklaufsperre
 		if piece.type == P.STATION and _ride_piece >= 0 and not in_title \
 				and track.pieces[_ride_piece].type != P.STATION and ride_v > 5.0:
 			sfx.play("brake", -2.0)
 		_ride_piece = smp.piece
 		var prev_s := ride_s
 		ride_s += ride_v * h
-		if track.closed and fposmod(prev_s, track.length) > fposmod(ride_s, track.length):
+		if track.closed and ride_v > 0.0 and fposmod(prev_s, track.length) > fposmod(ride_s, track.length):
 			ride_laps += 1
-	ride_max_v = maxf(ride_max_v, ride_v)
-	if not track.closed and ride_s >= track.length - 0.5:
-		ride_s = track.length - 0.5
-		ride_v = 0.0
-		if _ride_end_timer < 0.0:
-			_ride_end_timer = 2.0
-			_show_toast("Ende der Strecke erreicht")
+		if not track.closed:
+			# offene Strecke: Prellbock am Ende, Station am Anfang
+			if ride_s >= track.length - 0.5:
+				ride_s = track.length - 0.5
+				ride_v = 0.0
+				if _ride_end_timer < 0.0:
+					_ride_end_timer = 2.0
+					_show_toast("Ende der Strecke erreicht")
+			elif ride_s < CoasterTrain.CAR_SPACING * (CoasterTrain.CAR_COUNT - 1):
+				ride_s = CoasterTrain.CAR_SPACING * (CoasterTrain.CAR_COUNT - 1)
+				ride_v = maxf(ride_v, 0.0)
+	ride_max_v = maxf(ride_max_v, absf(ride_v))
+	_check_stuck(dt)
+
+
+## Erkennt, wenn der Zug nicht mehr vorwärtskommt (steht oder pendelt in einem Tal).
+func _check_stuck(dt: float) -> void:
+	if in_title or _ride_end_timer >= 0.0:
+		return
+	if ride_s > _best_s + 0.5:
+		_best_s = ride_s
+		_stuck_time = 0.0
+	else:
+		_stuck_time += dt
+	if ride_v < -0.5 and not _rollback_warned:
+		_rollback_warned = true
+		_show_toast("Zu wenig Schwung – der Zug rollt zurück!", 2.5)
+	if _stuck_time > 6.0:
+		_ride_end_timer = 3.0
+		_show_toast("Der Zug steckt fest. Baue mehr Höhe davor oder einen Booster!", 3.0)
 
 
 ## Wasserfontäne + Sound beim Durchfahren des Splash-Teils.
@@ -1219,9 +1261,10 @@ func _process(delta: float) -> void:
 			_look = _look.move_toward(Vector2.ZERO, 60.0 * delta)
 		_animate_riders(delta)
 		_update_ride_cam(delta)
-		var on_chain: bool = ride_v < 3.3 and train.any_on(track, ride_s, [P.UP, P.STEEP_UP])
-		sfx.update_ride(ride_v, on_chain, delta)
-		speed_label.text = "%d km/h\nRunden: %d" % [int(ride_v * 3.6), ride_laps]
+		var on_chain: bool = ride_v < 3.3 and train.probe(track, ride_s).on_lift
+		sfx.update_ride(absf(ride_v), on_chain, delta)
+		speed_label.text = "%d km/h%s\nRunden: %d" % [int(absf(ride_v) * 3.6),
+			"  (rückwärts)" if ride_v < -0.3 else "", ride_laps]
 		if _ride_end_timer >= 0.0:
 			_ride_end_timer -= delta
 			if _ride_end_timer < 0.0:

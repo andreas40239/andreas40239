@@ -94,13 +94,25 @@ das Quadrat beendet die Fahrt.
 Auf dem Desktop: Linksklick = Tippen/Verschieben, Mausrad = Zoom,
 rechte Maustaste ziehen = Drehen.
 
-## Fahrphysik (vereinfacht)
+## Fahrphysik
 
-- Hangabtrieb `a = -g · dy/ds`, gemittelt über alle Wagen des Zugs, dazu
-  Luftwiderstand und Rollreibung
-- „Hoch“-Teile haben einen Kettenlift (min. 3 m/s), der zieht, solange ein Wagen darauf ist
-- Die Station bremst/beschleunigt auf 4 m/s
-- Antriebsreifen verhindern Stillstand (min. 1 m/s)
+Ehrlich – ohne versteckte Hilfen:
+
+- Hangabtrieb `a = -g · dy/ds`, gemittelt über alle Wagen des Zugs (ein Wagen über
+  der Kuppe zieht die anderen mit), dazu Luftwiderstand und Rollreibung **gegen die
+  Fahrtrichtung**
+- **Kein Mindesttempo mehr:** Wer zu wenig Schwung hat, bleibt stehen oder rollt
+  rückwärts – z. B. aus einem Looping oder Korkenzieher heraus. Die Anzeige zeigt
+  dann „(rückwärts)“, und ein Hinweis erscheint.
+- Antrieb gibt es nur durch echte Bauteile:
+  - **Station:** Antriebsreifen bremsen/schieben auf 4 m/s (fangen auch einen
+    zurückrollenden Zug auf)
+  - **Kettenlift** (Hoch, Steil hoch): 3 m/s mit Rücklaufsperre, solange ein Wagen daran hängt
+  - **Booster:** Abschuss mit ca. 3 g bis 80 km/h
+- Bremse und Splash bremsen in beide Fahrtrichtungen
+- Offene Strecken enden an einem Prellbock
+- Kommt der Zug ohne Antrieb 6 Sekunden lang nicht mehr voran (steht oder pendelt
+  in einem Tal), endet die Fahrt mit dem Tipp, mehr Höhe oder einen Booster zu bauen.
 
 ## Projektstruktur
 

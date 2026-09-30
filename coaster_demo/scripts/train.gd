@@ -147,6 +147,18 @@ func mean_slope(track: CoasterTrack, s: float) -> float:
 	return acc / cars.size()
 
 
+## Eine Abfrage pro Wagen für die Physik: mittlere Steigung und ob ein Wagen
+## im Kettenlift hängt.
+func probe(track: CoasterTrack, s: float) -> Dictionary:
+	var slope := 0.0
+	var on_lift := false
+	for i in cars.size():
+		var smp := track.sample(s - i * CAR_SPACING)
+		slope += smp.tangent.y
+		on_lift = on_lift or CoasterTrack.is_lift(track.pieces[smp.piece].type)
+	return {"slope": slope / cars.size(), "on_lift": on_lift}
+
+
 ## Liegt irgendein Wagen auf einem Teil der angegebenen Typen?
 func any_on(track: CoasterTrack, s: float, types: Array) -> bool:
 	for i in cars.size():

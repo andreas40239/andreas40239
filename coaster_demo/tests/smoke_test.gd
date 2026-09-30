@@ -115,6 +115,37 @@ func _initialize() -> void:
 	main._stop_ride()
 	check(not main.riding, "Fahrt gestoppt")
 
+	# Ehrliche Physik: Looping direkt nach der Station → zu langsam, Zug rollt zurück
+	track.reset()
+	track.place(CoasterTrack.Piece.STRAIGHT)
+	track.place(CoasterTrack.Piece.LOOP)
+	track.place(CoasterTrack.Piece.STRAIGHT)
+	main._start_ride()
+	var went_back := false
+	for i in 60 * 40:
+		main._physics_ride(1.0 / 60.0)
+		went_back = went_back or main.ride_v < -0.5
+		if main._ride_end_timer >= 0.0:
+			break
+	check(went_back and main._rollback_warned, "zu langsam für den Looping → Zug rollt zurück")
+	check(main._ride_end_timer >= 0.0, "pendelnder Zug wird als festgesteckt erkannt")
+	main._stop_ride()
+
+	# Booster davor → Looping klappt
+	track.reset()
+	track.place(CoasterTrack.Piece.BOOSTER)
+	track.place(CoasterTrack.Piece.STRAIGHT)
+	track.place(CoasterTrack.Piece.LOOP)
+	for i in 4:
+		track.place(CoasterTrack.Piece.STRAIGHT)
+	main._start_ride()
+	for i in 60 * 15:
+		main._physics_ride(1.0 / 60.0)
+		if main._ride_end_timer >= 0.0:
+			break
+	check(not main._rollback_warned and main.ride_s > track.length - 1.0, "mit Booster durch den Looping bis zum Ende")
+	main._stop_ride()
+
 	# offene Strecke: Fahrt endet
 	track.reset()
 	track.place(CoasterTrack.Piece.STRAIGHT)
