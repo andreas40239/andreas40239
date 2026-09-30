@@ -7,6 +7,18 @@ const TAP_MAX_MOVE := 24.0
 const TAP_MAX_MS := 450
 const SKY_COLOR := Color(0.62, 0.8, 0.96)
 const GRASS_COLOR := Color(0.33, 0.62, 0.24)
+const FORWARD_TYPES := [P.STRAIGHT, P.UP, P.DOWN, P.STEEP_UP, P.STEEP_DOWN, P.LOOP, P.CORKSCREW,
+	P.BOOSTER, P.BRAKE, P.TUNNEL, P.SPLASH]
+const TURN_PAIRS := [[P.LEFT, P.RIGHT], [P.BANK_LEFT, P.BANK_RIGHT], [P.WIDE_LEFT, P.WIDE_RIGHT]]
+# Bauleiste: Kategorie-Reiter mit ihren Teilen (Icon, Teil)
+const CATEGORIES := [
+	["cat_turns", "Kurven", [["left", P.LEFT], ["right", P.RIGHT], ["bank_left", P.BANK_LEFT],
+		["bank_right", P.BANK_RIGHT], ["wide_left", P.WIDE_LEFT], ["wide_right", P.WIDE_RIGHT]]],
+	["cat_height", "Höhe", [["up", P.UP], ["down", P.DOWN], ["steep_up", P.STEEP_UP],
+		["steep_down", P.STEEP_DOWN]]],
+	["cat_special", "Spezial", [["loop", P.LOOP], ["corkscrew", P.CORKSCREW], ["booster", P.BOOSTER],
+		["brake", P.BRAKE], ["tunnel", P.TUNNEL], ["splash", P.SPLASH]]],
+]
 
 var track: CoasterTrack
 var rig: IsoCameraRig
@@ -16,6 +28,15 @@ var env: Environment
 var sfx: Sfx
 var save_menu: SaveMenu
 var title: TitleScreen
+var tutorial: Tutorial
+var ride_btn: Button
+var undo_btn: Button
+var save_btn: Button
+signal category_changed(ci: int)
+signal piece_built(type: int)
+signal ride_started
+signal ride_stopped
+
 var in_title := true   # startet im Startbildschirm (verhindert Autosave der leeren Strecke)
 var _autosave_timer := -1.0
 var sound_btn: Button
@@ -62,7 +83,10 @@ var _look := Vector2.ZERO        # Yaw/Pitch-Versatz des Blicks (Grad)
 var _chase_eye := Vector3.INF    # geglättete Position der Verfolgerkamera
 var _ride_end_timer := -1.0
 var _last_forward := P.STRAIGHT
-var _banked_turns := false       # Tippen aufs Seitenfeld: Schrägkurve statt flacher Kurve
+var _turn_pair := [P.LEFT, P.RIGHT]   # was ein Tippen aufs linke/rechte Seitenfeld setzt
+var _category := 0
+var _category_rows: Array[HBoxContainer] = []
+var _category_tabs: Array[Button] = []
 var _loop_warned := false
 var _ride_piece := -1
 var loop_entry_v := 0.0         # Tempo bei der letzten Looping-Einfahrt
@@ -354,16 +378,29 @@ func _setup_ui() -> void:
 	build_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	build_bar.offset_right = -16
 	build_bar.offset_bottom = -16
-	build_bar.add_child(_piece_button("left", P.LEFT))
+	var tab_style := StyleBoxFlat.new()
+	tab_style.bg_color = Color(0.2, 0.3, 0.42, 0.9)
+	tab_style.set_corner_radius_all(12)
+	tab_style.set_content_margin_all(14)
+	for ci in CATEGORIES.size():
+		var tab := _make_button(CATEGORIES[ci][0], CATEGORIES[ci][1], _select_category.bind(ci), 80.0)
+		tab.custom_minimum_size = Vector2(62, 80)
+		tab.add_theme_stylebox_override("normal", tab_style)
+		_category_tabs.append(tab)
+		build_bar.add_child(tab)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		for entry in CATEGORIES[ci][2]:
+			row.add_child(_piece_button(entry[0], entry[1]))
+		_category_rows.append(row)
+	var sep := VSeparator.new()
+	sep.custom_minimum_size = Vector2(6, 0)
+	build_bar.add_child(sep)
+	for row in _category_rows:
+		build_bar.add_child(row)
 	build_bar.add_child(_piece_button("straight", P.STRAIGHT))
-	build_bar.add_child(_piece_button("right", P.RIGHT))
-	build_bar.add_child(_piece_button("bank_left", P.BANK_LEFT))
-	build_bar.add_child(_piece_button("bank_right", P.BANK_RIGHT))
-	build_bar.add_child(_piece_button("up", P.UP))
-	build_bar.add_child(_piece_button("down", P.DOWN))
-	build_bar.add_child(_piece_button("steep_down", P.STEEP_DOWN))
-	build_bar.add_child(_piece_button("loop", P.LOOP))
-	build_bar.add_child(_make_button("undo", "Zurück", _on_undo))
+	undo_btn = _make_button("undo", "Zurück", _on_undo)
+	build_bar.add_child(undo_btn)
 	ui_root.add_child(build_bar)
 
 	# Aktionen rechts: Fahren, Demo-Strecke, Neu
@@ -375,7 +412,7 @@ func _setup_ui() -> void:
 	action_bar.offset_right = -16
 	action_bar.offset_top = -30
 	action_bar.offset_bottom = -30
-	var ride_btn := _make_button("play", "Fahren", _start_ride, 96)
+	ride_btn = _make_button("play", "Fahren", _start_ride, 96)
 	var ride_style := StyleBoxFlat.new()
 	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
 	ride_style.set_corner_radius_all(52)
@@ -387,9 +424,9 @@ func _setup_ui() -> void:
 	ride_btn.add_theme_stylebox_override("pressed", ride_hover)
 	action_bar.add_child(ride_btn)
 	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound)
+	save_btn = _make_button("save", "Speichern & Laden", _open_save_menu)
 	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new),
-			_make_button("save", "Speichern & Laden", _open_save_menu), sound_btn,
-			_make_button("home", "Startbildschirm", _enter_title)]:
+			save_btn, sound_btn]:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		action_bar.add_child(b)
 	ui_root.add_child(action_bar)
@@ -435,18 +472,39 @@ func _setup_ui() -> void:
 	title.new_pressed.connect(_leave_title.bind("new"))
 	title.load_pressed.connect(_leave_title.bind("load"))
 	title.demo_pressed.connect(_leave_title.bind("demo"))
+	title.tutorial_pressed.connect(_leave_title.bind("tutorial"))
+
+	tutorial = Tutorial.new()
+	ui_root.add_child(tutorial)
+	tutorial.setup()
+	tutorial.steps = _tutorial_steps()
+	tutorial.finished.connect(func(): _show_toast("Tutorial beendet – viel Spaß beim Bauen!", 3.0))
+	piece_built.connect(func(t): tutorial.notify_event("piece_built", t))
+	category_changed.connect(func(ci): tutorial.notify_event("category", ci))
+	ride_started.connect(func(): tutorial.notify_event("ride_started"))
+	ride_stopped.connect(func(): tutorial.notify_event("ride_stopped"))
 	title.sound_pressed.connect(_on_toggle_sound)
 
 	_update_help()
-	_refresh_selection()
+	_select_category(0, false)
 
 
 ## Markiert die Teile, die ein Tippen auf die Felder setzen würde.
+func _select_category(ci: int, with_sound := true) -> void:
+	_category = ci
+	for i in _category_rows.size():
+		_category_rows[i].visible = i == ci
+		_category_tabs[i].modulate = Color(1, 1, 1) if i == ci else Color(1, 1, 1, 0.55)
+	if with_sound:
+		sfx.play("click")
+	_refresh_selection()
+	category_changed.emit(ci)
+
+
 func _refresh_selection() -> void:
-	var sel_turns := [P.BANK_LEFT, P.BANK_RIGHT] if _banked_turns else [P.LEFT, P.RIGHT]
 	for type in piece_buttons:
 		var b: Button = piece_buttons[type]
-		if type == _last_forward or type in sel_turns:
+		if type == _last_forward or type in _turn_pair:
 			b.add_theme_stylebox_override("normal", b.get_theme_stylebox("selected"))
 		else:
 			b.remove_theme_stylebox_override("normal")
@@ -468,7 +526,7 @@ func _show_toast(msg: String, secs := 2.5) -> void:
 
 
 func _is_over_ui(pos: Vector2) -> bool:
-	if save_menu.visible or in_title:
+	if save_menu.visible or in_title or tutorial.is_over_card(pos):
 		return true
 	for c in [build_bar, action_bar, ride_bar, joystick]:
 		if c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
@@ -486,15 +544,16 @@ func _build(type: int) -> void:
 		_show_toast(err)
 		sfx.play("error", -4.0)
 		return
-	var pitch := {P.LOOP: 0.75, P.STEEP_DOWN: 0.85, P.UP: 1.1}.get(type, 1.0) as float
+	var pitch := {P.LOOP: 0.75, P.CORKSCREW: 0.8, P.STEEP_DOWN: 0.85, P.UP: 1.1, P.STEEP_UP: 1.15}.get(type, 1.0) as float
 	sfx.play("place", 0.0, pitch)
-	if type in [P.STRAIGHT, P.UP, P.DOWN, P.STEEP_DOWN, P.LOOP]:
+	if type in FORWARD_TYPES:
 		_last_forward = type
-	elif type in [P.LEFT, P.RIGHT]:
-		_banked_turns = false
-	elif type in [P.BANK_LEFT, P.BANK_RIGHT]:
-		_banked_turns = true
+	else:
+		for pair in TURN_PAIRS:
+			if type in pair:
+				_turn_pair = pair
 	_refresh_selection()
+	piece_built.emit(type)
 	if track.closed:
 		_show_toast("Strecke geschlossen! Jetzt FAHREN drücken", 3.5)
 		sfx.play("closed", -2.0, 1.0, 0.0)
@@ -506,6 +565,7 @@ func _on_undo() -> void:
 		sfx.play("error", -4.0)
 	else:
 		sfx.play("undo")
+		tutorial.notify_event("undo")
 
 
 func _on_demo() -> void:
@@ -538,6 +598,7 @@ func _enter_title() -> void:
 	if save_menu.visible:
 		save_menu.visible = false
 	_write_autosave()
+	tutorial.stop()
 	in_title = true
 	for c in [build_bar, action_bar, ride_bar, joystick, status_label, help_label, speed_label, toast_label]:
 		c.visible = false
@@ -579,12 +640,83 @@ func _leave_title(action: String) -> void:
 			_open_save_menu()
 		"demo":
 			_start_ride()
+		"tutorial":
+			track.reset()
+			_select_category(0, false)
+			_turn_pair = TURN_PAIRS[0]
+			_last_forward = P.STRAIGHT
+			_refresh_selection()
+			tutorial.start()
 	if action != "demo":
 		_place_cart(track.station_s())
 		var aabb := _track_bounds()
 		rig.position = Vector3(aabb.get_center().x, 0, aabb.get_center().z)
 		rig.zoom = clampf(maxf(aabb.size.x, aabb.size.z) * 1.1, 40.0, 70.0)
 		rig.zoom_by(1.0)
+
+
+# ------------------------------------------------------------- Tutorial ---
+
+func _tutorial_steps() -> Array[Dictionary]:
+	return [
+		{"title": "Willkommen!", "text": "Hier baust du deine eigene Achterbahn und fährst sie danach selbst. "
+			+ "Die Strecke beginnt an der Station und wird Teil für Teil verlängert."},
+		{"title": "Strecke verlängern", "text": "Tippe auf das grüne Feld vor der Strecke. "
+			+ "Dort wird das grün umrandete Teil aus der Leiste gesetzt.",
+			"target": _cursor_rect, "wait": "piece_built"},
+		{"title": "Kurven", "text": "Tippe jetzt auf eines der hellen Felder links oder rechts – so entsteht eine Kurve.",
+			"target": _side_rect, "wait": "piece_built", "accept": func(t): return not t in FORWARD_TYPES},
+		{"title": "Bauteile-Leiste", "text": "Unten findest du alle Teile. Ein Tipp auf ein Teil setzt es sofort. "
+			+ "Probier es aus!", "target": func(): return build_bar.get_global_rect(), "wait": "piece_built"},
+		{"title": "Kategorien", "text": "Die drei blauen Reiter wechseln zwischen Kurven, Höhe und Spezialteilen "
+			+ "(Looping, Korkenzieher, Booster, Bremse, Tunnel, Splash). Öffne die Kategorie „Höhe“.",
+			"target": _tabs_rect, "wait": "category", "accept": func(ci): return ci == 1},
+		{"title": "Bergauf", "text": "Setze ein Hoch-Teil. Bergauf zieht ein Kettenlift den Zug nach oben – "
+			+ "Höhe bedeutet später Tempo!", "target": func(): return build_bar.get_global_rect(),
+			"wait": "piece_built", "accept": func(t): return CoasterTrack.is_lift(t)},
+		{"title": "Zurücknehmen", "text": "Der gebogene Pfeil ganz rechts nimmt das letzte Teil zurück. Tippe ihn einmal an.",
+			"target": func(): return undo_btn.get_global_rect(), "wait": "undo"},
+		{"title": "Ansicht", "text": "Ein Finger verschiebt die Ansicht, zwei Finger zoomen. "
+			+ "Mit dem Joystick unten links drehst und kippst du die Kamera.",
+			"target": func(): return joystick.get_global_rect()},
+		{"title": "Strecke schließen", "text": "Führe die Strecke in Fahrtrichtung zurück in die Station – dann fährt "
+			+ "der Zug endlos Runden. Offene Strecken kannst du trotzdem schon testen."},
+		{"title": "Losfahren!", "text": "Tippe auf den grünen Play-Knopf und fahr deine Strecke selbst.",
+			"target": func(): return ride_btn.get_global_rect(), "wait": "ride_started"},
+		{"title": "Während der Fahrt", "text": "Das Auge wechselt die Kamera, mit Joystick oder Wischen schaust du "
+			+ "dich um. Das Quadrat beendet die Fahrt.", "target": func(): return ride_bar.get_global_rect(),
+			"wait": "ride_stopped"},
+		{"title": "Speichern", "text": "Mit der Diskette legst du deine Strecke auf einem von 5 Speicherplätzen ab. "
+			+ "Deine letzte Strecke wird außerdem automatisch gesichert. Viel Spaß!",
+			"target": func(): return save_btn.get_global_rect()},
+	]
+
+
+func _screen_rect_of(world_pos: Vector3, half: float) -> Rect2:
+	if riding or not cursor_root.visible:
+		return Rect2()
+	var p := rig.cam.unproject_position(world_pos)
+	return Rect2(p - Vector2(half, half), Vector2(half, half) * 2.0)
+
+
+func _cursor_rect() -> Rect2:
+	return _screen_rect_of(cursor_main.global_position, 55.0)
+
+
+func _side_rect() -> Rect2:
+	var r := Rect2()
+	for m in [cursor_left, cursor_right]:
+		if m.visible:
+			var mr := _screen_rect_of(m.global_position, 45.0)
+			r = mr if r.size == Vector2.ZERO else r.merge(mr)
+	return r
+
+
+func _tabs_rect() -> Rect2:
+	var r := _category_tabs[0].get_global_rect()
+	for t in _category_tabs:
+		r = r.merge(t.get_global_rect())
+	return r
 
 
 func _write_autosave() -> void:
@@ -714,8 +846,8 @@ func _update_cursor() -> void:
 	cursor_right.position = CoasterTrack.cell_center(rc) + Vector3(0, y, 0)
 	var ok_fwd := track.can_place(_last_forward) == ""
 	cursor_main.material_override = _flat_mat(Color(0.2, 0.85, 0.3, 0.55) if ok_fwd else Color(0.9, 0.2, 0.2, 0.55))
-	var lok := track.can_place(P.LEFT) == ""
-	var rok := track.can_place(P.RIGHT) == ""
+	var lok := track.can_place(_turn_pair[0]) == ""
+	var rok := track.can_place(_turn_pair[1]) == ""
 	cursor_left.visible = lok
 	cursor_right.visible = rok
 	var side_mat := _flat_mat(Color(0.75, 0.95, 0.75, 0.4))
@@ -749,9 +881,9 @@ func _on_tap(pos: Vector2) -> void:
 	elif cell == c or cell == c + CoasterTrack.DIRS[d]:
 		_build(_last_forward)
 	elif cell == c + CoasterTrack.DIRS[(d + 3) % 4]:
-		_build(P.BANK_LEFT if _banked_turns else P.LEFT)
+		_build(_turn_pair[0])
 	elif cell == c + CoasterTrack.DIRS[(d + 1) % 4]:
-		_build(P.BANK_RIGHT if _banked_turns else P.RIGHT)
+		_build(_turn_pair[1])
 
 
 # --------------------------------------------------------------- Eingabe ---
@@ -867,6 +999,7 @@ func _start_ride() -> void:
 	ride_cam.make_current()
 	sfx.play("bell", -3.0, 1.0, 0.0)
 	sfx.start_ride()
+	ride_started.emit()
 	env.fog_enabled = true
 	_update_help()
 	if not track.closed:
@@ -885,6 +1018,7 @@ func _stop_ride() -> void:
 	rig.make_current()
 	sfx.stop_ride()
 	sfx.play("click")
+	ride_stopped.emit()
 	env.fog_enabled = false
 	_place_cart(track.station_s())
 	_update_cursor()
@@ -936,8 +1070,21 @@ func _physics_ride(dt: float) -> void:
 		a -= 0.004 * ride_v * ride_v + 0.08         # Luftwiderstand + Rollreibung
 		ride_v += a * h
 		match piece.type:
-			P.UP:
+			P.UP, P.STEEP_UP:
 				ride_v = maxf(ride_v, 3.0)         # Kettenlift
+			P.BOOSTER:
+				if smp.piece != _ride_piece and not in_title:
+					sfx.play("boost", 0.0, 1.0, 0.03)
+				ride_v = move_toward(ride_v, maxf(ride_v, 22.0), 30.0 * h)  # Abschuss (~3 g) bis 80 km/h
+			P.BRAKE:
+				if smp.piece != _ride_piece and ride_v > 8.0 and not in_title:
+					sfx.play("brake", -2.0)
+				if ride_v > 6.0:
+					ride_v = move_toward(ride_v, 6.0, 14.0 * h)
+			P.SPLASH:
+				if smp.piece != _ride_piece and not in_title:
+					_splash()
+				ride_v = move_toward(ride_v, minf(ride_v, 5.0), 16.0 * h)
 			P.STATION:
 				ride_v = move_toward(ride_v, 4.0, 8.0 * h)  # Bremse / Antrieb
 			P.LOOP:
@@ -963,6 +1110,38 @@ func _physics_ride(dt: float) -> void:
 		if _ride_end_timer < 0.0:
 			_ride_end_timer = 2.0
 			_show_toast("Ende der Strecke erreicht")
+
+
+## Wasserfontäne + Sound beim Durchfahren des Splash-Teils.
+func _splash() -> void:
+	sfx.play("splash", 0.0, 1.0, 0.05)
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.emitting = false
+	p.amount = 90
+	p.lifetime = 1.2
+	p.explosiveness = 0.9
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 60.0
+	p.initial_velocity_min = 4.0
+	p.initial_velocity_max = 9.0
+	p.gravity = Vector3(0, -12, 0)
+	p.scale_amount_min = 0.15
+	p.scale_amount_max = 0.35
+	var drop := SphereMesh.new()
+	drop.radius = 0.5
+	drop.height = 1.0
+	drop.radial_segments = 6
+	drop.rings = 3
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.7, 0.85, 1.0, 0.85)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	drop.material = m
+	p.mesh = drop
+	add_child(p)
+	p.global_position = cart.global_position + Vector3.UP * 0.5
+	p.emitting = true
+	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
 
 
 func _place_cart(s: float) -> void:
@@ -1014,7 +1193,7 @@ func _process(delta: float) -> void:
 		elif _touches.is_empty() and not _mouse_left:
 			_look = _look.move_toward(Vector2.ZERO, 60.0 * delta)
 		_update_ride_cam(delta)
-		var on_chain: bool = _ride_piece >= 0 and track.pieces[_ride_piece].type == P.UP and ride_v < 3.3
+		var on_chain: bool = _ride_piece >= 0 and CoasterTrack.is_lift(track.pieces[_ride_piece].type) and ride_v < 3.3
 		sfx.update_ride(ride_v, on_chain, delta)
 		speed_label.text = "%d km/h\nRunden: %d" % [int(ride_v * 3.6), ride_laps]
 		if _ride_end_timer >= 0.0:

@@ -79,6 +79,26 @@ func _initialize() -> void:
 	check(inverted, "Looping steht kopf")
 	check(min_up < 0.85, "Schrägkurve ist geneigt (up.y=%.2f)" % min_up)
 
+	# Weitere Teile
+	track.reset()
+	check(track.place(CoasterTrack.Piece.STEEP_UP) == "" and track.cursor_h == 2, "Steile Auffahrt: +2 Stufen")
+	check(track.place(CoasterTrack.Piece.TUNNEL) != "", "Tunnel nur am Boden")
+	check(track.place(CoasterTrack.Piece.STEEP_DOWN) == "", "wieder runter")
+	var c0 := track.cursor_cell
+	check(track.place(CoasterTrack.Piece.WIDE_RIGHT) == "" and track.cursor_dir == 1
+		and track.cursor_cell == c0 + Vector2i(1, 2), "Weite Kurve rechts: 3 Zellen, neue Richtung")
+	c0 = track.cursor_cell
+	check(track.place(CoasterTrack.Piece.CORKSCREW) == "" and track.cursor_cell == c0 + Vector2i(0, 2), "Korkenzieher: 2 Zellen")
+	var cork_inv := false
+	for i in track.path_up.size():
+		if track.pieces[track.path_piece[i]].type == CoasterTrack.Piece.CORKSCREW:
+			cork_inv = cork_inv or track.path_up[i].y < -0.9
+	check(cork_inv, "Korkenzieher dreht kopfüber")
+	for t in [CoasterTrack.Piece.BOOSTER, CoasterTrack.Piece.BRAKE, CoasterTrack.Piece.TUNNEL, CoasterTrack.Piece.SPLASH]:
+		check(track.place(t) == "", "%s gesetzt" % CoasterTrack.PIECE_NAMES[t])
+	var tps := track.get_types()
+	check(track.load_types(tps) and track.get_types() == tps, "neue Teile speicher-/ladbar")
+
 	track.build_demo()
 	check(track.closed, "Demo-Strecke geschlossen (%d Teile, %.1f m)" % [track.pieces.size(), track.length])
 
@@ -131,6 +151,30 @@ func _initialize() -> void:
 	check(not main.title.continue_button.disabled, "Weiterbauen möglich")
 	main._leave_title("continue")
 	check(track.get_types() == saved_types, "Weiterbauen stellt die Strecke wieder her")
+
+	# Tutorial einmal komplett durchspielen
+	main._enter_title()
+	main._leave_title("tutorial")
+	var tut: Tutorial = main.tutorial
+	check(tut.active and tut.current_step() == 0, "Tutorial startet")
+	tut.next()                                      # Willkommen
+	main._build(CoasterTrack.Piece.STRAIGHT)        # grünes Feld
+	check(tut.current_step() == 2, "Schritt 'grünes Feld' erkannt")
+	main._build(CoasterTrack.Piece.STRAIGHT)        # keine Kurve → bleibt stehen
+	check(tut.current_step() == 2, "Kurven-Schritt wartet auf eine Kurve")
+	main._build(CoasterTrack.Piece.RIGHT)
+	main._build(CoasterTrack.Piece.STRAIGHT)        # Leiste
+	main._select_category(1)
+	main._build(CoasterTrack.Piece.UP)
+	main._on_undo()
+	check(tut.current_step() == 7, "bis 'Ansicht' durchgelaufen (Schritt %d)" % tut.current_step())
+	tut.next()
+	tut.next()
+	main._start_ride()
+	main._stop_ride()
+	check(tut.current_step() == 11, "Fahrt-Schritte erkannt")
+	tut.next()
+	check(not tut.active, "Tutorial beendet")
 
 	print("FAILS: %d" % fails)
 	quit(1 if fails > 0 else 0)

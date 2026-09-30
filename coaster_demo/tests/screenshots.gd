@@ -23,7 +23,13 @@ func _initialize() -> void:
 	for i in 90:
 		await process_frame   # Attract-Modus laufen lassen
 	await shot("00_title")
-	main._leave_title("new")
+	main._leave_title("tutorial")
+	main.tutorial.next()
+	for i in 30:
+		await process_frame
+	await shot("08_tutorial")
+	main.tutorial.stop()
+	main.track.reset()
 	for i in 30:
 		await process_frame
 	await shot("01_start")

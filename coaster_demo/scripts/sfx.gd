@@ -3,7 +3,8 @@ extends Node
 ## Soundeffekte: kurze Einzel-Sounds (Bauen, UI) und Fahrgeräusche als Schleifen,
 ## deren Lautstärke/Tonhöhe vom Tempo abhängen. Die WAVs liegen in res://sounds/.
 
-const ONESHOTS := ["place", "undo", "error", "click", "closed", "save", "load", "bell", "brake"]
+const ONESHOTS := ["place", "undo", "error", "click", "closed", "save", "load", "bell", "brake",
+	"splash", "boost"]
 const SETTINGS_PATH := "user://settings.cfg"
 
 var muted := false

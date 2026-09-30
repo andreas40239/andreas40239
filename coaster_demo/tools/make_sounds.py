@@ -126,6 +126,17 @@ for k in range(8):
     chain[i:i + len(c)] += c[: SR - i]
 chain += lowpass(noise(1.0), 300) * 0.3
 save("chain_loop", chain, 0.7)
+# Splash: Rauschen mit schnellem Anstieg + tiefes Platschen
+sp = lowpass(noise(1.4), 3000) * env(int(SR * 1.4), 0.01, 0.35)
+sp += tone(90, 1.4, 0.12) * 0.8
+save("splash", sp, 0.8)
+# Booster: ansteigendes Surren
+bt = t(0.9)
+freq = np.linspace(120, 520, len(bt))
+boost = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.6 + np.sin(4 * np.pi * np.cumsum(freq) / SR) * 0.3
+boost = boost * np.minimum(1, bt / 0.1) * np.exp(-np.maximum(0, bt - 0.6) / 0.1)
+boost += highpass(noise(0.9), 1500) * 0.15 * np.minimum(1, bt / 0.5)
+save("boost", boost, 0.6)
 # Bremse: Zischen
 hiss = highpass(noise(0.9), 1800) * env(int(SR * 0.9), 0.04, 0.3)
 save("brake", hiss, 0.6)

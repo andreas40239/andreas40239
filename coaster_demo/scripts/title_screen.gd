@@ -6,6 +6,7 @@ signal continue_pressed
 signal new_pressed
 signal load_pressed
 signal demo_pressed
+signal tutorial_pressed
 signal sound_pressed
 
 var continue_button: Button
@@ -45,7 +46,7 @@ func setup(can_continue: bool, muted: bool) -> void:
 	add_child(_panel)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 12)
+	col.add_theme_constant_override("separation", 10)
 	_panel.add_child(col)
 
 	var head := HBoxContainer.new()
@@ -74,6 +75,7 @@ func setup(can_continue: bool, muted: bool) -> void:
 	col.add_child(_menu_button("plus", "Neue Strecke", new_pressed))
 	col.add_child(_menu_button("load", "Strecke laden", load_pressed))
 	col.add_child(_menu_button("demo", "Demo-Strecke fahren", demo_pressed))
+	col.add_child(_menu_button("help", "Tutorial", tutorial_pressed))
 
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)
@@ -110,7 +112,7 @@ func _menu_button(icon_name: String, text: String, sig: Signal, primary := false
 	b.text = "  " + text
 	b.icon = load("res://icons/%s.svg" % icon_name)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.custom_minimum_size = Vector2(400, 66)
+	b.custom_minimum_size = Vector2(400, 60)
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_size_override("font_size", 26)
 	b.add_theme_constant_override("icon_max_width", 34)

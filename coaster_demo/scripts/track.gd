@@ -8,7 +8,11 @@ extends Node3D
 
 signal changed
 
-enum Piece { STATION, STRAIGHT, LEFT, RIGHT, UP, DOWN, BANK_LEFT, BANK_RIGHT, STEEP_DOWN, LOOP }
+# Neue Teile immer hinten anhängen – die Nummern stehen in den Spielständen.
+enum Piece {
+	STATION, STRAIGHT, LEFT, RIGHT, UP, DOWN, BANK_LEFT, BANK_RIGHT, STEEP_DOWN, LOOP,
+	STEEP_UP, WIDE_LEFT, WIDE_RIGHT, CORKSCREW, BOOSTER, BRAKE, TUNNEL, SPLASH,
+}
 
 const TILE := 4.0          # Kantenlänge einer Rasterzelle in Metern
 const LEVEL := 2.0         # Höhe einer Höhenstufe in Metern
@@ -20,6 +24,10 @@ const BANK_ANGLE := 35.0   # Neigung der Schrägkurven in Grad
 const LOOP_RADIUS := 2.6   # Radius des Loopings in Metern
 const LOOP_LEVELS := 3     # belegte Höhenstufen über dem Looping-Einstieg
 const LOOP_SHIFT := 1.8    # seitlicher Versatz zwischen Ein- und Ausfahrt
+const WIDE_RADIUS := 6.0   # Radius der weiten Kurve (1,5 Zellen)
+const WIDE_BANK := 20.0    # Neigung der weiten Kurve
+const CORK_RADIUS := 1.6   # Radius des Korkenziehers um seine Achse
+const CORK_LEVELS := 2
 # Richtungen: 0 = +X (Ost), 1 = +Z (Süd), 2 = -X (West), 3 = -Z (Nord)
 const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 
@@ -28,6 +36,10 @@ const PIECE_NAMES := {
 	Piece.RIGHT: "Rechts", Piece.UP: "Hoch", Piece.DOWN: "Runter",
 	Piece.BANK_LEFT: "Schrägkurve links", Piece.BANK_RIGHT: "Schrägkurve rechts",
 	Piece.STEEP_DOWN: "Steile Abfahrt", Piece.LOOP: "Looping",
+	Piece.STEEP_UP: "Steile Auffahrt", Piece.WIDE_LEFT: "Weite Kurve links",
+	Piece.WIDE_RIGHT: "Weite Kurve rechts", Piece.CORKSCREW: "Korkenzieher",
+	Piece.BOOSTER: "Booster", Piece.BRAKE: "Bremse", Piece.TUNNEL: "Tunnel",
+	Piece.SPLASH: "Wasser-Splash",
 }
 
 var pieces: Array[Dictionary] = []
@@ -48,6 +60,7 @@ var _mesh_instance: MeshInstance3D
 var _ties: MultiMeshInstance3D
 var _supports: MultiMeshInstance3D
 var _station_deco: Node3D
+var _special_deco: Node3D
 
 
 func _ready() -> void:
@@ -59,6 +72,8 @@ func _ready() -> void:
 	add_child(_supports)
 	_station_deco = Node3D.new()
 	add_child(_station_deco)
+	_special_deco = Node3D.new()
+	add_child(_special_deco)
 	reset()
 
 
@@ -85,9 +100,9 @@ static func cell_center(cell: Vector2i) -> Vector3:
 
 static func out_dir_of(type: int, d: int) -> int:
 	match type:
-		Piece.LEFT, Piece.BANK_LEFT:
+		Piece.LEFT, Piece.BANK_LEFT, Piece.WIDE_LEFT:
 			return (d + 3) % 4
-		Piece.RIGHT, Piece.BANK_RIGHT:
+		Piece.RIGHT, Piece.BANK_RIGHT, Piece.WIDE_RIGHT:
 			return (d + 1) % 4
 	return d
 
@@ -100,6 +115,8 @@ static func out_h_of(type: int, h: int) -> int:
 			return h - 1
 		Piece.STEEP_DOWN:
 			return h - 2
+		Piece.STEEP_UP:
+			return h + 2
 	return h
 
 
@@ -107,16 +124,31 @@ static func is_turn(type: int) -> bool:
 	return type in [Piece.LEFT, Piece.RIGHT, Piece.BANK_LEFT, Piece.BANK_RIGHT]
 
 
-## Zellen, die ein Teil belegt (der Looping ist zwei Zellen lang).
+static func is_wide_turn(type: int) -> bool:
+	return type == Piece.WIDE_LEFT or type == Piece.WIDE_RIGHT
+
+
+## Teile, bei denen der Kettenlift zieht.
+static func is_lift(type: int) -> bool:
+	return type == Piece.UP or type == Piece.STEEP_UP
+
+
+## Zellen, die ein Teil belegt (Looping/Korkenzieher: 2 lang, weite Kurve: 3 Zellen).
+## Die letzte Zelle ist die, aus der das Teil herausführt.
 static func cells_of(type: int, cell: Vector2i, d: int) -> Array[Vector2i]:
-	if type == Piece.LOOP:
+	if type == Piece.LOOP or type == Piece.CORKSCREW:
 		return [cell, cell + DIRS[d]]
+	if is_wide_turn(type):
+		var nd := out_dir_of(type, d)
+		return [cell, cell + DIRS[d], cell + DIRS[d] + DIRS[nd]]
 	return [cell]
 
 
 static func height_range(type: int, h: int) -> Vector2i:
 	if type == Piece.LOOP:
 		return Vector2i(h, h + LOOP_LEVELS)
+	if type == Piece.CORKSCREW:
+		return Vector2i(h, h + CORK_LEVELS)
 	var nh := out_h_of(type, h)
 	return Vector2i(mini(h, nh), maxi(h, nh))
 
@@ -129,6 +161,8 @@ static func in_grid(c: Vector2i) -> bool:
 func can_place(type: int) -> String:
 	if closed:
 		return "Strecke ist geschlossen – Zurück drücken zum Ändern"
+	if (type == Piece.TUNNEL or type == Piece.SPLASH) and cursor_h != 0:
+		return "%s geht nur auf Bodenhöhe" % PIECE_NAMES[type]
 	var nh := out_h_of(type, cursor_h)
 	if nh < 0:
 		return "Tiefer geht es nicht"
@@ -213,7 +247,7 @@ func load_types(types: Array) -> bool:
 	reset()
 	for t in types:
 		var type := int(t)
-		if type <= Piece.STATION or type > Piece.LOOP or can_place(type) != "":
+		if type <= Piece.STATION or type >= Piece.size() or can_place(type) != "":
 			_rebuild()
 			return false
 		_append(type)
@@ -228,12 +262,13 @@ func build_demo() -> void:
 	var S := Piece.STRAIGHT
 	var U := Piece.UP
 	var BR := Piece.BANK_RIGHT
+	var T := Piece.TUNNEL
 	var seq := [
 		U, U, U, U, U, BR,                                  # Lift + Schrägkurve
 		Piece.STEEP_DOWN, Piece.STEEP_DOWN, Piece.DOWN, S,  # First Drop
 		Piece.LOOP, BR,                                     # Looping
-		S, U, U, Piece.STEEP_DOWN, S, S, S, S, BR,          # Camelback
-		S, S, S, S, S, S, BR,                               # zurück zur Station
+		Piece.BOOSTER, Piece.CORKSCREW, S, Piece.SPLASH, S, S, S, BR,  # Booster, Korkenzieher, Splash
+		S, T, T, S, Piece.BRAKE, S, BR,                     # Tunnel, Bremse, Station
 	]
 	for t in seq:
 		var err := place(t)
@@ -269,6 +304,28 @@ func _piece_samples(p: Dictionary) -> Dictionary:
 				var inward := Vector3(pivot.x - pt.x, 0, pivot.z - pt.z).normalized()
 				up += inward * tan(deg_to_rad(BANK_ANGLE))
 			ups.append(up)
+	elif is_wide_turn(p.type):
+		var n := 16
+		var pivot := a + nd * WIDE_RADIUS
+		for i in n:
+			var t := float(i) / n * PI * 0.5
+			var pt := pivot - nd * WIDE_RADIUS * cos(t) + d * WIDE_RADIUS * sin(t)
+			pt.y = y0
+			pts.append(pt)
+			var inward := Vector3(pivot.x - pt.x, 0, pivot.z - pt.z).normalized()
+			ups.append(Vector3.UP + inward * tan(deg_to_rad(WIDE_BANK)))
+	elif p.type == Piece.CORKSCREW:
+		# Schraube um eine Achse in Fahrtrichtung: 360° Drehung über 2 Zellen
+		var side := d.cross(Vector3.UP)
+		var r := CORK_RADIUS
+		var n := 36
+		for i in n:
+			var u := float(i) / n
+			var th := TAU * smoothstep(0.1, 0.9, u)
+			var pt := a + d * (2.0 * TILE * u) + side * (r * sin(th))
+			pt.y = y0 + r * (1.0 - cos(th))
+			pts.append(pt)
+			ups.append(Vector3.UP * cos(th) - side * sin(th))
 	elif p.type == Piece.LOOP:
 		var lat_dir := d.cross(Vector3.UP)
 		var w := LOOP_SHIFT
@@ -299,7 +356,7 @@ func _piece_samples(p: Dictionary) -> Dictionary:
 			pt.y = lerpf(y0, y1, t)
 			pts.append(pt)
 			ups.append(Vector3.UP)
-	var fixed: bool = p.type == Piece.STATION or p.type == Piece.LOOP
+	var fixed: bool = p.type in [Piece.STATION, Piece.LOOP, Piece.CORKSCREW]
 	return {"pts": pts, "ups": ups, "fixed": fixed}
 
 
@@ -444,6 +501,7 @@ func _rebuild() -> void:
 	_build_rails()
 	_build_ties_and_supports()
 	_build_station()
+	_build_special_deco()
 	changed.emit()
 
 
@@ -513,8 +571,8 @@ func _build_ties_and_supports() -> void:
 	var acc := {}
 	for i in path_points.size():
 		var pi := path_piece[i]
-		if pieces[pi].type == Piece.LOOP:
-			continue  # Looping trägt sich selbst (Greybox)
+		if pieces[pi].type == Piece.LOOP or pieces[pi].type == Piece.CORKSCREW:
+			continue  # Inversionen tragen sich selbst (Greybox)
 		if not acc.has(pi):
 			acc[pi] = []
 		acc[pi].append(path_points[i])
@@ -560,3 +618,51 @@ func _build_station() -> void:
 		pole.mesh = pbox
 		pole.position = platform.position + Vector3(x * (TILE * STATION_LEN * 0.5 - 0.3), 1.6, 0)
 		_station_deco.add_child(pole)
+
+
+## Zusätzliche Greybox-Teile für Booster, Bremse, Tunnel und Splash.
+func _build_special_deco() -> void:
+	for c in _special_deco.get_children():
+		c.queue_free()
+	var mid_index := {}
+	for i in path_points.size():
+		mid_index[path_piece[i]] = mid_index.get(path_piece[i], []) + [i]
+	for pi in pieces.size():
+		var p: Dictionary = pieces[pi]
+		if not p.type in [Piece.BOOSTER, Piece.BRAKE, Piece.TUNNEL, Piece.SPLASH]:
+			continue
+		var idx: Array = mid_index.get(pi, [])
+		if idx.is_empty():
+			continue
+		var i: int = idx[idx.size() / 2]
+		var xf := Transform3D(_frame(i), path_points[i])
+		match p.type:
+			Piece.BOOSTER:
+				for k in 5:  # Antriebsräder / Linearmotor-Flossen zwischen den Schienen
+					_deco_box(xf, Vector3(0, 0.08, -1.6 + k * 0.8), Vector3(0.18, 0.25, 0.5), Color(0.95, 0.6, 0.2))
+			Piece.BRAKE:
+				for k in 4:
+					for x in [-0.25, 0.25]:
+						_deco_box(xf, Vector3(x, 0.1, -1.5 + k * 1.0), Vector3(0.06, 0.3, 0.8), Color(0.8, 0.25, 0.2))
+			Piece.TUNNEL:
+				var tun := Color(0.36, 0.37, 0.4)
+				for x in [-1.9, 1.9]:
+					_deco_box(xf, Vector3(x, 1.5, 0), Vector3(0.3, 3.4, TILE), tun)
+				_deco_box(xf, Vector3(0, 3.35, 0), Vector3(4.1, 0.4, TILE), tun)
+				_deco_box(xf, Vector3(0, 4.0, 0), Vector3(5.5, 1.0, TILE), Color(0.35, 0.55, 0.28))
+			Piece.SPLASH:
+				var water := _mat(Color(0.25, 0.55, 0.9, 0.75))
+				water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				_deco_box(xf, Vector3(0, 0.05, 0), Vector3(5.0, 0.35, TILE), Color(), water)
+				for x in [-2.6, 2.6]:
+					_deco_box(xf, Vector3(x, 0.0, 0), Vector3(0.3, 0.6, TILE), Color(0.55, 0.55, 0.58))
+
+
+func _deco_box(xf: Transform3D, local_pos: Vector3, size: Vector3, color: Color, mat: Material = null) -> void:
+	var mi := MeshInstance3D.new()
+	var b := BoxMesh.new()
+	b.size = size
+	b.material = mat if mat != null else _mat(color)
+	mi.mesh = b
+	mi.transform = Transform3D(xf.basis, xf * local_pos)
+	_special_deco.add_child(mi)
