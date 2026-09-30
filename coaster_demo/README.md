@@ -140,6 +140,11 @@ Push das APK und stellt es als Artefakt `coaster_demo_arm64` bereit.
 Installation auf dem Handy: APK herunterladen, „Installation aus unbekannten
 Quellen“ erlauben, öffnen.
 
+## Grafik-Assets
+
+Die Beschreibung aller benötigten Grafiken (Maße, Ausrichtung, Budgets, Prompts
+für Generatoren) steht in [`docs/GRAFIK_ASSETS.md`](docs/GRAFIK_ASSETS.md).
+
 ## Nächste Schritte (Ideen)
 
 - Echte Assets (Schienen, Wagen, Stützen, Umgebung) statt Greybox
