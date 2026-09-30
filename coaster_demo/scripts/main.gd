@@ -7,6 +7,8 @@ const TAP_MAX_MOVE := 24.0
 const TAP_MAX_MS := 450
 const SKY_COLOR := Color(0.62, 0.8, 0.96)
 const GRASS_COLOR := Color(0.33, 0.62, 0.24)
+const TAB_COLOR := Color(0.22, 0.36, 0.52, 0.95)   # aktive Registerkarte + Leiste
+const TAB_OFF_COLOR := Color(0.16, 0.17, 0.2, 0.85)
 const FORWARD_TYPES := [P.STRAIGHT, P.UP, P.DOWN, P.STEEP_UP, P.STEEP_DOWN, P.LOOP, P.CORKSCREW,
 	P.BOOSTER, P.BRAKE, P.TUNNEL, P.SPLASH]
 const TURN_PAIRS := [[P.LEFT, P.RIGHT], [P.BANK_LEFT, P.BANK_RIGHT], [P.WIDE_LEFT, P.WIDE_RIGHT]]
@@ -49,7 +51,7 @@ var cursor_arrow: MeshInstance3D
 
 # UI
 var ui_root: Control
-var build_bar: HBoxContainer
+var build_bar: VBoxContainer
 var action_bar: VBoxContainer
 var ride_bar: HBoxContainer
 var piece_buttons := {}          # Piece -> Button (für die Auswahl-Markierung)
@@ -348,36 +350,47 @@ func _setup_ui() -> void:
 	joystick.offset_top = -joystick.size.y - 16
 	joystick.offset_bottom = -16
 
-	build_bar = HBoxContainer.new()
-	build_bar.add_theme_constant_override("separation", 8)
+	# Bauleiste: Registerkarten (nur Symbole, auch für Kinder, die noch nicht lesen)
+	# hängen oben an einem Panel mit den Teilen der gewählten Kategorie.
+	build_bar = VBoxContainer.new()
+	build_bar.add_theme_constant_override("separation", 0)
 	build_bar.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	build_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	build_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	build_bar.offset_right = -16
-	build_bar.offset_bottom = -16
-	var tab_style := StyleBoxFlat.new()
-	tab_style.bg_color = Color(0.2, 0.3, 0.42, 0.9)
-	tab_style.set_corner_radius_all(12)
-	tab_style.set_content_margin_all(14)
+	build_bar.offset_bottom = -12
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	build_bar.add_child(tabs)
+	var panel := PanelContainer.new()
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = TAB_COLOR
+	panel_style.set_corner_radius_all(16)
+	panel_style.corner_radius_top_left = 0
+	panel_style.set_content_margin_all(10)
+	panel.add_theme_stylebox_override("panel", panel_style)
+	build_bar.add_child(panel)
+	var pieces := HBoxContainer.new()
+	pieces.add_theme_constant_override("separation", 8)
+	panel.add_child(pieces)
 	for ci in CATEGORIES.size():
-		var tab := _make_button(CATEGORIES[ci][0], CATEGORIES[ci][1], _select_category.bind(ci), 80.0)
-		tab.custom_minimum_size = Vector2(62, 80)
-		tab.add_theme_stylebox_override("normal", tab_style)
+		var tab := _make_button(CATEGORIES[ci][0], CATEGORIES[ci][1], _select_category.bind(ci))
+		tab.custom_minimum_size = Vector2(100, 58)
 		_category_tabs.append(tab)
-		build_bar.add_child(tab)
+		tabs.add_child(tab)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		for entry in CATEGORIES[ci][2]:
 			row.add_child(_piece_button(entry[0], entry[1]))
 		_category_rows.append(row)
+		pieces.add_child(row)
 	var sep := VSeparator.new()
-	sep.custom_minimum_size = Vector2(6, 0)
-	build_bar.add_child(sep)
-	for row in _category_rows:
-		build_bar.add_child(row)
-	build_bar.add_child(_piece_button("straight", P.STRAIGHT))
+	sep.custom_minimum_size = Vector2(10, 0)
+	pieces.add_child(sep)
+	pieces.add_child(_piece_button("straight", P.STRAIGHT))
 	undo_btn = _make_button("undo", "Zurück", _on_undo)
-	build_bar.add_child(undo_btn)
+	pieces.add_child(undo_btn)
 	ui_root.add_child(build_bar)
 
 	# Aktionen rechts: Fahren, Demo-Strecke, Neu
@@ -471,11 +484,32 @@ func _select_category(ci: int, with_sound := true) -> void:
 	_category = ci
 	for i in _category_rows.size():
 		_category_rows[i].visible = i == ci
-		_category_tabs[i].modulate = Color(1, 1, 1) if i == ci else Color(1, 1, 1, 0.55)
+		_style_tab(_category_tabs[i], i == ci)
 	if with_sound:
 		sfx.play("click")
 	_refresh_selection()
 	category_changed.emit(ci)
+
+
+## Registerkarte: aktiv = gleiche Farbe wie die Leiste und nahtlos verbunden.
+func _style_tab(tab: Button, active: bool) -> void:
+	var st := StyleBoxFlat.new()
+	st.bg_color = TAB_COLOR if active else TAB_OFF_COLOR
+	st.corner_radius_top_left = 14
+	st.corner_radius_top_right = 14
+	st.content_margin_left = 12
+	st.content_margin_right = 12
+	st.content_margin_top = 8
+	st.content_margin_bottom = 6
+	if active:
+		st.expand_margin_bottom = 2.0   # überlappt die Leiste, keine sichtbare Naht
+	else:
+		st.set_border_width_all(0)
+	for state in ["normal", "hover", "pressed"]:
+		tab.add_theme_stylebox_override(state, st)
+	var icon_col := Color(1, 1, 1) if active else Color(1, 1, 1, 0.45)
+	for c in ["icon_normal_color", "icon_hover_color", "icon_pressed_color"]:
+		tab.add_theme_color_override(c, icon_col)
 
 
 func _refresh_selection() -> void:
@@ -646,8 +680,9 @@ func _tutorial_steps() -> Array[Dictionary]:
 			"target": _side_rect, "wait": "piece_built", "accept": func(t): return not t in FORWARD_TYPES},
 		{"title": "Bauteile-Leiste", "text": "Unten findest du alle Teile. Ein Tipp auf ein Teil setzt es sofort. "
 			+ "Probier es aus!", "target": func(): return build_bar.get_global_rect(), "wait": "piece_built"},
-		{"title": "Kategorien", "text": "Die drei blauen Reiter wechseln zwischen Kurven, Höhe und Spezialteilen "
-			+ "(Looping, Korkenzieher, Booster, Bremse, Tunnel, Splash). Öffne die Kategorie „Höhe“.",
+		{"title": "Registerkarten", "text": "Die Karteikarten oben an der Leiste wechseln zwischen Kurven, "
+			+ "Berg-und-Tal-Teilen und Spezialteilen (Looping, Korkenzieher, Booster, Bremse, Tunnel, Splash). "
+			+ "Tippe auf die Karte mit dem Berg.",
 			"target": _tabs_rect, "wait": "category", "accept": func(ci): return ci == 1},
 		{"title": "Bergauf", "text": "Setze ein Hoch-Teil. Bergauf zieht ein Kettenlift den Zug nach oben – "
 			+ "Höhe bedeutet später Tempo!", "target": func(): return build_bar.get_global_rect(),

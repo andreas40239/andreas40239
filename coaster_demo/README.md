@@ -16,7 +16,7 @@ Beim Start fährt im Hintergrund die Demo-Strecke, während die Kamera langsam
 kreist. Menü: **Weiterbauen** (zuletzt bearbeitete Strecke, wird automatisch
 gesichert), **Neue Strecke**, **Strecke laden** (öffnet die Speicherplätze),
 **Demo-Strecke fahren**, **Tutorial**, dazu Ton an/aus. Im Spiel führt die
-Android-Zurück-Taste zurück zum Startbildschirm. Die Zurück-Taste schließt
+Haus-Symbol oder die Android-Zurück-Taste zurück zum Startbildschirm. Die Zurück-Taste schließt
 vorher offene Menüs bzw. beendet eine laufende Fahrt; auf dem Startbildschirm
 beendet sie die App.
 
@@ -41,8 +41,8 @@ Aufgabe gehen automatisch weiter, sobald sie erledigt ist.
 | 1 Finger ziehen | Ansicht verschieben |
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
-| Leiste unten | 3 blaue Kategorie-Reiter (Kurven · Höhe · Spezial), die Teile der Kategorie, Gerade, Zurück |
-| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus |
+| Leiste unten | Registerkarten mit Symbolen oben an der Leiste (Kurven · Berg und Tal · Spezial), darunter die Teile der Karte, dazu immer Gerade und Zurück |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus, 🏠 Startmenü |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
