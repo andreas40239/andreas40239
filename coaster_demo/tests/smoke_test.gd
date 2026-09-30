@@ -152,6 +152,11 @@ func _initialize() -> void:
 	main._leave_title("continue")
 	check(track.get_types() == saved_types, "Weiterbauen stellt die Strecke wieder her")
 
+	# Home-Button → Startmenü
+	main._on_home()
+	check(main.in_title, "Home-Button öffnet das Startmenü")
+	main._leave_title("new")
+
 	# Tutorial einmal komplett durchspielen
 	main._enter_title()
 	main._leave_title("tutorial")

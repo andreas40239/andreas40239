@@ -403,7 +403,7 @@ func _setup_ui() -> void:
 	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound)
 	save_btn = _make_button("save", "Speichern & Laden", _open_save_menu)
 	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new),
-			save_btn, sound_btn]:
+			save_btn, sound_btn, _make_button("home", "Startmenü", _on_home)]:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		action_bar.add_child(b)
 	ui_root.add_child(action_bar)
@@ -695,6 +695,11 @@ func _tabs_rect() -> Rect2:
 	for t in _category_tabs:
 		r = r.merge(t.get_global_rect())
 	return r
+
+
+func _on_home() -> void:
+	sfx.play("click")
+	_enter_title()
 
 
 func _write_autosave() -> void:
