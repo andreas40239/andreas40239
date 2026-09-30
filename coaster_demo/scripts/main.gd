@@ -22,7 +22,8 @@ const CATEGORIES := [
 
 var track: CoasterTrack
 var rig: IsoCameraRig
-var cart: Node3D
+var cart: Node3D                 # erster Wagen des Zugs
+var train: CoasterTrain
 var ride_cam: Camera3D
 var env: Environment
 var sfx: Sfx
@@ -78,7 +79,8 @@ var ride_s := 0.0
 var ride_v := 0.0
 var ride_max_v := 0.0
 var ride_laps := 0
-var third_person := false
+var view_mode := 0               # 0 = vorne, 1 = Mitte (mit Fahrgästen), 2 = Verfolger
+const VIEW_NAMES := ["Vorne im Zug", "Mitte – mit Fahrgästen", "Verfolgerkamera"]
 var _look := Vector2.ZERO        # Yaw/Pitch-Versatz des Blicks (Grad)
 var _chase_eye := Vector3.INF    # geglättete Position der Verfolgerkamera
 var _ride_end_timer := -1.0
@@ -236,41 +238,16 @@ func _setup_cursor() -> void:
 
 
 func _setup_cart() -> void:
-	cart = Node3D.new()
-	add_child(cart)
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = Color(0.85, 0.85, 0.87)
-	var dark_mat := StandardMaterial3D.new()
-	dark_mat.albedo_color = Color(0.3, 0.3, 0.32)
-	var body := MeshInstance3D.new()
-	var bb := BoxMesh.new()
-	bb.size = Vector3(1.5, 0.5, 2.6)
-	bb.material = body_mat
-	body.mesh = bb
-	body.position = Vector3(0, 0.55, 0)
-	cart.add_child(body)
-	var nose := MeshInstance3D.new()
-	var nb := BoxMesh.new()
-	nb.size = Vector3(1.5, 0.7, 0.4)
-	nb.material = dark_mat
-	nose.mesh = nb
-	nose.position = Vector3(0, 0.75, -1.35)
-	cart.add_child(nose)
-	for z in [0.9, -0.4]:
-		var seat := MeshInstance3D.new()
-		var sb := BoxMesh.new()
-		sb.size = Vector3(1.3, 0.6, 0.15)
-		sb.material = dark_mat
-		seat.mesh = sb
-		seat.position = Vector3(0, 1.1, z)
-		cart.add_child(seat)
+	train = CoasterTrain.new()
+	add_child(train)
+	cart = train.cars[0]
 	ride_cam = Camera3D.new()
 	ride_cam.fov = 80
 	ride_cam.near = 0.05
 	ride_cam.far = 600
-	cart.add_child(ride_cam)
-	_update_ride_cam()
+	add_child(ride_cam)
 	_place_cart(track.station_s())
+	_update_ride_cam()
 
 
 # -------------------------------------------------------------------- UI ---
@@ -511,8 +488,9 @@ func _refresh_selection() -> void:
 
 
 func _update_help() -> void:
+	help_label.position.y = 110.0 if riding else 52.0   # im Fahrmodus unter der Tempoanzeige
 	if riding:
-		help_label.text = "Joystick / Wischen: umschauen\nAnsicht: 1./3. Person"
+		help_label.text = "Joystick / Wischen: umschauen\nAuge: vorne / Mitte / Verfolger"
 	else:
 		help_label.text = "Tippen: grünes Feld = markiertes Teil, helle Felder = Kurve\n1 Finger: verschieben · 2 Finger: zoomen\nJoystick: Ansicht drehen / kippen"
 
@@ -1028,13 +1006,14 @@ func _stop_ride() -> void:
 
 func _toggle_view() -> void:
 	sfx.play("click")
-	third_person = not third_person
+	view_mode = (view_mode + 1) % VIEW_NAMES.size()
+	_show_toast(VIEW_NAMES[view_mode], 1.5)
 	_chase_eye = Vector3.INF
 	_update_ride_cam()
 
 
 func _update_ride_cam(delta := 0.0) -> void:
-	if third_person and riding:
+	if view_mode == 2 and riding:
 		# Verfolgerkamera mit Welt-Oben, weich nachgeführt – bleibt auch im Looping außerhalb
 		var smp := track.sample(ride_s)
 		var piece: Dictionary = track.pieces[smp.piece]
@@ -1043,8 +1022,9 @@ func _update_ride_cam(delta := 0.0) -> void:
 		if piece.type == P.LOOP or fwd.length() < 0.3:
 			fwd = CoasterTrack.dir_vec3(piece.dir)
 		fwd = fwd.normalized()
-		var target: Vector3 = smp.pos + Vector3.UP * 1.0
-		var eye: Vector3 = smp.pos - fwd * 8.0 + Vector3.UP * 4.0
+		var mid := track.sample(ride_s - CoasterTrain.CAR_SPACING)
+		var target: Vector3 = mid.pos + Vector3.UP * 1.0
+		var eye: Vector3 = smp.pos - fwd * 13.0 + Vector3.UP * 5.0
 		if piece.type == P.LOOP:
 			eye.y = maxf(eye.y, piece.h * CoasterTrack.LEVEL + CoasterTrack.LOOP_RADIUS + 2.0)
 		if delta <= 0.0 or _chase_eye == Vector3.INF:
@@ -1054,9 +1034,14 @@ func _update_ride_cam(delta := 0.0) -> void:
 		var xf := Transform3D(Basis.IDENTITY, _chase_eye).looking_at(target, Vector3.UP)
 		xf.basis = xf.basis * Basis.from_euler(Vector3(deg_to_rad(_look.y), deg_to_rad(_look.x), 0))
 		ride_cam.global_transform = xf
+		train.hide_rider_at(-1, 0, 0)
 		return
-	ride_cam.position = Vector3(0, 1.75, -0.75)
-	ride_cam.rotation_degrees = Vector3(-6.0 + _look.y, _look.x, 0)
+	# Ego-Sicht: Kamera sitzt auf dem linken Platz der ersten Reihe (Wagen 1 oder 2)
+	var car := 0 if view_mode == 0 else 1
+	train.hide_rider_at(car, 0, 0)
+	var eye := train.eye_transform(car, 0, 0)
+	eye.basis = eye.basis * Basis.from_euler(Vector3(deg_to_rad(-6.0 + _look.y), deg_to_rad(_look.x), 0))
+	ride_cam.global_transform = eye
 
 
 func _physics_ride(dt: float) -> void:
@@ -1066,12 +1051,10 @@ func _physics_ride(dt: float) -> void:
 		var smp := track.sample(ride_s)
 		var tan: Vector3 = smp.tangent
 		var piece: Dictionary = track.pieces[smp.piece]
-		var a := -G * tan.y                         # Hangabtrieb
+		var a := -G * train.mean_slope(track, ride_s)   # Hangabtrieb, gemittelt über den Zug
 		a -= 0.004 * ride_v * ride_v + 0.08         # Luftwiderstand + Rollreibung
 		ride_v += a * h
 		match piece.type:
-			P.UP, P.STEEP_UP:
-				ride_v = maxf(ride_v, 3.0)         # Kettenlift
 			P.BOOSTER:
 				if smp.piece != _ride_piece and not in_title:
 					sfx.play("boost", 0.0, 1.0, 0.03)
@@ -1094,6 +1077,8 @@ func _physics_ride(dt: float) -> void:
 					if not _loop_warned and ride_v * ride_v < 5.0 * G * CoasterTrack.LOOP_RADIUS * 0.8:
 						_loop_warned = true
 						_show_toast("Zu langsam für den Looping – mehr Höhe davor bauen!")
+		if train.any_on(track, ride_s, [P.UP, P.STEEP_UP]):
+			ride_v = maxf(ride_v, 3.0)             # Kettenlift zieht den ganzen Zug
 		ride_v = maxf(ride_v, 1.0)                  # Antriebsreifen verhindern Stillstand
 		if piece.type == P.STATION and _ride_piece >= 0 and not in_title \
 				and track.pieces[_ride_piece].type != P.STATION and ride_v > 5.0:
@@ -1145,10 +1130,9 @@ func _splash() -> void:
 
 
 func _place_cart(s: float) -> void:
-	if cart == null or track == null:
+	if train == null or track == null:
 		return
-	var smp := track.sample(s)
-	cart.global_transform = Transform3D(CoasterTrack.frame_basis(smp.tangent, smp.up), smp.pos)
+	train.place(track, s)
 
 
 func _update_fps(delta: float) -> void:
@@ -1180,6 +1164,7 @@ func _process(delta: float) -> void:
 		# Attract-Modus: Wagen fährt, Kamera kreist langsam
 		_physics_ride(delta)
 		_place_cart(ride_s)
+		_animate_riders(delta)
 		rig.rotate_view(6.0 * delta, 0.0)
 		return
 
@@ -1192,13 +1177,21 @@ func _process(delta: float) -> void:
 			_look.y = clampf(_look.y - j.y * 80.0 * delta, -70, 60)
 		elif _touches.is_empty() and not _mouse_left:
 			_look = _look.move_toward(Vector2.ZERO, 60.0 * delta)
+		_animate_riders(delta)
 		_update_ride_cam(delta)
-		var on_chain: bool = _ride_piece >= 0 and CoasterTrack.is_lift(track.pieces[_ride_piece].type) and ride_v < 3.3
+		var on_chain: bool = ride_v < 3.3 and train.any_on(track, ride_s, [P.UP, P.STEEP_UP])
 		sfx.update_ride(ride_v, on_chain, delta)
 		speed_label.text = "%d km/h\nRunden: %d" % [int(ride_v * 3.6), ride_laps]
 		if _ride_end_timer >= 0.0:
 			_ride_end_timer -= delta
 			if _ride_end_timer < 0.0:
 				_stop_ride()
-	elif j != Vector2.ZERO:
-		rig.rotate_view(-j.x * 90.0 * delta, -j.y * 45.0 * delta)
+	else:
+		train.animate(delta, 0.0, false)
+		if j != Vector2.ZERO:
+			rig.rotate_view(-j.x * 90.0 * delta, -j.y * 45.0 * delta)
+
+
+func _animate_riders(delta: float) -> void:
+	var front := track.sample(ride_s)
+	train.animate(delta, ride_v, front.tangent.y < -0.35)

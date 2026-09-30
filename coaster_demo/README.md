@@ -15,10 +15,20 @@ Grafik-Assets kommen später.
 Beim Start fährt im Hintergrund die Demo-Strecke, während die Kamera langsam
 kreist. Menü: **Weiterbauen** (zuletzt bearbeitete Strecke, wird automatisch
 gesichert), **Neue Strecke**, **Strecke laden** (öffnet die Speicherplätze),
-**Demo-Strecke fahren**, dazu Ton an/aus. Im Spiel führt das Haus-Symbol – oder
-die Android-Zurück-Taste – zurück zum Startbildschirm. Die Zurück-Taste schließt
+**Demo-Strecke fahren**, **Tutorial**, dazu Ton an/aus. Im Spiel führt die
+Android-Zurück-Taste zurück zum Startbildschirm. Die Zurück-Taste schließt
 vorher offene Menüs bzw. beendet eine laufende Fahrt; auf dem Startbildschirm
 beendet sie die App.
+
+## Tutorial
+
+Ein interaktiver Rundgang in 12 Schritten (erreichbar über den Startbildschirm):
+Strecke verlängern, Kurven, Bauteile-Leiste, Kategorien, Kettenlift, Zurücknehmen,
+Kamera, Strecke schließen, Fahren, Kameras während der Fahrt, Speichern. Das
+jeweils gemeinte Bedienelement wird grün pulsierend umrahmt; Schritte mit einer
+Aufgabe gehen automatisch weiter, sobald sie erledigt ist.
+
+![Tutorial](docs/tutorial.png)
 
 ## Steuerung
 
@@ -31,8 +41,8 @@ beendet sie die App.
 | 1 Finger ziehen | Ansicht verschieben |
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
-| Icon-Leiste unten | Kurve links, Gerade, Kurve rechts, Schrägkurve links/rechts, Hoch, Runter, Steile Abfahrt, Looping, Zurück |
-| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus, 🏠 Startbildschirm |
+| Leiste unten | 3 blaue Kategorie-Reiter (Kurven · Höhe · Spezial), die Teile der Kategorie, Gerade, Zurück |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
@@ -44,6 +54,13 @@ Kreuzungen sind erlaubt, wenn mindestens eine Höhenstufe Abstand dazwischen ist
 | Schrägkurve | 90°-Kurve, 35° zur Innenseite geneigt (Neigung wird weich ein-/ausgeblendet) |
 | Steile Abfahrt | 2 Höhenstufen (4 m) auf einer Zelle, ca. 45° |
 | Looping | 2 Zellen lang, Radius 2,6 m, Ein- und Ausfahrt seitlich versetzt; braucht ca. 41 km/h bei der Einfahrt (sonst Hinweis „zu langsam“) |
+| Steile Auffahrt | 2 Höhenstufen auf einer Zelle, mit Kettenlift |
+| Weite Kurve | 90°-Kurve mit 6 m Radius über 3 Zellen, 20° geneigt |
+| Korkenzieher | 2 Zellen lang, der Zug dreht sich einmal komplett um die Fahrtachse |
+| Booster | Abschuss mit ca. 3 g bis 80 km/h |
+| Bremse | bremst auf ca. 22 km/h herunter |
+| Tunnel | nur auf Bodenhöhe, mehrere hintereinander ergeben einen langen Tunnel |
+| Wasser-Splash | nur auf Bodenhöhe, bremst kräftig, Wasserfontäne + Platschen |
 
 ## Speichern & Laden
 
@@ -68,16 +85,20 @@ durch echte Aufnahmen gleichen Namens in `sounds/` ersetzt werden.
 Oben rechts steht die **Performance-Anzeige**: FPS (grün ≥ 55, gelb ≥ 30, rot darunter),
 längster Frame der letzten halben Sekunde und Draw Calls.
 
-**Fahrmodus**: Joystick oder Wischen zum Umschauen, *Ansicht* wechselt
-zwischen 1. Person und Verfolgerkamera, *Stopp* zurück zum Bauen.
+**Fahrmodus**: Ein Zug aus 3 Wagen mit 11 Fahrgästen (du sitzt auf dem zwölften
+Platz). Die Fahrgäste reißen bei Tempo, in steilen Abfahrten und kopfüber die
+Arme hoch. Joystick oder Wischen zum Umschauen; das Auge wechselt zwischen
+*vorne im Zug*, *Mitte* (mit Fahrgästen vor dir) und *Verfolgerkamera*;
+das Quadrat beendet die Fahrt.
 
 Auf dem Desktop: Linksklick = Tippen/Verschieben, Mausrad = Zoom,
 rechte Maustaste ziehen = Drehen.
 
 ## Fahrphysik (vereinfacht)
 
-- Hangabtrieb `a = -g · dy/ds`, dazu Luftwiderstand und Rollreibung
-- „Hoch“-Teile haben einen Kettenlift (min. 3 m/s)
+- Hangabtrieb `a = -g · dy/ds`, gemittelt über alle Wagen des Zugs, dazu
+  Luftwiderstand und Rollreibung
+- „Hoch“-Teile haben einen Kettenlift (min. 3 m/s), der zieht, solange ein Wagen darauf ist
 - Die Station bremst/beschleunigt auf 4 m/s
 - Antriebsreifen verhindern Stillstand (min. 1 m/s)
 
@@ -98,6 +119,8 @@ scripts/sfx.gd         Sound-Wiedergabe (Einzel-Sounds + tempoabhängige Fahrger
 scripts/save_slots.gd  Speicherplätze (JSON + Vorschaubild)
 scripts/save_menu.gd   Speichern/Laden-Menü
 scripts/title_screen.gd Startbildschirm
+scripts/tutorial.gd    Interaktives Tutorial
+scripts/train.gd       Zug mit Wagen und Fahrgästen
 tools/make_sounds.py   Erzeugt die Platzhalter-Sounds
 export_presets.cfg     Android-Export (nur arm64-v8a)
 ```
@@ -120,5 +143,5 @@ Quellen“ erlauben, öffnen.
 ## Nächste Schritte (Ideen)
 
 - Echte Assets (Schienen, Wagen, Stützen, Umgebung) statt Greybox
-- Mehr Teile: Booster, Korkenzieher, steile Auffahrten, größere Kurvenradien
-- Mehrere Wagen, G-Kräfte-Anzeige, Strecken benennen/teilen
+- Mehr Teile: Helix, Heartline-Roll, Zero-G-Stall, Tunnel durch Gelände
+- G-Kräfte-Anzeige und Bewertung, Strecken benennen/teilen

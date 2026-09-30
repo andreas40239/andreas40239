@@ -478,9 +478,9 @@ static func frame_basis(tangent: Vector3, up: Vector3) -> Basis:
 	return Basis(tangent.cross(up).normalized(), up, -tangent)
 
 
-## Startposition des Wagens: Mitte der Station.
+## Startposition des ersten Wagens: vorne in der Station, der Zug steht dahinter.
 func station_s() -> float:
-	return TILE * (STATION_LEN * 0.5)
+	return TILE * STATION_LEN - 1.5
 
 
 # ----------------------------------------------------------- Darstellung ---

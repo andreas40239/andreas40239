@@ -57,7 +57,20 @@ func _initialize() -> void:
 		main._physics_ride(1.0 / 60.0)
 	main._place_cart(main.ride_s)
 	main._update_ride_cam()
+	main._animate_riders(0.5)
 	await shot("04_ride_first")
+	# Mittlerer Wagen: Fahrgäste vorne sichtbar – Moment in der ersten Abfahrt
+	main.view_mode = 1
+	for i in 200:
+		main._physics_ride(1.0 / 60.0)
+		if main.track.sample(main.ride_s).tangent.y < -0.4:
+			break
+	main._place_cart(main.ride_s)
+	for i in 20:
+		main._animate_riders(0.05)
+	main._update_ride_cam()
+	await shot("04b_ride_middle")
+	main.view_mode = 0
 
 	# Scheitelpunkt des Loopings
 	var t: CoasterTrack = main.track
@@ -69,7 +82,7 @@ func _initialize() -> void:
 	main._place_cart(main.ride_s)
 	main._update_ride_cam()
 	await shot("05_loop_first")
-	main._toggle_view()
+	main.view_mode = 2
 	main.ride_s = t.path_dist[top] - 3.0
 	main._place_cart(main.ride_s)
 	main._update_ride_cam()
