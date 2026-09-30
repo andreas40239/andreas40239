@@ -4,9 +4,21 @@ Greybox-Prototyp: Achterbahn in isometrischer Ansicht bauen und anschließend
 selbst mitfahren. Alles besteht aus grauen Platzhalter-Formen – die richtigen
 Grafik-Assets kommen später.
 
+![Startbildschirm](docs/titel.png)
+
 | Bauen | Fahren | Looping |
 |---|---|---|
 | ![Bauen](docs/bauen.png) | ![Fahren](docs/fahren.png) | ![Looping](docs/looping.png) |
+
+## Startbildschirm
+
+Beim Start fährt im Hintergrund die Demo-Strecke, während die Kamera langsam
+kreist. Menü: **Weiterbauen** (zuletzt bearbeitete Strecke, wird automatisch
+gesichert), **Neue Strecke**, **Strecke laden** (öffnet die Speicherplätze),
+**Demo-Strecke fahren**, dazu Ton an/aus. Im Spiel führt das Haus-Symbol – oder
+die Android-Zurück-Taste – zurück zum Startbildschirm. Die Zurück-Taste schließt
+vorher offene Menüs bzw. beendet eine laufende Fahrt; auf dem Startbildschirm
+beendet sie die App.
 
 ## Steuerung
 
@@ -20,7 +32,7 @@ Grafik-Assets kommen später.
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
 | Icon-Leiste unten | Kurve links, Gerade, Kurve rechts, Schrägkurve links/rechts, Hoch, Runter, Steile Abfahrt, Looping, Zurück |
-| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus, 🏠 Startbildschirm |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
@@ -85,6 +97,7 @@ sounds/*.wav           Soundeffekte (Platzhalter, *_loop.wav laufen als Schleife
 scripts/sfx.gd         Sound-Wiedergabe (Einzel-Sounds + tempoabhängige Fahrgeräusche)
 scripts/save_slots.gd  Speicherplätze (JSON + Vorschaubild)
 scripts/save_menu.gd   Speichern/Laden-Menü
+scripts/title_screen.gd Startbildschirm
 tools/make_sounds.py   Erzeugt die Platzhalter-Sounds
 export_presets.cfg     Android-Export (nur arm64-v8a)
 ```

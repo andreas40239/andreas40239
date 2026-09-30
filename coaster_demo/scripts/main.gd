@@ -15,6 +15,9 @@ var ride_cam: Camera3D
 var env: Environment
 var sfx: Sfx
 var save_menu: SaveMenu
+var title: TitleScreen
+var in_title := true   # startet im Startbildschirm (verhindert Autosave der leeren Strecke)
+var _autosave_timer := -1.0
 var sound_btn: Button
 var cursor_root: Node3D
 var cursor_main: MeshInstance3D
@@ -82,7 +85,7 @@ func _ready() -> void:
 	rig.make_current()
 	_setup_ui()
 	_on_track_changed()
-	_show_toast("Tippe auf das grüne Feld, um die Strecke zu verlängern")
+	_enter_title()
 
 
 # ------------------------------------------------------------------ Welt ---
@@ -365,14 +368,14 @@ func _setup_ui() -> void:
 
 	# Aktionen rechts: Fahren, Demo-Strecke, Neu
 	action_bar = VBoxContainer.new()
-	action_bar.add_theme_constant_override("separation", 10)
+	action_bar.add_theme_constant_override("separation", 8)
 	action_bar.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 	action_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	action_bar.grow_vertical = Control.GROW_DIRECTION_BOTH
 	action_bar.offset_right = -16
-	action_bar.offset_top = -50
-	action_bar.offset_bottom = -50
-	var ride_btn := _make_button("play", "Fahren", _start_ride, 104)
+	action_bar.offset_top = -30
+	action_bar.offset_bottom = -30
+	var ride_btn := _make_button("play", "Fahren", _start_ride, 96)
 	var ride_style := StyleBoxFlat.new()
 	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
 	ride_style.set_corner_radius_all(52)
@@ -385,7 +388,8 @@ func _setup_ui() -> void:
 	action_bar.add_child(ride_btn)
 	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound)
 	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new),
-			_make_button("save", "Speichern & Laden", _open_save_menu), sound_btn]:
+			_make_button("save", "Speichern & Laden", _open_save_menu), sound_btn,
+			_make_button("home", "Startbildschirm", _enter_title)]:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		action_bar.add_child(b)
 	ui_root.add_child(action_bar)
@@ -423,6 +427,16 @@ func _setup_ui() -> void:
 	save_menu.closed.connect(_on_save_menu_closed)
 	save_menu.clicked.connect(sfx.play.bind("click"))
 
+	title = TitleScreen.new()
+	ui_root.add_child(title)
+	title.setup(false, sfx.muted)
+	title.visible = false
+	title.continue_pressed.connect(_leave_title.bind("continue"))
+	title.new_pressed.connect(_leave_title.bind("new"))
+	title.load_pressed.connect(_leave_title.bind("load"))
+	title.demo_pressed.connect(_leave_title.bind("demo"))
+	title.sound_pressed.connect(_on_toggle_sound)
+
 	_update_help()
 	_refresh_selection()
 
@@ -446,13 +460,15 @@ func _update_help() -> void:
 
 
 func _show_toast(msg: String, secs := 2.5) -> void:
+	if in_title:
+		return
 	toast_label.text = msg
 	toast_label.visible = true
 	_toast_time = secs
 
 
 func _is_over_ui(pos: Vector2) -> bool:
-	if save_menu.visible:
+	if save_menu.visible or in_title:
 		return true
 	for c in [build_bar, action_bar, ride_bar, joystick]:
 		if c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
@@ -507,8 +523,90 @@ func _on_new() -> void:
 func _on_toggle_sound() -> void:
 	sfx.set_muted(not sfx.muted)
 	sound_btn.icon = load("res://icons/%s.svg" % ("sound_off" if sfx.muted else "sound_on"))
+	title.set_muted(sfx.muted)
 	sfx.play("click")
-	_show_toast("Ton aus" if sfx.muted else "Ton an", 1.2)
+	if not in_title:
+		_show_toast("Ton aus" if sfx.muted else "Ton an", 1.2)
+
+
+# ------------------------------------------------------- Startbildschirm ---
+
+## Zeigt den Startbildschirm; im Hintergrund fährt die Demo-Strecke.
+func _enter_title() -> void:
+	if riding:
+		_stop_ride()
+	if save_menu.visible:
+		save_menu.visible = false
+	_write_autosave()
+	in_title = true
+	for c in [build_bar, action_bar, ride_bar, joystick, status_label, help_label, speed_label, toast_label]:
+		c.visible = false
+	_touches.clear()
+	_tap_valid = false
+	track.build_demo()
+	ride_s = track.station_s()
+	ride_v = 2.0
+	_ride_piece = -1
+	var aabb := _track_bounds()
+	rig.position = Vector3(aabb.get_center().x, 0, aabb.get_center().z)
+	rig.zoom = maxf(aabb.size.x, aabb.size.z) * 1.3
+	rig.zoom_by(1.0)
+	rig.cam.h_offset = -rig.zoom * 0.3   # Strecke rechts neben dem Menü zeigen
+	rig.make_current()
+	title.continue_button.disabled = SaveSlots.read_autosave().is_empty()
+	title.show_animated()
+
+
+func _leave_title(action: String) -> void:
+	if not in_title:
+		return
+	sfx.play("click")
+	in_title = false
+	title.hide_animated()
+	rig.cam.h_offset = 0.0
+	for c in [build_bar, action_bar, joystick, status_label, help_label]:
+		c.visible = true
+	ride_v = 0.0
+	match action:
+		"continue":
+			track.load_types(SaveSlots.read_autosave())
+			_show_toast("Weiter geht's!")
+		"new":
+			track.reset()
+			_show_toast("Tippe auf das grüne Feld, um die Strecke zu verlängern")
+		"load":
+			track.reset()
+			_open_save_menu()
+		"demo":
+			_start_ride()
+	if action != "demo":
+		_place_cart(track.station_s())
+		var aabb := _track_bounds()
+		rig.position = Vector3(aabb.get_center().x, 0, aabb.get_center().z)
+		rig.zoom = clampf(maxf(aabb.size.x, aabb.size.z) * 1.1, 40.0, 70.0)
+		rig.zoom_by(1.0)
+
+
+func _write_autosave() -> void:
+	_autosave_timer = -1.0
+	if not in_title and track != null:
+		SaveSlots.write_autosave(track.get_types())
+
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST:
+			_write_autosave()
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			# Android-Zurück: Menü schließen → Fahrt beenden → Startbildschirm → App beenden
+			if save_menu.visible:
+				save_menu.close()
+			elif riding:
+				_stop_ride()
+			elif not in_title:
+				_enter_title()
+			else:
+				get_tree().quit()
 
 
 # ------------------------------------------------------- Speichern/Laden ---
@@ -598,6 +696,8 @@ func _on_track_changed() -> void:
 	_update_cursor()
 	if not riding:
 		_place_cart(track.station_s())
+	if not in_title:
+		_autosave_timer = 1.0
 
 
 func _update_cursor() -> void:
@@ -848,7 +948,7 @@ func _physics_ride(dt: float) -> void:
 						_loop_warned = true
 						_show_toast("Zu langsam für den Looping – mehr Höhe davor bauen!")
 		ride_v = maxf(ride_v, 1.0)                  # Antriebsreifen verhindern Stillstand
-		if piece.type == P.STATION and _ride_piece >= 0 \
+		if piece.type == P.STATION and _ride_piece >= 0 and not in_title \
 				and track.pieces[_ride_piece].type != P.STATION and ride_v > 5.0:
 			sfx.play("brake", -2.0)
 		_ride_piece = smp.piece
@@ -892,6 +992,17 @@ func _process(delta: float) -> void:
 		_toast_time -= delta
 		if _toast_time <= 0.0:
 			toast_label.visible = false
+
+	if _autosave_timer > 0.0:
+		_autosave_timer -= delta
+		if _autosave_timer <= 0.0:
+			_write_autosave()
+	if in_title:
+		# Attract-Modus: Wagen fährt, Kamera kreist langsam
+		_physics_ride(delta)
+		_place_cart(ride_s)
+		rig.rotate_view(6.0 * delta, 0.0)
+		return
 
 	var j := joystick.output
 	if riding:

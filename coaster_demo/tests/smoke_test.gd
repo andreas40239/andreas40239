@@ -26,6 +26,14 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	var track: CoasterTrack = main.track
+	check(main.in_title and main.title.visible, "Start im Startbildschirm")
+	check(track.closed, "Startbildschirm zeigt die Demo-Strecke")
+	var s0: float = main.ride_s
+	for i in 30:
+		await process_frame
+	check(main.ride_s != s0, "Wagen fährt im Hintergrund")
+	main._leave_title("new")
+	check(not main.in_title and main.build_bar.visible, "Neue Strecke → Baumodus")
 	check(track.pieces.size() == CoasterTrack.STATION_LEN, "Station angelegt")
 	check(not track.closed, "neue Strecke offen")
 
@@ -112,6 +120,17 @@ func _initialize() -> void:
 	check(not track.load_types([99]), "ungültige Daten werden abgelehnt")
 	SaveSlots.erase(4)
 	check(SaveSlots.read(4).is_empty(), "Platz gelöscht")
+
+	# Autosave / Weiterbauen / Zurück-Taste
+	track.reset()
+	track.place(CoasterTrack.Piece.UP)
+	track.place(CoasterTrack.Piece.LOOP)
+	var saved_types := track.get_types()
+	main._notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	check(main.in_title, "Zurück-Taste → Startbildschirm")
+	check(not main.title.continue_button.disabled, "Weiterbauen möglich")
+	main._leave_title("continue")
+	check(track.get_types() == saved_types, "Weiterbauen stellt die Strecke wieder her")
 
 	print("FAILS: %d" % fails)
 	quit(1 if fails > 0 else 0)

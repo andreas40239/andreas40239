@@ -56,3 +56,25 @@ static func thumbnail(slot: int) -> Texture2D:
 	if img == null or img.is_empty():
 		return null
 	return ImageTexture.create_from_image(img)
+
+
+# ------------------------------------------------------------- Autosave ---
+# Die zuletzt bearbeitete Strecke, für „Weiterbauen“ auf dem Startbildschirm.
+
+const AUTOSAVE_PATH := "user://autosave.json"
+
+
+static func write_autosave(types: Array) -> void:
+	var f := FileAccess.open(AUTOSAVE_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify({"version": VERSION, "pieces": types}))
+
+
+static func read_autosave() -> Array:
+	var f := FileAccess.open(AUTOSAVE_PATH, FileAccess.READ)
+	if f == null:
+		return []
+	var data = JSON.parse_string(f.get_as_text())
+	if typeof(data) != TYPE_DICTIONARY or typeof(data.get("pieces")) != TYPE_ARRAY:
+		return []
+	return data.pieces

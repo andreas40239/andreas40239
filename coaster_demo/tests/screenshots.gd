@@ -20,6 +20,12 @@ func _initialize() -> void:
 	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	for i in 90:
+		await process_frame   # Attract-Modus laufen lassen
+	await shot("00_title")
+	main._leave_title("new")
+	for i in 30:
+		await process_frame
 	await shot("01_start")
 	main.track.build_demo()
 	main.rig.position = Vector3(40, 0, 60)
