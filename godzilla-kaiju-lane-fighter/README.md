@@ -1,11 +1,16 @@
 # GODZILLA: Kaiju Lane Fighter
 
 A 2.5D lane-based kaiju beat-'em-up for Android, built with **Godot 4.2** from the
-[Game Design Document](../GODZILLA_Kaiju_Lane_Fighter_GDD.md) (MVP scope: Levels 1–3).
+[Game Design Document](../GODZILLA_Kaiju_Lane_Fighter_GDD.md) — full 8-level campaign.
 
-## MVP contents
+## Contents
 
-- **3 levels** — Primeval Shores, Jungle Ruins, The Tyrant's Throne (march → arena → boss flow)
+- **Splash screen** — Godzilla rises and roars (tap to skip)
+- **Training level** — 14 practice steps; an animated finger shows each tap / swipe / hold
+  right on the real button. New players start here automatically.
+- **8 levels** — Primeval Shores, Jungle Ruins, The Tyrant's Throne (boss), Cretaceous Caverns
+  (T-Rex mini-bosses), First Contact (tanks + helicopters), Skies of Fire (Super X boss),
+  The Hybrid War (jetpack raptors + Mecha prototype), Final Protocol (Mechagodzilla boss)
 - **3-lane combat** — high / mid / ground with lane-coded threats
 - **Enemies** — Raptor packs (rush + leap, scatter), Pteranodons (diving swoops),
   Ankylosaurus (armored front, tail-spin, grab it during recovery)
@@ -43,5 +48,8 @@ Regenerate assets with
 `cd tools && python3 gen_art.py && python3 gen_art_ext.py && python3 gen_audio.py`
 (requires `pillow` + `numpy`).
 
-Smoke tests: `godot --headless tools/test_scene.tscn -- <level 1-8>` and
-`godot --headless tools/move_scene.tscn` (walk-left regression test)
+Tests (headless):
+- `tools/test_scene.tscn -- <level 1-8>` — random-input chaos run incl. bosses, death, respawn
+- `tools/move_scene.tscn` — walking left after reaching the right wall
+- `tools/touch_scene.tscn` — every point of each *drawn* button hits that button
+- `tools/train_scene.tscn` — a bot completes all training steps

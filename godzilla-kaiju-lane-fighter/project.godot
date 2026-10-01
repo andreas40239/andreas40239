@@ -6,7 +6,12 @@ config_version=5
 [application]
 
 config/name="Kaiju Lane Fighter"
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/splash.tscn"
+boot_splash/bg_color=Color(0.0509804, 0.0666667, 0.0901961, 1)
+boot_splash/show_image=true
+boot_splash/image="res://assets/sprites/ui/boot_splash.png"
+boot_splash/fullsize=false
+boot_splash/use_filter=false
 config/features=PackedStringArray("4.2")
 config/icon="res://icon.png"
 

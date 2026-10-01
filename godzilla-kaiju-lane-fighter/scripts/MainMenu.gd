@@ -24,7 +24,7 @@ func _ready() -> void:
 	# crop first frame via atlas
 	var at := AtlasTexture.new()
 	at.atlas = gz.texture
-	at.region = Rect2(0, 0, 48, 48)
+	at.region = Rect2(0, 0, 64, 48)
 	gz.texture = at
 	gz.anchor_left = 0.5
 	gz.anchor_top = 1.0
@@ -40,7 +40,7 @@ func _ready() -> void:
 	var fins := TextureRect.new()
 	var at2 := AtlasTexture.new()
 	at2.atlas = load("res://assets/sprites/characters/godzilla_fins.png")
-	at2.region = Rect2(0, 0, 48, 48)
+	at2.region = Rect2(0, 0, 64, 48)
 	fins.texture = at2
 	for prop in ["anchor_left", "anchor_top", "anchor_right", "anchor_bottom", "offset_left", "offset_top", "offset_right", "offset_bottom"]:
 		fins.set(prop, gz.get(prop))
@@ -48,6 +48,7 @@ func _ready() -> void:
 	fins.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	fins.modulate = G.COL_FIN
 	add_child(fins)
+	move_child(fins, gz.get_index())  # fins behind the body
 
 	var box := VBoxContainer.new()
 	box.anchor_right = 1.0
@@ -60,12 +61,20 @@ func _ready() -> void:
 	box.add_child(t1)
 	box.add_child(t2)
 	box.add_child(Ui.label(" ", 8))
-	var start := Ui.button("STOMP IN", func(): get_tree().change_scene_to_file("res://scenes/level_select.tscn"), 13)
+	var start := Ui.button("STOMP IN", func():
+		if GameState.is_new_player():  # first time: learn the moves
+			GameState.current_level = 0
+			get_tree().change_scene_to_file("res://scenes/game.tscn")
+		else:
+			get_tree().change_scene_to_file("res://scenes/level_select.tscn"), 13)
 	var wrap := CenterContainer.new()
 	wrap.add_child(start)
 	box.add_child(wrap)
+	box.add_child(Ui.icon_button("icon_hand", "TRAINING", func():
+		GameState.current_level = 0
+		get_tree().change_scene_to_file("res://scenes/game.tscn"), Color("facc15")))
 	box.add_child(Ui.icon_button("icon_gem", "POWER UP", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), Color("a855f7")))
-	var stats := Ui.label("HI-SCORE %06d    EP %d" % [GameState.high_score, GameState.ep], 7, Color(0.7, 0.75, 0.8))
+	var stats := Ui.label("HI-SCORE %06d    GEMS %d" % [GameState.high_score, GameState.ep], 7, Color(0.7, 0.75, 0.8))
 	stats.anchor_top = 1.0
 	stats.anchor_bottom = 1.0
 	stats.anchor_right = 1.0

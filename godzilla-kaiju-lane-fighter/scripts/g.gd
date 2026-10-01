@@ -44,6 +44,10 @@ static func arena(waves: Array) -> Dictionary:
 
 ## Level definitions (GDD 7). Arena waves are lists of [kind, from_left].
 static var LEVELS := {
+	0: {
+		"name": "TRAINING", "theme": "beach", "training": true,
+		"story": "", "segments": [{"type": "training"}],
+	},
 	1: {
 		"name": "PRIMEVAL SHORES", "theme": "beach",
 		"story": "Dawn breaks over the ancient coast.\n\nSomething colossal rises from\nthe waves. The pack hunters\nsmell an intruder.\n\nTeach them who is KING.",

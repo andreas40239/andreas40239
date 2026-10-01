@@ -59,7 +59,24 @@ def frame_draw(sheet, i, w):
 # ============================================================
 # GODZILLA  (32x40 design in a 48x48 frame, facing right)
 # ============================================================
-GZ_FW, GZ_FH, GZ_FRAMES = 48, 48, 16
+GZ_FW, GZ_FH, GZ_FRAMES = 64, 48, 16
+GZ_X = 14  # extra room on the left so the long tail is never clipped by the frame
+
+
+def tail_points(pose):
+    """Centre + radius of each tail segment, from hips to tip (shared by body + fins)."""
+    lean = pose.get("lean", 0)
+    crouch = pose.get("crouch", 0)
+    hipx, hipy = 20 + lean, 30 + crouch
+    t = pose.get("tail", 0.0)
+    tx, ty = hipx - 2, hipy + 2
+    pts = []
+    for s in range(9):
+        r = 4.5 - s * 0.42
+        tx -= 2.6
+        ty += 0.8 - t * 1.0
+        pts.append((tx, ty, r))
+    return pts
 
 def draw_godzilla_frame(d, ox, pose):
     """pose keys: leg (0-3), tail (deg-ish -1..1), mouth (0/1/2), head_up,
@@ -69,13 +86,10 @@ def draw_godzilla_frame(d, ox, pose):
     ground = 46
     hipx, hipy = 20 + lean, 30 + crouch
     # tail: chain of circles going left & down from hips
-    t = pose.get("tail", 0.0)
-    tx, ty = hipx - 2, hipy + 2
-    for s in range(7):
-        r = 4 - s * 0.45
-        tx -= 2.6
-        ty += 1.2 - t * 1.6
-        d.ellipse([ox + tx - r, ty - r, ox + tx + r, ty + r], fill=GZ_SHADOW)
+    for k, (tx, ty, r) in enumerate(tail_points(pose)):
+        d.ellipse([ox + tx - r, ty - r, ox + tx + r, ty + r], fill=GZ_SHADOW if k % 2 else GZ_SKIN)
+    for tx, ty, r in tail_points(pose):  # belly line keeps the tail one solid shape
+        d.ellipse([ox + tx - r * 0.6, ty, ox + tx + r * 0.6, ty + r * 0.8], fill=GZ_SHADOW)
     # legs
     leg = pose.get("leg", 0)
     offs = [(0, 0), (2, -2), (0, 0), (-2, -2)][leg % 4]
@@ -124,24 +138,23 @@ def draw_godzilla_frame(d, ox, pose):
 
 
 def draw_godzilla_fins(d, ox, pose):
-    """Fins overlay in WHITE (tinted at runtime = the living HUD)."""
+    """Fins layer in WHITE (tinted at runtime = the living HUD). Rendered BEHIND the
+    body in-engine, so only the parts sticking out of the back/tail are visible."""
     crouch = pose.get("crouch", 0)
     lean = pose.get("lean", 0)
     hipx = 20 + lean
     # dorsal fins along the back (left side of body, going down the spine)
-    spots = [(hipx + 3, 8 + crouch), (hipx - 2, 12 + crouch), (hipx - 6, 17 + crouch),
-             (hipx - 8, 23 + crouch), (hipx - 9, 29 + crouch)]
+    spots = [(hipx + 1, 7 + crouch), (hipx - 4, 10 + crouch), (hipx - 8, 15 + crouch),
+             (hipx - 11, 21 + crouch), (hipx - 12, 27 + crouch)]
     for i, (fx, fy) in enumerate(spots):
         s = 4 - abs(i - 2)  # biggest in middle
-        s = max(2, s + 2)
+        s = max(3, s + 3)
         d.polygon([(ox + fx, fy), (ox + fx - s, fy + s), (ox + fx + s // 2 + 1, fy + s)], fill=WHITE)
-    # small tail fins
-    t = pose.get("tail", 0.0)
-    tx, ty = hipx - 6, 33 + crouch
-    for s in range(3):
-        tx -= 5
-        ty += 2 - t * 3
-        d.polygon([(ox + tx, ty - 3), (ox + tx - 2, ty), (ox + tx + 2, ty)], fill=WHITE)
+    # small fins growing out of the TOP of the tail, following its curve
+    for k, (tx, ty, r) in enumerate(tail_points(pose)):
+        if k in (1, 3, 5, 7):
+            h = 4 if k < 5 else 3
+            d.polygon([(ox + tx + 2, ty), (ox + tx - 1, ty - r - h), (ox + tx - 2, ty)], fill=WHITE)
 
 
 GZ_POSES = [
@@ -166,11 +179,11 @@ def gen_godzilla():
     fins = new_sheet(GZ_FRAMES, GZ_FW, GZ_FH)
     for i, pose in enumerate(GZ_POSES):
         d, ox = frame_draw(body, i, GZ_FW)
-        draw_godzilla_frame(d, ox, pose)
+        draw_godzilla_frame(d, ox + GZ_X, pose)
         d2, ox2 = frame_draw(fins, i, GZ_FW)
-        draw_godzilla_fins(d2, ox2, pose)
+        draw_godzilla_fins(d2, ox2 + GZ_X, pose)
     outline(body).save(f"{ROOT}/characters/godzilla.png")
-    fins.save(f"{ROOT}/characters/godzilla_fins.png")
+    outline(fins).save(f"{ROOT}/characters/godzilla_fins.png")
 
 
 # ============================================================
@@ -510,16 +523,17 @@ def gen_ui():
 
     # app icon 512x512: godzilla frame scaled up on dark gradient
     icon = vgrad(512, 512, (13, 17, 23), (30, 41, 59)).convert("RGBA")
-    gz = Image.open(f"{ROOT}/characters/godzilla.png").crop((0, 0, GZ_FW, GZ_FH))
-    fins = Image.open(f"{ROOT}/characters/godzilla_fins.png").crop((0, 0, GZ_FW, GZ_FH))
+    gz = Image.open(f"{ROOT}/characters/godzilla.png").crop((8, 0, 8 + GZ_FH, GZ_FH))
+    fins = Image.open(f"{ROOT}/characters/godzilla_fins.png").crop((8, 0, 8 + GZ_FH, GZ_FH))
     # tint fins teal
     tinted = Image.new("RGBA", fins.size, (0, 0, 0, 0))
     fp, tp = fins.load(), tinted.load()
     for y in range(fins.size[1]):
         for x in range(fins.size[0]):
             if fp[x, y][3] > 10:
-                tp[x, y] = FIN_GLOW
-    gz.alpha_composite(tinted)
+                tp[x, y] = FIN_GLOW if fp[x, y][0] > 128 else BLACK
+    tinted.alpha_composite(gz)  # fins sit behind the body, like in-game
+    gz = tinted
     big = gz.resize((432, 432), Image.NEAREST)
     icon.alpha_composite(big, (40, 60))
     d = ImageDraw.Draw(icon)

@@ -12,6 +12,9 @@ var wave_i := 0
 var wave_pending := []        # queued spawns for current wave
 var wave_spawn_t := 0.0
 var frozen := false
+var training := false
+var trainer: Training = null
+var ui_layer: CanvasLayer
 var frost := 0.0              # Mechagodzilla absolute-zero screen frost (0..1)
 
 var player: Player
@@ -29,6 +32,7 @@ var overlay: CanvasLayer = null
 func _ready() -> void:
 	level_id = GameState.current_level
 	level_def = G.LEVELS[level_id]
+	training = level_def.get("training", false)
 	_build_background(level_def["theme"])
 	world = Node2D.new()
 	add_child(world)
@@ -38,7 +42,7 @@ func _ready() -> void:
 	player.died.connect(_on_player_died)
 	fx_root = Node2D.new()
 	world.add_child(fx_root)
-	var ui_layer := CanvasLayer.new()
+	ui_layer = CanvasLayer.new()
 	ui_layer.layer = 10
 	add_child(ui_layer)
 	frost_rect = ColorRect.new()
@@ -58,7 +62,8 @@ func _ready() -> void:
 	ui_layer.add_child(pause_btn)
 	AudioManager.play_music("march")
 	AudioManager.play_sfx("gz_roar", -4.0)
-	hud.flash_message("LEVEL %d\n%s" % [level_id, level_def["name"]], 2.2)
+	if not training:
+		hud.flash_message("LEVEL %d\n%s" % [level_id, level_def["name"]], 2.2)
 	_start_segment(0)
 
 # ---------------- background ----------------
@@ -112,6 +117,10 @@ func _start_segment(i: int) -> void:
 			wave_i = -1
 			hud.flash_message("ARENA - CLEAR THEM ALL!")
 			_next_wave()
+		"training":
+			trainer = Training.new()
+			ui_layer.add_child(trainer)
+			trainer.setup(self)
 		"boss":
 			hud.flash_message(level_def.get("boss_name", "BOSS"), 2.5)
 			AudioManager.play_music("boss")
@@ -247,6 +256,7 @@ func melee_hit(lanes: Array, x_min: float, x_max: float, dmg: float, opts := {})
 			if p is Projectile and not p.friendly and p.swattable and p.lane in lanes \
 					and p.position.x >= x_min - 10.0 and p.position.x <= x_max + 10.0:
 				p.reflect(player.facing)
+				player.did.emit("swat")
 	if count > 0:
 		add_score(10 * count)
 	return count
@@ -380,14 +390,16 @@ func _victory() -> void:
 	GameState.complete_level(level_id, hud.score)
 	AudioManager.play_music("victory", false)
 	AudioManager.play_sfx("gz_roar")
-	var items: Array = [
-		Ui.label("LEVEL COMPLETE!", 13, Color("2dd4bf")),
-		Ui.label("SCORE  %06d" % hud.score, 9),
-		Ui.gem_row(GameState.last_ep_gain, "+"),
-	]
+	var items: Array = [Ui.label("TRAINING DONE!" if training else "LEVEL COMPLETE!", 13, Color("2dd4bf"))]
+	if training:
+		items.append(Ui.label("YOU KNOW ALL THE MOVES!", 8))
+	else:
+		items.append(Ui.label("SCORE  %06d" % hud.score, 9))
+	if GameState.last_ep_gain > 0:
+		items.append(Ui.gem_row(GameState.last_ep_gain, "+"))
 	items.append(Ui.icon_button("icon_plus", "POWER UP!", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), Color("a855f7")))
 	if level_id < GameState.MAX_LEVEL:
-		items.append(Ui.button("NEXT LEVEL", func():
+		items.append(Ui.button("START LEVEL 1" if training else "NEXT LEVEL", func():
 			GameState.current_level = level_id + 1
 			get_tree().change_scene_to_file("res://scenes/story_card.tscn")))
 	else:

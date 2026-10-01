@@ -26,6 +26,7 @@ var _base_y := 0.0
 var _attack := ""
 var shield_t := 0.0
 var shield_cd := 4.0
+var dizzy_forever := false  # training: stays grabbable until thrown
 var heal_target = null   # boss-summoned raptors run to heal the boss (GDD 6.1)
 
 const TEX := {"raptor": "raptor", "ptera": "pteranodon", "anky": "ankylosaurus", "tank": "tank",
@@ -95,7 +96,7 @@ func _process(delta: float) -> void:
 	match state:
 		"stunned":
 			_frame(FRAMES[kind] - 1)
-			if state_t > 1.4:
+			if state_t > 1.4 and not dizzy_forever:
 				_goto("approach")
 		"grabbed":
 			_frame(FRAMES[kind] - 1)
@@ -354,7 +355,7 @@ func _proto(delta: float) -> void:
 				_goto("recover")
 		"recover":  # grab window (GDD: bait jet dash, grab during recovery)
 			_frame(7)
-			if state_t > 1.4:
+			if state_t > 1.4 and not dizzy_forever:
 				_goto("approach")
 
 # ---------------- shared combat ----------------

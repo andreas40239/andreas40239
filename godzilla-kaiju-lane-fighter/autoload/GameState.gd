@@ -6,7 +6,7 @@ const MAX_LEVEL := 8
 const MAX_UPGRADE := 5
 
 ## Gems for the FIRST clear of each level (GDD 7). Replays always give 1.
-const LEVEL_EP := {1: 1, 2: 2, 3: 3, 4: 2, 5: 2, 6: 3, 7: 3, 8: 5}
+const LEVEL_EP := {0: 1, 1: 1, 2: 2, 3: 3, 4: 2, 5: 2, 6: 3, 7: 3, 8: 5}
 
 ## Five power trees, 5 stars each, 1 gem per star. Icons so kids can read them.
 const UPGRADES := {
@@ -73,6 +73,9 @@ func pulse_cooldown() -> float:
 func pulse_damage() -> float:
 	return 30.0 + 8.0 * lvl("blast")
 
+func is_new_player() -> bool:
+	return completed.is_empty() and unlocked_level <= 1
+
 func mercy_active(level: int) -> bool:
 	return mercy_deaths.get(level, 0) >= 5
 
@@ -97,7 +100,7 @@ func complete_level(level: int, score: int) -> void:
 		completed[level] = true
 		last_ep_gain = LEVEL_EP.get(level, 1)
 	else:
-		last_ep_gain = 1
+		last_ep_gain = 0 if level == 0 else 1  # replaying training gives no gems
 	ep += last_ep_gain
 	unlocked_level = max(unlocked_level, min(level + 1, MAX_LEVEL))
 	save_game()

@@ -3,18 +3,19 @@ extends Control
 ## Touch gestures → InputHandler signals (GDD 3, 11.6).
 ## D-pad = movement/lanes. Swipes ON the action buttons = directional attacks.
 
-const DPAD_HALF := 62.0
-const BTN_R := 24.0
-const HIT_PAD := 12.0
+const DPAD_HALF := 66.0
 const SWIPE_MIN := 15.0
 const CHARGE_HOLD := 0.32
+const HIT_PAD := 14.0
 
 var fingers := {}  # index -> {zone, start, time, charging, dpad_dir}
 var player: Player
-var dpad_center := Vector2(71, 566)
-var atk_c := Vector2(302, 468)
-var jmp_c := Vector2(302, 528)
-var spc_c := Vector2(294, 592)
+var dpad_center := Vector2(76, 560)
+var atk_c := Vector2(302, 500)
+var jmp_c := Vector2(222, 576)
+var spc_c := Vector2(310, 588)
+## Visual radius of each round button (the touch zone is a bit bigger).
+const RADIUS := {"attack": 34.0, "jump": 30.0, "special": 26.0}
 
 func _ready() -> void:
 	anchor_right = 1.0
@@ -26,32 +27,43 @@ func _ready() -> void:
 func _layout() -> void:
 	# anchor cluster to the real screen corners (expand stretch adds space)
 	var vs := get_viewport_rect().size
-	dpad_center = Vector2(71, vs.y - 74)
-	atk_c = Vector2(vs.x - 58, vs.y - 186)
-	jmp_c = Vector2(vs.x - 58, vs.y - 122)
-	spc_c = Vector2(vs.x - 66, vs.y - 46)
+	dpad_center = Vector2(76, vs.y - 80)
+	atk_c = Vector2(vs.x - 58, vs.y - 142)   # big red, top right
+	jmp_c = Vector2(vs.x - 138, vs.y - 66)   # blue, left of it
+	spc_c = Vector2(vs.x - 50, vs.y - 54)    # purple, bottom corner
 	for c in get_children():
 		c.queue_free()
-	var dpad := TextureRect.new()
-	dpad.texture = load("res://assets/sprites/ui/dpad.png")
-	dpad.position = dpad_center - Vector2(DPAD_HALF, DPAD_HALF)
-	dpad.size = Vector2(DPAD_HALF * 2, DPAD_HALF * 2)
-	dpad.stretch_mode = TextureRect.STRETCH_SCALE
-	dpad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dpad)
-	_mk_btn("btn_attack", atk_c, BTN_R)
-	_mk_btn("btn_jump", jmp_c, BTN_R)
-	_mk_btn("btn_special", spc_c, BTN_R + 4)
+	_mk_rect("dpad", dpad_center, DPAD_HALF, "")
+	_mk_rect("btn_attack", atk_c, RADIUS["attack"], "icon_claws")
+	_mk_rect("btn_jump", jmp_c, RADIUS["jump"], "icon_jump")
+	_mk_rect("btn_special", spc_c, RADIUS["special"], "icon_blast")
 
-func _mk_btn(tex: String, center: Vector2, r: float) -> void:
+func _mk_rect(tex: String, center: Vector2, r: float, symbol: String) -> void:
 	var b := TextureRect.new()
 	b.texture = load("res://assets/sprites/ui/%s.png" % tex)
+	# IGNORE_SIZE: otherwise the 96px texture forces its own size and the picture
+	# drifts away from its touch zone (this was the "blue button doesn't work" bug).
+	b.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	b.stretch_mode = TextureRect.STRETCH_SCALE
 	b.position = center - Vector2(r, r)
 	b.size = Vector2(r * 2, r * 2)
-	b.stretch_mode = TextureRect.STRETCH_SCALE
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.name = tex
 	add_child(b)
+	if symbol != "":
+		var ic := TextureRect.new()
+		ic.texture = load("res://assets/sprites/ui/%s.png" % symbol)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ic.position = Vector2(r * 0.45, r * 0.45)
+		ic.size = Vector2(r * 1.1, r * 1.1)
+		ic.modulate = Color(1, 1, 1, 0.85)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+
+func button_center(zone: String) -> Vector2:
+	return {"attack": atk_c, "jump": jmp_c, "special": spc_c, "dpad": dpad_center}[zone]
 
 func _process(delta: float) -> void:
 	for id in fingers:
@@ -60,10 +72,20 @@ func _process(delta: float) -> void:
 		if f["zone"] == "attack" and not f["charging"] and f["time"] > CHARGE_HOLD:
 			f["charging"] = true
 			InputHandler.attack_charge_start.emit()
-	# dim special while on cooldown
-	var spc := get_node_or_null("btn_special")
-	if spc and is_instance_valid(player):
-		spc.modulate = Color(1, 1, 1) if player.special_cd <= 0.0 else Color(0.5, 0.5, 0.5, 0.7)
+	# light up a button while a finger is on it; dim the nuke while it recharges
+	var held := {}
+	for id in fingers:
+		held[fingers[id]["zone"]] = true
+	for zone in RADIUS:
+		var node: Control = get_node_or_null("btn_" + zone)
+		if node == null:
+			continue
+		var col := Color(1.5, 1.5, 1.5) if held.has(zone) else Color(1, 1, 1)
+		if zone == "special" and is_instance_valid(player) and player.special_cd > 0.0:
+			col = Color(0.5, 0.5, 0.5, 0.7)
+		node.modulate = col
+		node.pivot_offset = node.size * 0.5
+		node.scale = Vector2(1.1, 1.1) if held.has(zone) else Vector2.ONE
 
 func _to_local_pos(pos: Vector2) -> Vector2:
 	# convert window coords to 360x640 canvas coords under canvas_items scaling
@@ -82,13 +104,17 @@ func _input(event: InputEvent) -> void:
 		_keyboard(event)
 
 func _zone_at(pos: Vector2) -> String:
-	if pos.distance_to(atk_c) < BTN_R + HIT_PAD:
-		return "attack"
-	if pos.distance_to(jmp_c) < BTN_R + HIT_PAD:
-		return "jump"
-	if pos.distance_to(spc_c) < BTN_R + HIT_PAD + 4:
-		return "special"
-	if pos.x < 190 and pos.y > get_viewport_rect().size.y - 170:
+	# nearest button wins, so neighbouring touch zones never steal each other's taps
+	var best := ""
+	var best_d := INF
+	for zone in RADIUS:
+		var d := pos.distance_to(button_center(zone))
+		if d < RADIUS[zone] + HIT_PAD and d < best_d:
+			best = zone
+			best_d = d
+	if best != "":
+		return best
+	if pos.distance_to(dpad_center) < DPAD_HALF + 24.0:
 		return "dpad"
 	return ""
 

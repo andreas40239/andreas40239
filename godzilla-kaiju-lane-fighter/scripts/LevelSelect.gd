@@ -19,6 +19,10 @@ func _ready() -> void:
 	root.add_theme_constant_override("separation", 10)
 	add_child(root)
 	root.add_child(Ui.label("PICK A LEVEL", 14, Color("2dd4bf")))
+	var train_label := "TRAINING" + ("  OK" if GameState.completed.get(0, false) else "  NEW!")
+	root.add_child(Ui.icon_button("icon_hand", train_label, func():
+		GameState.current_level = 0
+		get_tree().change_scene_to_file("res://scenes/game.tscn"), Color("facc15")))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -42,7 +46,7 @@ func _card(lv: int) -> Control:
 	var unlocked: bool = lv <= GameState.unlocked_level
 	var done: bool = GameState.completed.get(lv, false)
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(164, 104)
+	b.custom_minimum_size = Vector2(164, 96)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0)
 	sb.border_color = Color("2dd4bf") if unlocked else Color(0.3, 0.32, 0.36)

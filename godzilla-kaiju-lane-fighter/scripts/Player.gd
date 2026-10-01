@@ -5,6 +5,7 @@ extends Node2D
 
 signal died
 signal stats_changed
+signal did(action: String)   # move performed (used by the training level)
 
 const WALK_SPEED := 110.0
 const WHIP_FRONT := 82.0
@@ -66,10 +67,9 @@ func _ready() -> void:
 	fins = Sprite2D.new()
 	fins.texture = load("res://assets/sprites/characters/godzilla_fins.png")
 	fins.hframes = 16
-	fins.scale = Vector2(4, 4)
-	fins.position = body.position
 	fins.modulate = G.COL_FIN
-	add_child(fins)
+	fins.show_behind_parent = true  # fins grow out from behind the back + tail
+	body.add_child(fins)
 	position = Vector2(96, G.LANE_Y[lane])
 	z_index = 10 + lane
 	var ih := InputHandler
@@ -96,7 +96,6 @@ func reset_for_respawn() -> void:
 	_set_facing(1.0)
 	position = Vector2(96, G.LANE_Y[lane])
 	body.position.y = -96.0
-	fins.position.y = -96.0
 
 func _can_act() -> bool:
 	return state in ["idle", "walk"] and stun_t <= 0.0
@@ -207,6 +206,7 @@ func _animate(delta: float) -> void:
 		idx = mini(idx, frames.size() - 1)
 	body.frame = frames[idx]
 	fins.frame = frames[idx]
+	fins.modulate = fin_color()
 
 func _play(anim: String) -> void:
 	if _anim == anim:
@@ -231,7 +231,10 @@ func fin_color() -> Color:
 func _switch_lane(dir: int) -> void:
 	if airborne or not _can_act():
 		return
+	var before := lane
 	force_lane(clampi(lane + dir, 0, 2), GameState.lane_switch_time())
+	if lane != before:
+		did.emit("lane")
 
 func force_lane(target: int, dur := 0.3) -> void:
 	if target == lane:
@@ -267,7 +270,9 @@ func _on_attack_tap() -> void:
 	AudioManager.play_sfx("tail_whip", 0.0, 1.0 + 0.08 * combo)
 	var dmg := 10.0 * GameState.melee_mult()
 	var opts := {}
+	did.emit("whip")
 	if combo >= 3:
+		did.emit("combo")
 		dmg *= 1.5
 		opts = {"knockdown": true, "stun": 1.0}
 		combo = 0
@@ -287,17 +292,20 @@ func _on_attack_swipe(dir: Vector2) -> void:
 	if dir.x != 0.0:  # dash-claw: lunge the way you swiped
 		_set_facing(signf(dir.x))
 		AudioManager.play_sfx("dash")
+		did.emit("dash")
 		var from_x := position.x
 		position.x = clampf(position.x + 90.0 * facing, G.PLAY_LEFT, G.PLAY_RIGHT)
 		_swing(dmg, [lane], Vector2(minf(from_x, position.x) - 10.0, maxf(from_x, position.x) + 10.0) + Vector2(minf(0.0, 50.0 * facing), maxf(0.0, 50.0 * facing)), {})
 	elif dir.y < 0:  # anti-air tail
 		AudioManager.play_sfx("tail_whip", 0.0, 1.3)
+		did.emit("antiair")
 		var lanes := [lane]
 		if lane > 0:
 			lanes.append(lane - 1)
 		_swing(dmg, lanes, _reach(80.0, 30.0), {"knockdown": true})
 	else:  # ground pound
 		AudioManager.play_sfx("stomp")
+		did.emit("pound")
 		game.shake(3.0)
 		var lanes2 := [lane]
 		if lane < 2:
@@ -321,6 +329,7 @@ func _fire_breath() -> void:
 	state_t = 0.0
 	_play("fire")
 	AudioManager.play_sfx("breath_fire")
+	did.emit("breath")
 	game.shake(4.0)
 	var dmg := (15.0 + 22.0 * charge_t) * GameState.breath_mult()
 	game.spawn_beam(position + Vector2(48 * facing, -108), facing)
@@ -333,6 +342,7 @@ func _on_jump_tap() -> void:
 		return
 	_start_air("jump", 0.5)
 	AudioManager.play_sfx("jump", -4.0)
+	did.emit("jump")
 
 func _on_jump_swipe(dir: Vector2) -> void:
 	if dir.y < 0:  # high leap
@@ -340,11 +350,13 @@ func _on_jump_swipe(dir: Vector2) -> void:
 			return
 		_start_air("jump", 0.75)
 		AudioManager.play_sfx("jump")
+		did.emit("leap")
 	elif dir.y > 0:  # dive slam → ground lane
 		if not (_can_act() or state == "jump"):
 			return
 		force_lane(G.LANE_GROUND, 0.12)
 		_start_air("dive", 0.16)
+		did.emit("dive")
 	elif dir.x != 0.0:  # sideways swipe on jump = hop that way
 		if not _can_act():
 			return
@@ -360,16 +372,16 @@ func _start_air(kind: String, dur: float) -> void:
 	air_t = dur
 	airborne = true
 	_play("jump")
-	for s in [body, fins]:
-		var tw := create_tween()
-		tw.tween_property(s, "position:y", -96.0 - 40.0, dur * 0.4)
-		tw.tween_property(s, "position:y", -96.0, dur * 0.6)
+	var tw := create_tween()
+	tw.tween_property(body, "position:y", -96.0 - 40.0, dur * 0.4)
+	tw.tween_property(body, "position:y", -96.0, dur * 0.6)
 
 func _on_special() -> void:
 	# 360° Nuclear Pulse (GDD 3.4): clears nearby lanes, cooldown-based.
 	if special_cd > 0.0 or not _can_act():
 		return
 	special_cd = GameState.pulse_cooldown()
+	did.emit("pulse")
 	AudioManager.play_sfx("pulse")
 	AudioManager.play_sfx("gz_roar", -6.0)
 	game.shake(8.0)
@@ -392,6 +404,7 @@ func _try_grab() -> void:
 		e.begin_grabbed()
 		AudioManager.play_sfx("grab")
 		_play("grab")
+		did.emit("grab")
 
 func _do_throw() -> void:
 	if grabbed_enemy == null:
@@ -400,6 +413,7 @@ func _do_throw() -> void:
 	state_t = 0.0
 	_play("throw")
 	AudioManager.play_sfx("throw")
+	did.emit("throw")
 	var e = grabbed_enemy
 	grabbed_enemy = null
 	if is_instance_valid(e):
@@ -408,6 +422,9 @@ func _do_throw() -> void:
 # ---------- damage ----------
 func take_damage(dmg: float, opts := {}) -> void:
 	if state == "dead" or invuln_t > 0.0:
+		return
+	if game.training:  # practice: enemies can't hurt you
+		AudioManager.play_sfx("hit", -10.0)
 		return
 	if GameState.mercy_active(GameState.current_level):
 		dmg *= 0.7

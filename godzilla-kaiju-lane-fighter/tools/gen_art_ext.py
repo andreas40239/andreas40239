@@ -286,6 +286,16 @@ def gen_icons():
         d.rectangle([6, 1, 9, 14], fill=WHITE)
         d.rectangle([1, 6, 14, 9], fill=WHITE)
     icon("plus", plus)
+    # JUMP: big up arrow
+    def jump(d):
+        d.polygon([(8, 0), (15, 8), (11, 8), (11, 15), (5, 15), (5, 8), (1, 8)], fill=WHITE)
+    icon("jump", jump)
+    # HAND (finger hint for the training level)
+    def hand(d):
+        d.rounded_rectangle([5, 0, 9, 9], 2, fill=(255, 237, 213, 255))
+        d.rounded_rectangle([3, 6, 13, 15], 3, fill=(255, 237, 213, 255))
+        d.line([(7, 1), (7, 3)], fill=(250, 204, 170, 255))
+    icon("hand", hand)
     # SKULL-ish boss marker (kaiju head)
     def boss(d):
         d.ellipse([2, 2, 13, 12], fill=ENEMY_RED)
@@ -404,13 +414,15 @@ def gen_thumbs():
 
 if __name__ == "__main__":
     random.seed(5)
-    gen_tank()
-    gen_heli()
-    gen_jetraptor()
-    gen_superx()
-    gen_mecha()
-    gen_fx_ext()
+    if os.environ.get("ICONS_ONLY") != "1":
+        gen_tank()
+        gen_heli()
+        gen_jetraptor()
+        gen_superx()
+        gen_mecha()
+        gen_fx_ext()
     gen_icons()
-    gen_bg_ext()
-    gen_thumbs()
+    if os.environ.get("ICONS_ONLY") != "1":
+        gen_bg_ext()
+        gen_thumbs()
     print("ext art OK")
