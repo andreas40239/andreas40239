@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'de.andreas40239.schattengruft'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'de.andreas40239.schattengruft'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        // Reine Java/WebView-App ohne native Bibliotheken; Zielplattform arm64.
+        ndk { abiFilters 'arm64-v8a' }
+    }
+
+    // Das Spiel selbst (HTML/JS) liegt in ../../web und wird als Asset eingebunden.
+    sourceSets {
+        main {
+            assets.srcDirs = ['../../web']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Prototyp: mit Debug-Schlüssel signieren, damit die APK direkt installierbar ist.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

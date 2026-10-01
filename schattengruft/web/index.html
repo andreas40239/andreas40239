@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1a1430">
+<title>Schattengruft</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="menu" class="overlay">
+  <div class="panel title">
+    <h1>Schattengruft</h1>
+    <p class="sub">Steig hinab in das Labyrinth der Finsternis</p>
+    <button data-act="new" class="big">Neues Spiel</button>
+    <button data-act="help">Anleitung &amp; Bestiarium</button>
+    <div class="row"><button data-act="music" class="small">Musik: An</button><button data-act="sfx" class="small">Effekte: An</button></div>
+    <p class="ver">Prototyp v0.1</p>
+  </div>
+</div>
+
+<div id="help" class="overlay">
+  <div class="panel wide scroll">
+    <h2>Anleitung</h2>
+    <ul class="help">
+      <li><b>Linke Bildschirmhälfte:</b> Joystick – Figur bewegen</li>
+      <li><b>Rechts:</b> drei Aktionstasten – Waffe oder Zauber auslösen</li>
+      <li><b>Aktionstaste lange drücken:</b> Belegung jederzeit ändern (auch im Pausemenü)</li>
+      <li><b>Mini-Karte antippen:</b> große Karte ein/aus</li>
+      <li>Das Labyrinth wird erst beim Erkunden sichtbar. Finde die <b>Treppe</b> zur nächsten Ebene.</li>
+      <li><b>Truhen</b> enthalten Herzen, Mana, neue Waffen und Waffen-Upgrades.</li>
+      <li><b>Waffen:</b> Schwert (Schnitt), Axt (Wucht), Bogen (Stich, Fernkampf)</li>
+      <li><b>Zauber</b> lernst du mit Stufen: Lähmung (2), Feuerwand (3), Eisregen (5)</li>
+      <li>Tastatur: WASD/Pfeile, J K L = Aktionen, 1 2 3 = belegen, M = Karte, Esc = Pause</li>
+    </ul>
+    <h2>Bestiarium</h2>
+    <table id="bestiary"></table>
+    <button data-act="backHelp">Zurück</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay">
+  <div class="panel">
+    <h2>Pause</h2>
+    <button data-act="resume" class="big">Weiter</button>
+    <button data-act="assignMenu">Tasten belegen</button>
+    <button data-act="help">Anleitung &amp; Bestiarium</button>
+    <div class="row"><button data-act="music" class="small">Musik: An</button><button data-act="sfx" class="small">Effekte: An</button></div>
+    <button data-act="toMenu" class="ghost">Hauptmenü</button>
+  </div>
+</div>
+
+<div id="slots" class="overlay">
+  <div class="panel">
+    <h2>Tasten belegen</h2>
+    <div id="slotList" class="grid three"></div>
+    <button data-act="backSlots">Zurück</button>
+  </div>
+</div>
+
+<div id="assign" class="overlay">
+  <div class="panel wide">
+    <h2 id="assignTitle">Taste belegen</h2>
+    <div id="assignGrid" class="grid"></div>
+    <button data-act="closeAssign">Abbrechen</button>
+  </div>
+</div>
+
+<div id="gameover" class="overlay">
+  <div class="panel">
+    <h1 class="red">Du bist gefallen</h1>
+    <p id="goStats" class="sub"></p>
+    <button data-act="retry" class="big">Nochmal</button>
+    <button data-act="toMenu" class="ghost">Hauptmenü</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+<script src="js/input.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
