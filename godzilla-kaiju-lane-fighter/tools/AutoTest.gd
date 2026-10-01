@@ -46,30 +46,34 @@ func _process(delta: float) -> void:
 	# staged scenario events
 	if phase == 0 and t > 5.0:
 		phase = 1
-		if GameState.current_level == 3:
+		var segs: Array = game.level_def["segments"]
+		if segs[-1]["type"] == "boss":
 			print("AUTOTEST: jumping to boss segment")
-			game._start_segment(1)
+			game._start_segment(segs.size() - 1)
+		else:
+			print("AUTOTEST: jumping to last arena")
+			game._start_segment(segs.size() - 1)
 	if phase == 1 and t > 8.0:
 		phase = 2
 		if game.boss != null and is_instance_valid(game.boss):
 			print("AUTOTEST: hammering boss")
 	if phase >= 1 and game.boss != null and is_instance_valid(game.boss) and rng.randf() < 0.2:
-		game.boss.take_hit(12.0, {"breath": rng.randf() < 0.3})
-	if phase == 2 and t > 18.0:
+		game.boss.take_hit(6.0, {"breath": rng.randf() < 0.3, "pulse": rng.randf() < 0.1})
+	if phase == 2 and t > 28.0:
 		phase = 3
 		print("AUTOTEST: killing player to test death overlay")
 		if game.player.state != "dead":
 			game.player.take_damage(9999.0)
-	if phase == 3 and t > 20.0:
+	if phase == 3 and t > 30.0:
 		phase = 4
 		print("AUTOTEST: respawning")
 		game._respawn()
-	if OS.has_environment("SCREENSHOT_DIR") and (absf(t - 4.0) < delta or absf(t - 10.0) < delta or absf(t - 16.0) < delta):
+	if OS.has_environment("SCREENSHOT_DIR") and (absf(t - 4.0) < delta or absf(t - 10.0) < delta or absf(t - 16.0) < delta or absf(t - 22.0) < delta):
 		var img := get_viewport().get_texture().get_image()
 		if img != null:
 			var p := "%s/shot_l%d_t%d.png" % [OS.get_environment("SCREENSHOT_DIR"), GameState.current_level, int(t)]
 			img.save_png(p)
 			print("AUTOTEST: screenshot " + p)
-	if t > 34.0:
+	if t > 44.0:
 		print("AUTOTEST: OK — score %d, segment %d, enemies %d" % [game.hud.score, game.segment_i, game.enemies.size()])
 		get_tree().quit(0)

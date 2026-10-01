@@ -1,6 +1,7 @@
 class_name Player
 extends Node2D
 ## Godzilla. Lane-based movement + gesture-driven attacks (GDD 3, 4).
+## Walks and turns both ways; backing away from an attacker blocks it.
 
 signal died
 signal stats_changed
@@ -12,6 +13,7 @@ const WHIP_BACK := 46.0
 var game  # Game node (owns enemy list / fx / shake)
 
 var lane := G.LANE_GROUND
+var facing := 1.0          # +1 right, -1 left
 var hp: float
 var max_hp: float
 var meter: float
@@ -29,6 +31,7 @@ var stun_t := 0.0
 var grabbed_enemy = null
 var grab_hold_t := 0.0
 var invuln_t := 0.0
+var block_flash := 0.0
 var lane_tween: Tween
 
 var body: Sprite2D
@@ -80,44 +83,75 @@ func _ready() -> void:
 	ih.jump_swipe.connect(_on_jump_swipe)
 	ih.special_tap.connect(_on_special)
 
-func is_blocking() -> bool:
-	return InputHandler.move_axis < -0.5 and not airborne and _can_act()
+func reset_for_respawn() -> void:
+	hp = max_hp
+	meter = max_meter * 0.4
+	state = "idle"
+	stun_t = 0.0
+	grabbed_enemy = null
+	airborne = false
+	special_cd = 0.0
+	lane = G.LANE_GROUND
+	z_index = 10 + lane
+	_set_facing(1.0)
+	position = Vector2(96, G.LANE_Y[lane])
+	body.position.y = -96.0
+	fins.position.y = -96.0
 
 func _can_act() -> bool:
 	return state in ["idle", "walk"] and stun_t <= 0.0
 
-func busy_attacking() -> bool:
-	return state in ["whip", "charge", "fire", "dive", "throw"]
+func _set_facing(f: float) -> void:
+	facing = f
+	body.flip_h = f < 0.0
+	fins.flip_h = f < 0.0
+
+## Front/back reach of a melee swing in world X, depending on facing.
+func _reach(front: float, back: float) -> Vector2:
+	if facing > 0.0:
+		return Vector2(position.x - back, position.x + front)
+	return Vector2(position.x - front, position.x + back)
+
+## "Hold back to block" (GDD 3.4): moving away from where the hit came from.
+func _is_backing_from(src_x) -> bool:
+	if src_x == null or airborne:
+		return false
+	var ax := InputHandler.move_axis
+	if absf(ax) < 0.5:
+		return false
+	return signf(ax) == signf(position.x - float(src_x))
 
 func _process(delta: float) -> void:
 	if state == "dead" or (game != null and game.frozen):
 		return
 	state_t += delta
-	special_cd = max(0.0, special_cd - delta)
-	invuln_t = max(0.0, invuln_t - delta)
-	combo_window = max(0.0, combo_window - delta)
+	special_cd = maxf(0.0, special_cd - delta)
+	invuln_t = maxf(0.0, invuln_t - delta)
+	block_flash = maxf(0.0, block_flash - delta)
+	combo_window = maxf(0.0, combo_window - delta)
 	if combo_window <= 0.0:
 		combo = 0
-	meter = min(max_meter, meter + 3.0 * delta)  # slow passive regen
+	meter = minf(max_meter, meter + 3.0 * delta)  # slow passive regen
 	if stun_t > 0.0:
 		stun_t -= delta
 		_play("hurt")
+		_animate(delta)
 		emit_signal("stats_changed")
 		return
 	match state:
 		"idle", "walk":
 			var ax := InputHandler.move_axis
-			if is_blocking():
-				_play("block")
-				state = "idle"
-			elif absf(ax) > 0.2:
-				position.x = clampf(position.x + ax * WALK_SPEED * delta, G.PLAY_LEFT, G.PLAY_RIGHT - 60.0)
+			if absf(ax) > 0.2:
+				if grabbed_enemy == null:
+					_set_facing(signf(ax))
+				position.x = clampf(position.x + ax * WALK_SPEED * GameState.walk_mult() * delta,
+					G.PLAY_LEFT, G.PLAY_RIGHT)
 				state = "walk"
-				_play("walk")
+				_play("block" if block_flash > 0.0 else ("grab" if grabbed_enemy != null else "walk"))
 				_try_grab()
 			else:
 				state = "idle"
-				_play("idle" if grabbed_enemy == null else "grab")
+				_play("block" if block_flash > 0.0 else ("idle" if grabbed_enemy == null else "grab"))
 		"whip":
 			if state_t >= 0.18:
 				state = "idle"
@@ -154,7 +188,9 @@ func _process(delta: float) -> void:
 	if grabbed_enemy != null:
 		grab_hold_t += delta
 		if is_instance_valid(grabbed_enemy):
-			grabbed_enemy.global_position = global_position + Vector2(34, -70)
+			grabbed_enemy.global_position = global_position + Vector2(34 * facing, -70)
+		else:
+			grabbed_enemy = null
 		if grab_hold_t > 3.0:
 			_do_throw()
 	_animate(delta)
@@ -193,9 +229,11 @@ func fin_color() -> Color:
 
 # ---------- lane movement ----------
 func _switch_lane(dir: int) -> void:
-	if airborne or not (_can_act() or state == "walk"):
+	if airborne or not _can_act():
 		return
-	var target: int = clampi(lane + dir, 0, 2)
+	force_lane(clampi(lane + dir, 0, 2), GameState.lane_switch_time())
+
+func force_lane(target: int, dur := 0.3) -> void:
 	if target == lane:
 		return
 	lane = target
@@ -204,12 +242,17 @@ func _switch_lane(dir: int) -> void:
 	if lane_tween:
 		lane_tween.kill()
 	lane_tween = create_tween()
-	lane_tween.tween_property(self, "position:y", G.LANE_Y[lane], GameState.lane_switch_time())
+	lane_tween.tween_property(self, "position:y", G.LANE_Y[lane], dur)
 
 func _on_lane_up() -> void: _switch_lane(-1)
 func _on_lane_down() -> void: _switch_lane(1)
 
 # ---------- attacks ----------
+func _swing(dmg: float, lanes: Array, reach: Vector2, opts := {}) -> void:
+	var hits: int = game.melee_hit(lanes, reach.x, reach.y, dmg, opts)
+	if hits > 0:
+		meter = minf(max_meter, meter + 4.0 * hits)
+
 func _on_attack_tap() -> void:
 	if grabbed_enemy != null:
 		_do_throw()
@@ -228,10 +271,8 @@ func _on_attack_tap() -> void:
 		dmg *= 1.5
 		opts = {"knockdown": true, "stun": 1.0}
 		combo = 0
-	var w := 6.0 if GameState.has_upg("claws") else 0.0
-	var hits: int = game.melee_hit([lane], position.x - WHIP_BACK - w, position.x + WHIP_FRONT + w, dmg, opts)
-	if hits > 0:
-		meter = min(max_meter, meter + 4.0 * hits)
+	var w := GameState.whip_bonus()
+	_swing(dmg, [lane], _reach(WHIP_FRONT + w, WHIP_BACK + w), opts)
 
 func _on_attack_swipe(dir: Vector2) -> void:
 	if grabbed_enemy != null:
@@ -243,30 +284,25 @@ func _on_attack_swipe(dir: Vector2) -> void:
 	state_t = 0.0
 	_play("whip")
 	var dmg := 12.0 * GameState.melee_mult()
-	var hits := 0
-	if dir.x > 0:  # dash-claw: lunge forward
+	if dir.x != 0.0:  # dash-claw: lunge the way you swiped
+		_set_facing(signf(dir.x))
 		AudioManager.play_sfx("dash")
 		var from_x := position.x
-		position.x = clampf(position.x + 90.0, G.PLAY_LEFT, G.PLAY_RIGHT - 40.0)
-		hits = game.melee_hit([lane], from_x, position.x + 50.0, dmg, {})
+		position.x = clampf(position.x + 90.0 * facing, G.PLAY_LEFT, G.PLAY_RIGHT)
+		_swing(dmg, [lane], Vector2(minf(from_x, position.x) - 10.0, maxf(from_x, position.x) + 10.0) + Vector2(minf(0.0, 50.0 * facing), maxf(0.0, 50.0 * facing)), {})
 	elif dir.y < 0:  # anti-air tail
 		AudioManager.play_sfx("tail_whip", 0.0, 1.3)
 		var lanes := [lane]
 		if lane > 0:
 			lanes.append(lane - 1)
-		hits = game.melee_hit(lanes, position.x - 30.0, position.x + 80.0, dmg, {"knockdown": true})
-	elif dir.y > 0:  # ground pound
+		_swing(dmg, lanes, _reach(80.0, 30.0), {"knockdown": true})
+	else:  # ground pound
 		AudioManager.play_sfx("stomp")
 		game.shake(3.0)
 		var lanes2 := [lane]
 		if lane < 2:
 			lanes2.append(lane + 1)
-		hits = game.melee_hit(lanes2, position.x - 55.0, position.x + 75.0, dmg, {"knockdown": true, "stun": 0.8})
-	else:  # swipe left → quick back whip
-		AudioManager.play_sfx("tail_whip")
-		hits = game.melee_hit([lane], position.x - 95.0, position.x + 20.0, dmg, {})
-	if hits > 0:
-		meter = min(max_meter, meter + 4.0 * hits)
+		_swing(dmg, lanes2, _reach(75.0, 55.0), {"knockdown": true, "stun": 0.8})
 
 func _on_charge_start() -> void:
 	if not _can_act() or meter < 12.0 or grabbed_enemy != null:
@@ -286,9 +322,10 @@ func _fire_breath() -> void:
 	_play("fire")
 	AudioManager.play_sfx("breath_fire")
 	game.shake(4.0)
-	var dmg := 15.0 + 22.0 * charge_t
-	game.spawn_beam(position + Vector2(48, -108), lane)
-	game.melee_hit([lane], position.x + 20.0, 999.0, dmg, {"pierce_armor": true, "breath": true})
+	var dmg := (15.0 + 22.0 * charge_t) * GameState.breath_mult()
+	game.spawn_beam(position + Vector2(48 * facing, -108), facing)
+	var span := Vector2(position.x + 20.0, 999.0) if facing > 0.0 else Vector2(-999.0, position.x - 20.0)
+	game.melee_hit([lane], span.x, span.y, dmg, {"pierce_armor": true, "breath": true, "full": charge_t >= 1.0})
 	charge_t = 0.0
 
 func _on_jump_tap() -> void:
@@ -306,13 +343,16 @@ func _on_jump_swipe(dir: Vector2) -> void:
 	elif dir.y > 0:  # dive slam → ground lane
 		if not (_can_act() or state == "jump"):
 			return
-		lane = G.LANE_GROUND
-		z_index = 10 + lane
-		if lane_tween:
-			lane_tween.kill()
-		lane_tween = create_tween()
-		lane_tween.tween_property(self, "position:y", G.LANE_Y[lane], 0.12)
+		force_lane(G.LANE_GROUND, 0.12)
 		_start_air("dive", 0.16)
+	elif dir.x != 0.0:  # sideways swipe on jump = hop that way
+		if not _can_act():
+			return
+		_set_facing(signf(dir.x))
+		_start_air("jump", 0.5)
+		var tw := create_tween()
+		tw.tween_property(self, "position:x", clampf(position.x + 110.0 * facing, G.PLAY_LEFT, G.PLAY_RIGHT), 0.5)
+		AudioManager.play_sfx("jump", -4.0)
 
 func _start_air(kind: String, dur: float) -> void:
 	state = kind
@@ -320,18 +360,16 @@ func _start_air(kind: String, dur: float) -> void:
 	air_t = dur
 	airborne = true
 	_play("jump")
-	var tw := create_tween()
-	tw.tween_property(body, "position:y", -96.0 - 40.0, dur * 0.4)
-	tw.tween_property(body, "position:y", -96.0, dur * 0.6)
-	var tw2 := create_tween()
-	tw2.tween_property(fins, "position:y", -96.0 - 40.0, dur * 0.4)
-	tw2.tween_property(fins, "position:y", -96.0, dur * 0.6)
+	for s in [body, fins]:
+		var tw := create_tween()
+		tw.tween_property(s, "position:y", -96.0 - 40.0, dur * 0.4)
+		tw.tween_property(s, "position:y", -96.0, dur * 0.6)
 
 func _on_special() -> void:
-	# 360° Nuclear Pulse (GDD 3.4): clears immediate lane, cooldown-based.
+	# 360° Nuclear Pulse (GDD 3.4): clears nearby lanes, cooldown-based.
 	if special_cd > 0.0 or not _can_act():
 		return
-	special_cd = 10.0
+	special_cd = GameState.pulse_cooldown()
 	AudioManager.play_sfx("pulse")
 	AudioManager.play_sfx("gz_roar", -6.0)
 	game.shake(8.0)
@@ -339,7 +377,9 @@ func _on_special() -> void:
 	var lanes := [lane]
 	if lane > 0: lanes.append(lane - 1)
 	if lane < 2: lanes.append(lane + 1)
-	game.melee_hit(lanes, position.x - 130.0, position.x + 130.0, 30.0, {"knockdown": true, "pierce_armor": true})
+	game.melee_hit(lanes, position.x - 130.0, position.x + 130.0, GameState.pulse_damage(),
+		{"knockdown": true, "pierce_armor": true, "pulse": true})
+	game.clear_projectiles_near(position.x, 150.0)
 
 # ---------- grab & throw (GDD 3.4: walk into stunned enemy) ----------
 func _try_grab() -> void:
@@ -363,18 +403,18 @@ func _do_throw() -> void:
 	var e = grabbed_enemy
 	grabbed_enemy = null
 	if is_instance_valid(e):
-		e.begin_thrown(1.0 if InputHandler.move_axis >= 0.0 else -1.0)
+		e.begin_thrown(facing)
 
 # ---------- damage ----------
 func take_damage(dmg: float, opts := {}) -> void:
 	if state == "dead" or invuln_t > 0.0:
 		return
-	if airborne and opts.get("dodge_air", false):
-		return
 	if GameState.mercy_active(GameState.current_level):
 		dmg *= 0.7
-	if is_blocking():
+	dmg *= GameState.damage_taken_mult()
+	if not opts.get("unblockable", false) and _is_backing_from(opts.get("src_x", null)):
 		dmg *= 0.6
+		block_flash = 0.3
 		AudioManager.play_sfx("hit", -6.0)
 	else:
 		AudioManager.play_sfx("gz_hurt", -3.0)
@@ -391,10 +431,10 @@ func take_damage(dmg: float, opts := {}) -> void:
 		emit_signal("died")
 	emit_signal("stats_changed")
 
-func apply_stun(dur: float) -> void:
+func apply_stun(dur: float, src_x = null) -> void:
 	if state == "dead":
 		return
-	if is_blocking():
+	if _is_backing_from(src_x):
 		dur *= 0.4
 	stun_t = maxf(stun_t, dur)
 

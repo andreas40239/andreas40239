@@ -12,14 +12,17 @@ var wave_i := 0
 var wave_pending := []        # queued spawns for current wave
 var wave_spawn_t := 0.0
 var frozen := false
+var frost := 0.0              # Mechagodzilla absolute-zero screen frost (0..1)
 
 var player: Player
 var enemies: Array = []
-var boss: Boss = null
+var boss: BossBase = null
 var parallax: ParallaxBackground
 var hud: Hud
 var controls: TouchControls
 var world: Node2D
+var fx_root: Node2D           # projectiles + hazards (cleared on respawn)
+var frost_rect: ColorRect
 var shake_amt := 0.0
 var overlay: CanvasLayer = null
 
@@ -33,9 +36,17 @@ func _ready() -> void:
 	player.game = self
 	world.add_child(player)
 	player.died.connect(_on_player_died)
+	fx_root = Node2D.new()
+	world.add_child(fx_root)
 	var ui_layer := CanvasLayer.new()
 	ui_layer.layer = 10
 	add_child(ui_layer)
+	frost_rect = ColorRect.new()
+	frost_rect.color = Color(0.7, 0.9, 1.0, 0.0)
+	frost_rect.anchor_right = 1.0
+	frost_rect.anchor_bottom = 1.0
+	frost_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(frost_rect)
 	hud = Hud.new()
 	hud.player = player
 	ui_layer.add_child(hud)
@@ -47,7 +58,7 @@ func _ready() -> void:
 	ui_layer.add_child(pause_btn)
 	AudioManager.play_music("march")
 	AudioManager.play_sfx("gz_roar", -4.0)
-	hud.flash_message(level_def["name"], 2.0)
+	hud.flash_message("LEVEL %d\n%s" % [level_id, level_def["name"]], 2.2)
 	_start_segment(0)
 
 # ---------------- background ----------------
@@ -102,12 +113,24 @@ func _start_segment(i: int) -> void:
 			hud.flash_message("ARENA - CLEAR THEM ALL!")
 			_next_wave()
 		"boss":
-			hud.flash_message("TYRANNOKING", 2.5)
+			hud.flash_message(level_def.get("boss_name", "BOSS"), 2.5)
 			AudioManager.play_music("boss")
-			boss = Boss.new()
-			boss.setup(self)
+			match seg["boss"]:
+				"superx":
+					var sx := SuperX.new()
+					sx.setup(self)
+					boss = sx
+				"mecha":
+					var m := Mecha.new()
+					m.setup(self)
+					boss = m
+				_:
+					var t := Boss.new()
+					t.setup(self)
+					boss = t
 			world.add_child(boss)
 			hud.boss_ratio = 1.0
+			hud.boss_marks = boss.phase_marks
 			boss.hp_changed.connect(func(r): hud.boss_ratio = r)
 			boss.boss_died.connect(_on_boss_died)
 
@@ -115,6 +138,7 @@ func _process(delta: float) -> void:
 	if shake_amt > 0.0:
 		shake_amt = maxf(0.0, shake_amt - 30.0 * delta)
 		world.position = Vector2(randf_range(-shake_amt, shake_amt), randf_range(-shake_amt, shake_amt))
+	frost_rect.color.a = frost * 0.45
 	if frozen:
 		return
 	enemies = enemies.filter(func(e): return is_instance_valid(e) and e.state != "dead")
@@ -127,7 +151,7 @@ func _process(delta: float) -> void:
 			if spawn_timer <= 0.0 and march_dist < seg["dist"] - 120.0:
 				spawn_timer = seg["rate"] + randf_range(-0.5, 0.7)
 				var kinds: Array = seg["spawn"]
-				spawn_enemy(kinds[randi() % kinds.size()], false)
+				spawn_enemy(kinds[randi() % kinds.size()], randf() < 0.15)
 			if march_dist >= seg["dist"] and enemies.is_empty():
 				_start_segment(segment_i + 1)
 		"arena":
@@ -152,37 +176,77 @@ func _next_wave() -> void:
 	wave_pending = waves[wave_i].duplicate()
 	wave_spawn_t = 0.6
 
-func spawn_enemy(kind: String, from_left: bool) -> Enemy:
+func spawn_enemy(kind: String, from_left: bool):
+	if kind == "trex":  # Level 4 mini-boss
+		var t := Boss.new()
+		t.setup(self, true)
+		world.add_child(t)
+		enemies.append(t)
+		hud.flash_message("T-REX!")
+		return t
 	var e := Enemy.new()
 	world.add_child(e)
 	e.setup(kind, self, from_left)
 	enemies.append(e)
 	return e
 
+func spawn_projectile(tex: String, lane: int, x: float, vel: Vector2, dmg: float, homing := 0.0) -> Projectile:
+	var p := Projectile.new()
+	fx_root.add_child(p)
+	p.setup(self, tex, lane, x, vel, dmg, homing)
+	return p
+
+func spawn_hazard(lanes: Array, x0: float, x1: float, warn: float, active: float, dmg: float, color: Color, hits_air := false) -> Hazard:
+	var h := Hazard.new()
+	h.game = self
+	h.lanes = lanes
+	h.x0 = x0
+	h.x1 = x1
+	h.warn = warn
+	h.active = active
+	h.dmg = dmg
+	h.color = color
+	h.hits_air = hits_air
+	fx_root.add_child(h)
+	return h
+
+## Everything the player (or a reflected missile) can damage.
+func all_targets() -> Array:
+	var out: Array = []
+	for e in enemies:
+		if is_instance_valid(e) and not (e.state in ["dead", "grabbed", "thrown"]):
+			out.append(e)
+	if boss != null and is_instance_valid(boss) and boss.state != "dead":
+		out.append(boss)
+	return out
+
+func clear_projectiles_near(x: float, radius: float) -> void:
+	for p in fx_root.get_children():
+		if p is Projectile and not p.friendly and absf(p.position.x - x) < radius:
+			p._explode()
+
 # ---------------- combat resolution ----------------
 func melee_hit(lanes: Array, x_min: float, x_max: float, dmg: float, opts := {}) -> int:
 	var count := 0
 	var exclude = opts.get("exclude", null)
-	for e in enemies:
-		if not is_instance_valid(e) or e == exclude or e.state in ["dead", "grabbed", "thrown"]:
+	for e in all_targets():
+		if e == exclude:
 			continue
 		var in_lane := false
 		for l in lanes:
 			if e.occupies(l):
 				in_lane = true
 				break
-		if in_lane and e.position.x >= x_min and e.position.x <= x_max:
+		var span: Vector2 = e.hit_span()
+		if in_lane and span.y >= x_min and span.x <= x_max:
 			e.take_hit(dmg, opts)
 			count += 1
-	if boss != null and is_instance_valid(boss) and boss.state != "dead":
-		var bl := false
-		for l in lanes:
-			if boss.occupies(l):
-				bl = true
-				break
-		if bl and boss.position.x - 40.0 >= x_min - 60.0 and boss.position.x <= x_max + 40.0:
-			boss.take_hit(dmg, opts)
-			count += 1
+	# tail whips swat enemy missiles back (GDD 5.2)
+	if exclude == null and not opts.get("breath", false):
+		for p in fx_root.get_children():
+			if p is Projectile and not p.friendly and p.swattable and p.lane in lanes \
+					and p.position.x >= x_min - 10.0 and p.position.x <= x_max + 10.0:
+				p.reflect(player.facing)
 	if count > 0:
 		add_score(10 * count)
 	return count
@@ -211,12 +275,9 @@ func _one_shot(tex: String, pos: Vector2, hframes: int, fps: float, sc := 4.0) -
 	s.position = pos
 	s.z_index = 20
 	world.add_child(s)
-	var timer := 0.0
-	s.set_process(true)
-	var frames := hframes
 	var tw := create_tween()
-	for f in frames:
-		tw.tween_callback(func(): s.frame = mini(f, frames - 1)).set_delay(0.0 if f == 0 else 1.0 / fps)
+	for f in hframes:
+		tw.tween_callback(func(): s.frame = f).set_delay(0.0 if f == 0 else 1.0 / fps)
 	tw.tween_interval(1.0 / fps)
 	tw.tween_callback(s.queue_free)
 
@@ -251,7 +312,7 @@ func spawn_pulse(pos: Vector2) -> void:
 	tw.tween_property(s, "modulate:a", 0.0, 0.4)
 	tw.chain().tween_callback(s.queue_free)
 
-func spawn_beam(pos: Vector2, lane: int) -> void:
+func spawn_beam(pos: Vector2, dir: float) -> void:
 	var s := Sprite2D.new()
 	s.texture = load("res://assets/sprites/fx/beam.png")
 	s.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -259,7 +320,7 @@ func spawn_beam(pos: Vector2, lane: int) -> void:
 	s.region_rect = Rect2(0, 0, 96, 8)
 	s.centered = false
 	s.position = pos - Vector2(0, 16)
-	s.scale = Vector2(4, 4)
+	s.scale = Vector2(4 * dir, 4)
 	s.z_index = 25
 	world.add_child(s)
 	var tw := create_tween()
@@ -270,6 +331,7 @@ func spawn_beam(pos: Vector2, lane: int) -> void:
 # ---------------- death / victory / pause ----------------
 func _on_player_died() -> void:
 	frozen = true
+	frost = 0.0
 	GameState.add_death(level_id)
 	AudioManager.play_music("gameover", false)
 	var items: Array = [Ui.label("GODZILLA HAS FALLEN", 12, Color("ef4444"))]
@@ -288,24 +350,22 @@ func _respawn() -> void:
 		if is_instance_valid(e):
 			e.queue_free()
 	enemies.clear()
+	for c in fx_root.get_children():
+		c.queue_free()
 	if boss != null and is_instance_valid(boss):
 		boss.queue_free()
-		boss = null
-		hud.boss_ratio = -1.0
-	player.hp = player.max_hp
-	player.meter = player.max_meter * 0.4
-	player.state = "idle"
-	player.stun_t = 0.0
-	player.grabbed_enemy = null
-	player.airborne = false
-	player.lane = G.LANE_GROUND
-	player.position = Vector2(96, G.LANE_Y[player.lane])
+	boss = null
+	hud.boss_ratio = -1.0
+	hud.timer_text = ""
+	frost = 0.0
+	player.reset_for_respawn()
 	frozen = false
 	AudioManager.play_sfx("checkpoint")
 	_start_segment(segment_i)
 
 func _on_boss_died() -> void:
 	hud.boss_ratio = -1.0
+	hud.timer_text = ""
 	boss = null
 	await get_tree().create_timer(1.4).timeout
 	_victory()
@@ -315,32 +375,32 @@ func _victory() -> void:
 		return
 	frozen = true
 	seg_state = "done"
+	for c in fx_root.get_children():
+		c.queue_free()
 	GameState.complete_level(level_id, hud.score)
 	AudioManager.play_music("victory", false)
 	AudioManager.play_sfx("gz_roar")
 	var items: Array = [
 		Ui.label("LEVEL COMPLETE!", 13, Color("2dd4bf")),
 		Ui.label("SCORE  %06d" % hud.score, 9),
+		Ui.gem_row(GameState.last_ep_gain, "+"),
 	]
-	if GameState.last_ep_gain > 0:
-		items.append(Ui.label("+%d EVOLUTION POINT%s" % [GameState.last_ep_gain, "S" if GameState.last_ep_gain > 1 else ""], 9, Color("fbbf24")))
-	items.append(Ui.button("EVOLVE (UPGRADES)", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), 9, Color("a855f7")))
-	if level_id < 3:
+	items.append(Ui.icon_button("icon_plus", "POWER UP!", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), Color("a855f7")))
+	if level_id < GameState.MAX_LEVEL:
 		items.append(Ui.button("NEXT LEVEL", func():
 			GameState.current_level = level_id + 1
 			get_tree().change_scene_to_file("res://scenes/story_card.tscn")))
 	else:
-		items.append(Ui.label("YOU ARE THE KING\nOF THE MONSTERS", 9, Color("fbbf24")))
+		items.append(Ui.label("YOU ARE THE KING\nOF THE MONSTERS!", 10, Color("fbbf24")))
 	items.append(Ui.button("MAIN MENU", func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"), 9, Color("6b7280")))
 	overlay = Ui.center_overlay(self, items)
-	if GameState.last_ep_gain > 0:
-		AudioManager.play_sfx("ep_gain")
+	AudioManager.play_sfx("ep_gain")
 
 func _open_pause() -> void:
 	if get_tree().paused or frozen:
 		return
 	get_tree().paused = true
-	var pl := Ui.center_overlay(self, [
+	overlay = Ui.center_overlay(self, [
 		Ui.label("PAUSED", 13),
 		Ui.button("RESUME", func():
 			get_tree().paused = false
@@ -353,4 +413,3 @@ func _open_pause() -> void:
 			get_tree().paused = false
 			get_tree().change_scene_to_file("res://scenes/main_menu.tscn"), 9, Color("6b7280")),
 	])
-	overlay = pl

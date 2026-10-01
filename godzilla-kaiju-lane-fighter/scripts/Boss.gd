@@ -1,55 +1,29 @@
 class_name Boss
-extends Node2D
+extends BossBase
 ## TYRANNOKING — Level 3 boss (GDD 6.1). Two phases, pattern-based.
+## With mini=true it is the smaller T-Rex mini-boss of Level 4.
 
-signal boss_died
-signal hp_changed(ratio: float)
-
-var game
-var player: Player
-var hp := G.BOSS_HP
-var max_hp := G.BOSS_HP
-var phase := 1
-var state := "intro"    # intro|idle|bite_wind|bite|tail_wind|tail|roar_wind|roar|quake_wind|quake|summon|stunned|recover|dead
-var state_t := 0.0
-var atk_cd := 2.0
-var spr: Sprite2D
-var _anim_t := 0.0
-var _hit_done := false
-var _speed_mult := 1.0
 var summons_alive := 0
 
 # frames: 0,1 idle/walk | 2 bite windup | 3 bite | 4 tail windup | 5 tail spin | 6 roar | 7 hurt
 
-func setup(p_game) -> void:
+func setup(p_game, p_mini := false, from_left := false) -> void:
 	game = p_game
 	player = p_game.player
-	spr = Sprite2D.new()
-	spr.texture = load("res://assets/sprites/characters/tyrannoking.png")
-	spr.hframes = 8
-	spr.scale = Vector2(4, 4)
-	spr.position = Vector2(0, -144)
-	add_child(spr)
+	mini = p_mini
+	max_hp = G.BOSS_HP["trex" if mini else "tyrannoking"]
+	hp = max_hp
+	phase_marks = [0.6]
+	_make_sprite("tyrannoking", 8, 3.0 if mini else 4.0, 72.0)
+	if mini:
+		base_mod = Color(0.8, 1.0, 0.8)
+		spr.modulate = base_mod
 	position = Vector2(430.0, G.LANE_Y[G.LANE_GROUND])
 	z_index = 14
-	AudioManager.play_sfx("boss_roar")
+	AudioManager.play_sfx("boss_roar", 0.0, 1.2 if mini else 1.0)
 
-func occupies(l: int) -> bool:
-	# occupies ground + mid (GDD 5.1); during tail spin it threatens mid+high
-	return l in [G.LANE_MID, G.LANE_GROUND]
-
-func grabbable() -> bool:
-	return false
-
-func _tell(sfx: String) -> void:
-	AudioManager.play_sfx(sfx)
-	spr.modulate = Color(1.7, 1.15, 1.15)
-
-func _clear_tell() -> void:
-	spr.modulate = Color(1, 1, 1)
-
-func _wind_time(base: float) -> float:
-	return (base + GameState.tell_bonus()) / _speed_mult
+func hit_span() -> Vector2:
+	return Vector2(position.x - (65.0 if mini else 90.0), position.x + 30.0)
 
 func _process(delta: float) -> void:
 	if state == "dead" or game.frozen:
@@ -57,6 +31,7 @@ func _process(delta: float) -> void:
 	state_t += delta
 	_anim_t += delta
 	atk_cd -= delta / _speed_mult
+	var reach := 0.75 if mini else 1.0
 	match state:
 		"intro":
 			position.x = move_toward(position.x, 268.0, 60.0 * delta)
@@ -65,8 +40,8 @@ func _process(delta: float) -> void:
 				_goto("idle")
 		"idle":
 			_frame_walk()
-			# stalk the player slowly
-			var tx: float = clampf(player.position.x + 130.0, 220.0, 300.0)
+			# stalk the player, staying on the side it came from
+			var tx: float = clampf(player.position.x + 130.0 * reach, 120.0, 310.0)
 			position.x = move_toward(position.x, tx, 42.0 * _speed_mult * delta)
 			if atk_cd <= 0.0:
 				_choose_attack()
@@ -78,14 +53,13 @@ func _process(delta: float) -> void:
 				AudioManager.play_sfx("bite")
 		"bite":  # lunge forward in ground lane — dodge to high/mid
 			spr.frame = 3
-			position.x -= 420.0 * _speed_mult * delta
-			if not _hit_done and player.lane == G.LANE_GROUND and absf(player.position.x - position.x + 40.0) < 78.0 and not player.airborne:
+			position.x = maxf(40.0, position.x - 420.0 * _speed_mult * delta)
+			if not _hit_done and player.lane == G.LANE_GROUND and absf(player.position.x - position.x + 40.0 * reach) < 78.0 * reach and not player.airborne:
 				_hit_done = true
-				player.take_damage(18.0)
+				_hit_player(12.0 if mini else 18.0)
 			if state_t > 0.35 / _speed_mult:
 				if phase == 2 and randf() < 0.5 and not _hit_done:
 					_goto("bite")  # blood frenzy: chained bites
-					_hit_done = false
 				else:
 					_goto("recover")
 		"tail_wind":  # tail trembles 0.5s
@@ -94,13 +68,12 @@ func _process(delta: float) -> void:
 				_clear_tell()
 				_goto("tail")
 				AudioManager.play_sfx("tail_whip", 0.0, 0.6)
-		"tail":  # cyclone hits MID + HIGH for 1.2s — drop to ground!
+		"tail":  # cyclone hits MID + HIGH — drop to ground!
 			spr.frame = 5 if int(_anim_t * 14) % 2 == 0 else 4
-			if state_t > 0.15 and player.lane in [G.LANE_MID, G.LANE_HIGH] \
-					and absf(player.position.x - position.x) < 150.0 and not player.airborne:
-				if not _hit_done:
-					_hit_done = true
-					player.take_damage(16.0, {"stun": 0.4})
+			if state_t > 0.15 and not _hit_done and player.lane in [G.LANE_MID, G.LANE_HIGH] \
+					and absf(player.position.x - position.x) < 150.0 * reach and not player.airborne:
+				_hit_done = true
+				_hit_player(11.0 if mini else 16.0, {"stun": 0.4})
 			if state_t > 1.2 / _speed_mult:
 				_goto("recover")
 		"roar_wind":  # chest puffs 0.8s — interrupt with charged breath!
@@ -110,11 +83,11 @@ func _process(delta: float) -> void:
 				_goto("roar")
 				AudioManager.play_sfx("boss_roar")
 				game.shake(7.0)
-		"roar":  # stuns all lanes 1.2s unless blocked
+		"roar":  # stuns all lanes 1.2s unless you back away
 			spr.frame = 6
 			if not _hit_done and state_t > 0.1:
 				_hit_done = true
-				player.apply_stun(1.2)
+				player.apply_stun(0.8 if mini else 1.2, position.x)
 			if state_t > 0.9:
 				_goto("recover")
 		"quake_wind":  # phase 2: rears up 0.7s — be airborne!
@@ -133,7 +106,7 @@ func _process(delta: float) -> void:
 			if not _hit_done and state_t > 0.05:
 				_hit_done = true
 				if not player.airborne:
-					player.take_damage(20.0, {"stun": 0.5})
+					_hit_player(20.0, {"stun": 0.5, "unblockable": true})
 			if state_t > 0.5:
 				_goto("recover")
 		"summon":
@@ -142,8 +115,7 @@ func _process(delta: float) -> void:
 				_hit_done = true
 				AudioManager.play_sfx("boss_roar", -8.0, 1.4)
 				for i in 4:
-					var from_left := i % 2 == 1
-					var r = game.spawn_enemy("raptor", from_left)
+					var r = game.spawn_enemy("raptor", i % 2 == 1)
 					r.heal_target = self
 					summons_alive += 1
 					r.enemy_died.connect(func(_e): summons_alive -= 1)
@@ -163,25 +135,18 @@ func _process(delta: float) -> void:
 func _frame_walk() -> void:
 	spr.frame = int(_anim_t * 4) % 2
 
-func _goto(s: String) -> void:
-	state = s
-	state_t = 0.0
-	if s != "bite":
-		_hit_done = false
-	else:
-		_hit_done = false
-
 func _choose_attack() -> void:
 	var opts := ["bite", "tail", "roar"]
-	if phase == 2:
+	if mini:
+		opts = ["bite", "bite", "tail"]
+	elif phase == 2:
 		opts = ["bite", "tail", "quake", "quake"]
 		if summons_alive <= 0 and randf() < 0.3:
 			opts = ["summon"]
-	var pick: String = opts[randi() % opts.size()]
-	match pick:
+	match opts[randi() % opts.size()]:
 		"bite":
 			_goto("bite_wind")
-			_tell("bite")  # audio tell 0.3s+ before strike (GDD 10.5)
+			_tell("bite")  # audio tell before strike (GDD 10.5)
 		"tail":
 			_goto("tail_wind")
 			_tell("tail_whip")
@@ -194,42 +159,18 @@ func _choose_attack() -> void:
 		"summon":
 			_goto("summon")
 
-func heal(amount: float) -> void:
-	hp = minf(max_hp, hp + amount)
-	emit_signal("hp_changed", hp / max_hp)
-
 func take_hit(amount: float, opts := {}) -> void:
-	if state in ["dead", "intro"]:
-		return
 	# charged atomic breath interrupts the roar windup (GDD counter)
-	if opts.get("breath", false) and state == "roar_wind":
+	if (opts.get("breath", false) or opts.get("pulse", false)) and state == "roar_wind":
 		_clear_tell()
 		_goto("stunned")
 		AudioManager.play_sfx("gz_hurt", 0.0, 0.6)
 		game.shake(5.0)
-	hp -= amount
-	AudioManager.play_sfx("hit", -2.0)
-	var flash := spr.modulate
-	spr.modulate = Color(3, 3, 3)
-	var tw := create_tween()
-	tw.tween_property(spr, "modulate", Color(1, 1, 1), 0.12)
-	emit_signal("hp_changed", hp / max_hp)
-	if hp <= max_hp * 0.6 and phase == 1:
+	if not _apply_damage(amount):
+		return
+	if not mini and hp > 0.0 and hp <= max_hp * 0.6 and phase == 1:
 		phase = 2
 		_speed_mult = 1.4  # Blood Frenzy (GDD 6.1 phase 2)
 		AudioManager.play_sfx("boss_roar", 2.0, 0.85)
 		game.shake(8.0)
 		game.flash_message("BLOOD FRENZY!")
-	if hp <= 0.0:
-		_die()
-
-func _die() -> void:
-	state = "dead"
-	game.add_score(G.SCORE["boss"])
-	AudioManager.play_sfx("boss_roar", 0.0, 0.7)
-	game.shake(12.0)
-	for i in 5:
-		game.spawn_explosion(position + Vector2(randf_range(-60, 40), randf_range(-160, -20)))
-	var tw := create_tween()
-	tw.tween_property(spr, "modulate", Color(2, 0.5, 0.5, 0.0), 1.2)
-	tw.tween_callback(func(): emit_signal("boss_died"); queue_free())

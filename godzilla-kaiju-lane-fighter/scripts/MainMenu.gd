@@ -64,9 +64,7 @@ func _ready() -> void:
 	var wrap := CenterContainer.new()
 	wrap.add_child(start)
 	box.add_child(wrap)
-	var wrap2 := CenterContainer.new()
-	wrap2.add_child(Ui.button("EVOLVE", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), 9, Color("a855f7")))
-	box.add_child(wrap2)
+	box.add_child(Ui.icon_button("icon_gem", "POWER UP", func(): get_tree().change_scene_to_file("res://scenes/upgrade_screen.tscn"), Color("a855f7")))
 	var stats := Ui.label("HI-SCORE %06d    EP %d" % [GameState.high_score, GameState.ep], 7, Color(0.7, 0.75, 0.8))
 	stats.anchor_top = 1.0
 	stats.anchor_bottom = 1.0
@@ -74,6 +72,3 @@ func _ready() -> void:
 	stats.offset_top = -30
 	add_child(stats)
 	AudioManager.play_music("menu")
-
-func _input(event: InputEvent) -> void:
-	pass

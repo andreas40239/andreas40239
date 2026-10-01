@@ -74,3 +74,46 @@ static func center_overlay(root: Node, items: Array) -> CanvasLayer:
 		box.add_child(it)
 	root.add_child(layer)
 	return layer
+
+static func icon(name: String, px := 48.0) -> TextureRect:
+	var t := TextureRect.new()
+	t.texture = load("res://assets/sprites/ui/%s.png" % name)
+	t.custom_minimum_size = Vector2(px, px)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return t
+
+## Row of gem icons ("+ 💎💎💎") — readable without reading numbers.
+static func gem_row(count: int, prefix := "") -> Control:
+	var wrap := CenterContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	wrap.add_child(row)
+	if prefix != "":
+		row.add_child(label(prefix, 14, Color("22d3ee")))
+	if count <= 6:
+		for i in count:
+			row.add_child(icon("icon_gem", 30))
+	else:
+		row.add_child(icon("icon_gem", 30))
+		row.add_child(label("x%d" % count, 14, Color("22d3ee")))
+	return wrap
+
+static func icon_button(icon_name: String, text: String, cb: Callable, color := Color("2dd4bf")) -> Control:
+	var wrap := CenterContainer.new()
+	var b := button("", cb, 10, color)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon(icon_name, 24))
+	var l := label(text, 10, color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(l)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	b.add_child(row)
+	b.custom_minimum_size = Vector2(190, 44)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	wrap.add_child(b)
+	return wrap

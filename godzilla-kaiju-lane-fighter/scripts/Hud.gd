@@ -5,6 +5,9 @@ extends Control
 var player: Player
 var score := 0
 var boss_ratio := -1.0
+var boss_marks: Array = []
+var timer_text := ""
+var timer_label: Label
 var _msg := ""
 var _msg_t := 0.0
 var _hp_flash := 0.0
@@ -41,6 +44,16 @@ func _ready() -> void:
 	msg_label.position.y = 150
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(msg_label)
+	timer_label = Label.new()
+	timer_label.add_theme_font_override("font", font)
+	timer_label.add_theme_font_size_override("font_size", 11)
+	timer_label.add_theme_color_override("font_color", Color("ef4444"))
+	timer_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	timer_label.add_theme_constant_override("outline_size", 3)
+	timer_label.anchor_right = 1.0
+	timer_label.position.y = 54
+	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(timer_label)
 
 func flash_message(text: String, dur := 1.6) -> void:
 	_msg = text
@@ -54,6 +67,8 @@ func _process(delta: float) -> void:
 		if _msg_t <= 0.0:
 			msg_label.visible = false
 	score_label.text = "%06d" % score
+	timer_label.text = timer_text
+	timer_label.visible = timer_text != "" and int(Time.get_ticks_msec() / 250) % 2 == 0
 	if is_instance_valid(player):
 		if _last_hp >= 0.0 and player.hp < _last_hp:
 			_hp_flash = 0.25
@@ -82,8 +97,8 @@ func _draw() -> void:
 		var bw := 240.0
 		var bpos := Vector2((vs.x - bw) * 0.5, 34)
 		_bar(bpos, Vector2(bw, 11), boss_ratio, Color("dc2626"))
-		var mx := bpos.x + bw * 0.6
-		draw_rect(Rect2(mx, bpos.y - 1, 2, 13), Color("fbbf24"))
+		for m in boss_marks:
+			draw_rect(Rect2(bpos.x + bw * float(m), bpos.y - 1, 2, 13), Color("fbbf24"))
 
 func _bar(pos: Vector2, size: Vector2, ratio: float, color: Color) -> void:
 	draw_rect(Rect2(pos - Vector2(2, 2), size + Vector2(4, 4)), Color.BLACK)
