@@ -1,10 +1,16 @@
 'use strict';
 // Prozedurale Audio-Engine: düstere Hintergrundmusik + alle Soundeffekte per WebAudio synthetisiert.
+// Auf schwächere Android-Geräte ausgelegt: großer Audiopuffer, günstiger Delay-Hall statt Faltungshall,
+// Stimmenbegrenzung, Aufräumen beendeter Knoten und ein Wächter, der einen hängenden Kontext neu startet.
 const Sound = (() => {
   let ctx = null, master, reverb, noiseBuf, musicBus, sfxBus;
   let musicOn = true, sfxOn = true;
   let musicRunning = false, schedTimer = null, nextStep = 0, stepIdx = 0, drone = null;
   let melodyIdx = 4;
+  let sfxVoices = 0, musicVoices = 0, appPaused = false, wantMusic = false;
+  let watchdog = null, lastCT = -1, stuck = 0;
+  const MAX_SFX = 22, HARD_SFX = 34, MAX_MUSIC = 26;
+  const PRIORITY = new Set(['playerHurt', 'levelUp', 'chest', 'gameOver', 'stairs', 'menuSelect', 'menuBack', 'upgrade', 'heart', 'mana', 'armor']);
   const lastPlay = {};
 
   try {
@@ -16,14 +22,24 @@ const Sound = (() => {
     try { localStorage.setItem('sg_audio', JSON.stringify({ music: musicOn, sfx: sfxOn })); } catch (e) { }
   }
 
-  function makeImpulse(seconds, decay) {
-    const rate = ctx.sampleRate, len = Math.floor(rate * seconds);
-    const buf = ctx.createBuffer(2, len, rate);
-    for (let c = 0; c < 2; c++) {
-      const d = buf.getChannelData(c);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
-    }
-    return buf;
+  // Günstiger Hall: vier rückgekoppelte, tiefpassgefilterte Verzögerungen (kein ConvolverNode).
+  function makeReverb() {
+    const input = ctx.createGain(), out = ctx.createGain();
+    out.gain.value = 0.5;
+    const pre = ctx.createDelay(0.1); pre.delayTime.value = 0.03;
+    input.connect(pre);
+    [[0.113, 0.62, -0.7], [0.157, 0.6, 0.7], [0.191, 0.58, -0.3], [0.233, 0.56, 0.3]].forEach(([t, fb, pan]) => {
+      const d = ctx.createDelay(0.5); d.delayTime.value = t;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+      const g = ctx.createGain(); g.gain.value = fb;
+      pre.connect(d); d.connect(lp); lp.connect(g); g.connect(d);
+      if (ctx.createStereoPanner) {
+        const p = ctx.createStereoPanner(); p.pan.value = pan;
+        lp.connect(p); p.connect(out);
+      } else lp.connect(out);
+    });
+    out.connect(master);
+    return input;
   }
 
   function makeBus(vol) {
@@ -43,31 +59,64 @@ const Sound = (() => {
   }
 
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { if (ctx.state === 'suspended' && !appPaused) ctx.resume().catch(() => { }); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    ctx = new AC();
+    // 'playback' = größerer Puffer -> kein Knacksen/Rauschen bei CPU-Spitzen (etwas mehr Latenz).
+    try { ctx = new AC({ latencyHint: 'playback' }); } catch (e) { ctx = new AC(); }
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 5;
     comp.attack.value = 0.004; comp.release.value = 0.25;
     comp.connect(ctx.destination);
     master = ctx.createGain(); master.gain.value = 0.9; master.connect(comp);
-    reverb = ctx.createConvolver(); reverb.buffer = makeImpulse(3.4, 2.4);
-    const revOut = ctx.createGain(); revOut.gain.value = 0.5;
-    reverb.connect(revOut); revOut.connect(master);
+    reverb = makeReverb();
     musicBus = makeBus(musicOn ? 0.55 : 0);
     sfxBus = makeBus(sfxOn ? 0.9 : 0);
     const len = ctx.sampleRate * 2;
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    sfxVoices = 0; musicVoices = 0; lastCT = -1; stuck = 0;
+    ctx.onstatechange = () => { if (ctx && ctx.state === 'suspended' && !appPaused && !document.hidden) ctx.resume().catch(() => { }); };
+    if (!watchdog) watchdog = setInterval(checkHealth, 1000);
   }
 
-  function route(node, bus, wet) {
+  // Wächter: Kontext hängt (Zeit steht trotz 'running') oder wurde vom System geschlossen -> neu aufbauen.
+  function checkHealth() {
+    if (!ctx || appPaused || document.hidden) { stuck = 0; return; }
+    if (ctx.state === 'closed') { rebuild(); return; }
+    if (ctx.state === 'suspended') { ctx.resume().catch(() => { }); return; }
+    if (ctx.currentTime === lastCT) { if (++stuck >= 3) rebuild(); }
+    else stuck = 0;
+    lastCT = ctx.currentTime;
+  }
+
+  function rebuild() {
+    const old = ctx;
+    const hadMusic = musicRunning || wantMusic;
+    if (musicRunning) { clearInterval(schedTimer); musicRunning = false; drone = null; }
+    ctx = null;
+    try { old.close(); } catch (e) { }
+    init();
+    if (hadMusic) startMusic();
+  }
+
+  // Beendete Klangquellen: alle zugehörigen Knoten trennen, damit nichts liegen bleibt.
+  function track(src, nodes, bus) {
+    const music = bus === musicBus;
+    if (music) musicVoices++; else sfxVoices++;
+    src.onended = () => {
+      for (const n of nodes) { try { n.disconnect(); } catch (e) { } }
+      if (music) musicVoices--; else sfxVoices--;
+    };
+  }
+
+  function route(node, bus, wet, nodes) {
     node.connect(bus.dry);
     if (wet > 0) {
       const s = ctx.createGain(); s.gain.value = wet;
       node.connect(s); s.connect(bus.wet);
+      nodes.push(s);
     }
   }
 
@@ -80,6 +129,8 @@ const Sound = (() => {
   // Oszillator-Ton mit Hüllkurve und optionalem Filter
   function tone(type, f, t0, dur, o) {
     o = o || {};
+    const bus = o.bus || sfxBus;
+    if (bus === sfxBus && sfxVoices >= HARD_SFX) return null; // harte Obergrenze gleichzeitiger Effektstimmen
     const osc = ctx.createOscillator();
     osc.type = type;
     osc.frequency.setValueAtTime(f, t0);
@@ -87,22 +138,25 @@ const Sound = (() => {
     if (o.detune) osc.detune.value = o.detune;
     const g = ctx.createGain();
     env(g, t0, o.vol || 0.2, o.a || 0.005, dur);
+    const nodes = [osc, g];
     let n = osc;
     if (o.filter) {
       const fl = ctx.createBiquadFilter();
       fl.type = o.filter; fl.frequency.setValueAtTime(o.ff || 1000, t0);
       if (o.ff1) fl.frequency.exponentialRampToValueAtTime(o.ff1, t0 + dur);
       fl.Q.value = o.q || 1;
-      osc.connect(fl); n = fl;
+      osc.connect(fl); n = fl; nodes.push(fl);
     }
     if (o.vib) {
       const lfo = ctx.createOscillator(), lg = ctx.createGain();
       lfo.frequency.value = o.vib; lg.gain.value = o.vibAmt || f * 0.03;
       lfo.connect(lg); lg.connect(osc.frequency);
       lfo.start(t0); lfo.stop(t0 + dur + 0.05);
+      nodes.push(lfo, lg);
     }
     n.connect(g);
-    route(g, o.bus || sfxBus, o.wet == null ? 0.15 : o.wet);
+    route(g, bus, o.wet == null ? 0.15 : o.wet, nodes);
+    track(osc, nodes, bus);
     osc.start(t0); osc.stop(t0 + dur + 0.05);
     return osc;
   }
@@ -110,6 +164,8 @@ const Sound = (() => {
   // Gefiltertes Rauschen
   function noise(t0, dur, o) {
     o = o || {};
+    const bus = o.bus || sfxBus;
+    if (bus === sfxBus && sfxVoices >= HARD_SFX) return null; // harte Obergrenze gleichzeitiger Effektstimmen
     const s = ctx.createBufferSource();
     s.buffer = noiseBuf; s.loop = true;
     const fl = ctx.createBiquadFilter();
@@ -120,13 +176,17 @@ const Sound = (() => {
     const g = ctx.createGain();
     env(g, t0, o.vol || 0.2, o.a || 0.005, dur);
     s.connect(fl); fl.connect(g);
-    route(g, o.bus || sfxBus, o.wet == null ? 0.1 : o.wet);
+    const nodes = [s, fl, g];
+    route(g, bus, o.wet == null ? 0.1 : o.wet, nodes);
+    track(s, nodes, bus);
     s.start(t0, Math.random() * 1.5); s.stop(t0 + dur + 0.05);
   }
 
   // FM-Glocke
   function bell(f, t0, dur, o) {
     o = o || {};
+    const bus = o.bus || sfxBus;
+    if (bus === sfxBus && sfxVoices >= HARD_SFX) return null; // harte Obergrenze gleichzeitiger Effektstimmen
     const car = ctx.createOscillator(), mod = ctx.createOscillator();
     const mg = ctx.createGain(), g = ctx.createGain();
     car.frequency.value = f; mod.frequency.value = f * (o.ratio || 3.5);
@@ -135,7 +195,9 @@ const Sound = (() => {
     mod.connect(mg); mg.connect(car.frequency);
     env(g, t0, o.vol || 0.08, o.a || 0.004, dur);
     car.connect(g);
-    route(g, o.bus || sfxBus, o.wet == null ? 0.4 : o.wet);
+    const nodes = [car, mod, mg, g];
+    route(g, bus, o.wet == null ? 0.4 : o.wet, nodes);
+    track(car, nodes, bus);
     car.start(t0); mod.start(t0); car.stop(t0 + dur + 0.05); mod.stop(t0 + dur + 0.05);
   }
 
@@ -156,27 +218,40 @@ const Sound = (() => {
     const lfo = ctx.createOscillator(), lg = ctx.createGain();
     lfo.frequency.value = 0.06; lg.gain.value = 90;
     lfo.connect(lg); lg.connect(lp.frequency);
-    const oscs = [lfo];
-    [[26, 0, 1], [38, -6, 0.7], [38, 7, 0.7], [33, 3, 0.35]].forEach(([n, det, v]) => {
+    const oscs = [lfo], nodes = [lfo, lg, lp, out];
+    [[26, 0, 1], [38, -6, 0.8], [33, 3, 0.35]].forEach(([n, det, v]) => {
       const o = ctx.createOscillator(); o.type = 'sawtooth';
       o.frequency.value = midi(n); o.detune.value = det;
       const g = ctx.createGain(); g.gain.value = v;
-      o.connect(g); g.connect(lp); o.start(t); oscs.push(o);
+      o.connect(g); g.connect(lp); o.start(t); oscs.push(o); nodes.push(o, g);
     });
-    lp.connect(out); route(out, musicBus, 0.3);
+    lp.connect(out); route(out, musicBus, 0.3, nodes);
     lfo.start(t);
-    drone = { out, oscs };
+    drone = { out, oscs, nodes };
   }
 
+  // Akkordfläche: ein Sägezahn je Ton + Sub-Sinus, gemeinsamer Filter und Hüllkurve (wenige Knoten).
   function pad(notes, t, dur) {
-    notes.forEach((n, i) => {
-      [-8, 8].forEach(det => {
-        tone('sawtooth', midi(n), t, dur + 2.5, {
-          bus: musicBus, vol: 0.022, a: 2.6, detune: det + i, filter: 'lowpass', ff: 520, ff1: 900, q: 0.7, wet: 0.7
-        });
-      });
+    const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.Q.value = 0.7;
+    fl.frequency.setValueAtTime(520, t); fl.frequency.linearRampToValueAtTime(900, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 2.6);
+    g.gain.setValueAtTime(0.05, t + dur - 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 1.6);
+    const nodes = [fl, g];
+    const oscs = notes.map((n, i) => {
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = midi(n); o.detune.value = (i - 1) * 7;
+      o.connect(fl); nodes.push(o); return o;
     });
-    tone('sine', midi(notes[0] - 12), t, dur + 2, { bus: musicBus, vol: 0.06, a: 2, wet: 0.3 });
+    const sub = ctx.createOscillator(); sub.frequency.value = midi(notes[0] - 12);
+    const sg = ctx.createGain(); sg.gain.value = 1.4;
+    sub.connect(sg); sg.connect(g); nodes.push(sub, sg); oscs.push(sub);
+    fl.connect(g);
+    route(g, musicBus, 0.7, nodes);
+    track(oscs[0], nodes, musicBus);
+    for (const o of oscs) { o.start(t); o.stop(t + dur + 1.7); }
     // Chor-artige Formantstimme
     tone('sawtooth', midi(notes[2] + 12), t + 0.5, dur, {
       bus: musicBus, vol: 0.012, a: 3, filter: 'bandpass', ff: 800, q: 6, wet: 0.9, vib: 4.5, vibAmt: 3
@@ -191,6 +266,7 @@ const Sound = (() => {
   function playStep(i, t) {
     const inBar = i % 8, chord = CHORDS[Math.floor(i / 16) % CHORDS.length];
     if (i % 16 === 0) pad(chord, t, STEP * 16);
+    if (musicVoices > MAX_MUSIC) return; // Notbremse: Zierstimmen auslassen
     if (inBar === 0) { heartbeat(t, 1); heartbeat(t + 0.24, 0.6); }
     if (i % 16 === 0 || i % 16 === 11) {
       tone('triangle', midi(chord[0] - 12), t, 1.8, { bus: musicBus, vol: 0.11, filter: 'lowpass', ff: 600, ff1: 120, wet: 0.3 });
@@ -204,12 +280,14 @@ const Sound = (() => {
     }
     if (i % 32 === 24) noise(t, 3.5, { bus: musicBus, type: 'bandpass', f: 900, f1: 2600, q: 9, vol: 0.05, a: 1.5, wet: 1 });
     if (i % 64 === 40) { // fernes Kettenrasseln
-      for (let k = 0; k < 6; k++) noise(t + k * 0.07 + Math.random() * 0.03, 0.05, { bus: musicBus, f: 3500 + Math.random() * 1500, q: 12, vol: 0.05, wet: 1 });
+      for (let k = 0; k < 4; k++) noise(t + k * 0.08 + Math.random() * 0.03, 0.05, { bus: musicBus, f: 3500 + Math.random() * 1500, q: 12, vol: 0.05, wet: 1 });
     }
   }
 
   function schedule() {
-    if (!ctx) return;
+    if (!ctx || ctx.state !== 'running') return;
+    // Nach Rucklern/Pausen nicht alle verpassten Schritte auf einmal nachholen (Stimmenlawine).
+    if (nextStep < ctx.currentTime - 0.05) nextStep = ctx.currentTime + 0.05;
     while (nextStep < ctx.currentTime + 0.3) {
       playStep(stepIdx, nextStep);
       nextStep += STEP; stepIdx++;
@@ -217,6 +295,7 @@ const Sound = (() => {
   }
 
   function startMusic() {
+    wantMusic = true;
     if (!ctx || musicRunning) return;
     musicRunning = true;
     nextStep = ctx.currentTime + 0.15; stepIdx = 0;
@@ -225,13 +304,15 @@ const Sound = (() => {
   }
 
   function stopMusic() {
+    wantMusic = false;
     if (!musicRunning) return;
     musicRunning = false;
     clearInterval(schedTimer);
     if (drone) {
-      const t = ctx.currentTime;
-      drone.out.gain.setTargetAtTime(0.0001, t, 0.4);
-      drone.oscs.forEach(o => o.stop(t + 2));
+      const t = ctx.currentTime, dr = drone;
+      dr.out.gain.setTargetAtTime(0.0001, t, 0.4);
+      dr.oscs.forEach(o => o.stop(t + 2));
+      dr.oscs[0].onended = () => dr.nodes.forEach(n => { try { n.disconnect(); } catch (e) { } });
       drone = null;
     }
   }
@@ -273,11 +354,11 @@ const Sound = (() => {
     fire(t) {
       noise(t, 0.9, { type: 'lowpass', f: 400, f1: 1600, q: 1, vol: 0.4, a: 0.15, wet: 0.3 });
       tone('sawtooth', 70, t, 0.8, { f1: 40, vol: 0.1, filter: 'lowpass', ff: 300 });
-      for (let k = 0; k < 14; k++) noise(t + Math.random() * 0.9, 0.02, { f: 2000 + Math.random() * 3000, q: 2, vol: 0.12 });
+      for (let k = 0; k < 8; k++) noise(t + Math.random() * 0.9, 0.02, { f: 2000 + Math.random() * 3000, q: 2, vol: 0.12 });
     },
     ice(t) {
       noise(t, 1.2, { type: 'highpass', f: 3000, f1: 6000, vol: 0.06, a: 0.3, wet: 0.6 });
-      for (let k = 0; k < 10; k++) bell(2000 + Math.random() * 2500, t + Math.random() * 1.1, 0.5, { vol: 0.03, ratio: 1.41, index: 1, wet: 0.7 });
+      for (let k = 0; k < 6; k++) bell(2000 + Math.random() * 2500, t + Math.random() * 1.1, 0.5, { vol: 0.03, ratio: 1.41, index: 1, wet: 0.7 });
     },
     shard(t) { tone('sine', 2500 + Math.random() * 1500, t, 0.12, { vol: 0.04, wet: 0.4 }); noise(t, 0.04, { type: 'highpass', f: 5000, vol: 0.06 }); },
     burn(t) { noise(t, 0.12, { f: 900, q: 1, vol: 0.12 }); },
@@ -295,7 +376,7 @@ const Sound = (() => {
       tone('sawtooth', 320, t, 0.45, { f1: 40, vol: 0.18, filter: 'lowpass', ff: 1500, ff1: 200 });
       noise(t, 0.3, { type: 'lowpass', f: 1200, f1: 200, vol: 0.25 });
     },
-    bones(t) { for (let k = 0; k < 8; k++) noise(t + k * 0.04 + Math.random() * 0.02, 0.03, { f: 1500 + Math.random() * 1500, q: 5, vol: 0.2 }); },
+    bones(t) { for (let k = 0; k < 5; k++) noise(t + k * 0.05 + Math.random() * 0.02, 0.03, { f: 1500 + Math.random() * 1500, q: 5, vol: 0.2 }); },
     playerHurt(t) {
       tone('sawtooth', 240, t, 0.25, { f1: 110, vol: 0.2, filter: 'lowpass', ff: 1400 });
       noise(t, 0.15, { type: 'lowpass', f: 1500, vol: 0.3 });
@@ -307,6 +388,11 @@ const Sound = (() => {
     },
     heart(t) { tone('sine', midi(76), t, 0.2, { vol: 0.12 }); tone('sine', midi(81), t + 0.1, 0.35, { vol: 0.12, wet: 0.3 }); },
     mana(t) { tone('sine', 700, t, 0.5, { f1: 1600, vol: 0.09, vib: 12, vibAmt: 30, wet: 0.6 }); },
+    armor(t) {
+      for (let k = 0; k < 3; k++) noise(t + k * 0.06, 0.05, { f: 2500 + k * 400, q: 8, vol: 0.18 });
+      tone('sine', 520, t + 0.15, 0.6, { vol: 0.08, wet: 0.4 }); tone('sine', 780, t + 0.15, 0.5, { vol: 0.05, wet: 0.4 });
+      [50, 57, 62].forEach((n, k) => tone('triangle', midi(n + 12), t + 0.25 + k * 0.1, 0.5, { vol: 0.09, wet: 0.4 }));
+    },
     upgrade(t) { [57, 62, 65, 69, 74].forEach((n, k) => tone('triangle', midi(n), t + k * 0.08, 0.5, { vol: 0.1, wet: 0.4 })); },
     levelUp(t) {
       [50, 57, 62, 65, 69, 74].forEach((n, k) => bell(midi(n + 12), t + k * 0.12, 2.2, { vol: 0.07, ratio: 2, index: 1.5, wet: 0.8 }));
@@ -332,10 +418,12 @@ const Sound = (() => {
     }
   };
 
+  const THROTTLE = { step: 0.12, shard: 0.07, burn: 0.15, hit: 0.05, resist: 0.08, weak: 0.06 };
   function play(name, delay) {
-    if (!ctx || !sfxOn || !SFX[name]) return;
+    if (!ctx || !sfxOn || !SFX[name] || ctx.state !== 'running') return;
+    if (sfxVoices >= MAX_SFX && !PRIORITY.has(name)) return;
     const now = ctx.currentTime;
-    if (lastPlay[name] && now - lastPlay[name] < 0.04) return;
+    if (lastPlay[name] && now - lastPlay[name] < (THROTTLE[name] || 0.04)) return;
     lastPlay[name] = now;
     SFX[name](now + 0.01 + (delay || 0));
   }
@@ -354,7 +442,8 @@ const Sound = (() => {
       if (ctx) sfxBus.set(sfxOn ? 0.9 : 0);
       return sfxOn;
     },
-    suspend() { if (ctx && ctx.state === 'running') ctx.suspend(); },
-    resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+    suspend() { appPaused = true; if (ctx && ctx.state === 'running') ctx.suspend(); },
+    resume() { appPaused = false; stuck = 0; if (ctx && ctx.state !== 'running') ctx.resume().catch(() => { }); },
+    get voices() { return { sfx: sfxVoices, music: musicVoices, state: ctx ? ctx.state : 'none' }; }
   };
 })();

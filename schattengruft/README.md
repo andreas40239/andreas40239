@@ -1,4 +1,4 @@
-# Schattengruft – Labyrinth-Dungeon (Prototyp v0.1)
+# Schattengruft – Labyrinth-Dungeon (Prototyp v0.2)
 
 Düsterer Dungeon-Crawler für Android (arm64) in 3/4-Ansicht: lila Steinmauern mit Säulen und orangefarbener Sandboden.
 
@@ -24,8 +24,11 @@ Düsterer Dungeon-Crawler für Android (arm64) in 3/4-Ansicht: lila Steinmauern 
 | Feuerkobold | wirft Feuerbälle, immun gegen Feuer | Eis |
 | Steingolem | zäh, kaum zu lähmen | Eis & Axt |
 
-* **Schatztruhen:** Herzen (auch Herzcontainer), Mana (auch Manakristalle), neue Waffen und Waffen-Upgrades.
-* **Audio:** alles wird live per WebAudio synthetisiert, es gibt keine Audiodateien. Dazu gehören düstere Hintergrundmusik (D-Moll-Drone, Pads, Glocken, Herzschlag) sowie Sounds für Waffen, Magie, Schritte, jedes Monster und das Menü.
+* **Schatztruhen:** Herzen (auch Herzcontainer), Mana (auch Manakristalle), neue Waffen, Waffen-Upgrades und Rüstungen.
+* **Rüstungen** (zufällig in Truhen ab Ebene 2, garantiert auf Ebene 3): Leder −15 %, Kettenhemd −30 %, Schuppenpanzer −40 %, Platte −50 % Monsterschaden.
+* **Ab Ebene 3:** mehr Truhen, höhere Herzchance, ein garantierter Herzcontainer pro Ebene, häufigere Herz-Drops, mehr Heilung beim Treppenabstieg.
+* **Monster geben auf:** Wer weit genug wegläuft, wird nicht mehr verfolgt. Das Monster läuft seinen Weg zurück ins Revier und regeneriert dabei.
+* **Audio:** alles wird live per WebAudio synthetisiert, es gibt keine Audiodateien. Dazu gehören düstere Hintergrundmusik (D-Moll-Drone, Pads, Glocken, Herzschlag) sowie Sounds für Waffen, Magie, Schritte, jedes Monster und das Menü. Die Engine ist auf schwächere Geräte ausgelegt: großer Audiopuffer, günstiger Delay-Hall, Stimmenbegrenzung und ein Wächter, der einen hängenden Audiokontext automatisch neu startet.
 
 ## Aufbau
 

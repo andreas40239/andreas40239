@@ -317,6 +317,23 @@ function drawPlayer(g, p) {
   g.beginPath();
   g.moveTo(X - 0.18 * s, by - 0.14 * s); g.lineTo(X + 0.18 * s, by - 0.14 * s);
   g.lineTo(X + 0.11 * s, by - 0.56 * s); g.lineTo(X - 0.11 * s, by - 0.56 * s); g.closePath(); g.fill();
+  const arm = ARMORS[p.armor];
+  if (arm) { // Brustpanzer + Schulterstücke
+    g.fillStyle = arm.color;
+    g.beginPath();
+    g.moveTo(X - 0.15 * s, by - 0.28 * s); g.lineTo(X + 0.15 * s, by - 0.28 * s);
+    g.lineTo(X + 0.12 * s, by - 0.54 * s); g.lineTo(X - 0.12 * s, by - 0.54 * s); g.closePath(); g.fill();
+    g.fillStyle = arm.trim;
+    g.fillRect(X - 0.12 * s, by - 0.54 * s, 0.24 * s, 0.035 * s);
+    if (p.armor >= 2) {
+      g.beginPath(); g.ellipse(X - 0.16 * s, by - 0.52 * s, 0.08 * s, 0.05 * s, 0, 0, TAU); g.fill();
+      g.beginPath(); g.ellipse(X + 0.16 * s, by - 0.52 * s, 0.08 * s, 0.05 * s, 0, 0, TAU); g.fill();
+    }
+    if (p.armor === 2) { // Kettenglieder andeuten
+      g.fillStyle = 'rgba(60,66,84,0.45)';
+      for (let k = 0; k < 3; k++) g.fillRect(X - 0.1 * s, by - (0.33 + k * 0.06) * s, 0.2 * s, Math.max(1, 0.012 * s));
+    }
+  }
   g.fillStyle = '#6b4424'; g.fillRect(X - 0.17 * s, by - 0.3 * s, 0.34 * s, 0.05 * s);
   g.fillStyle = '#e7c14c'; g.fillRect(X - 0.03 * s, by - 0.31 * s, 0.06 * s, 0.07 * s);
   // Kopf + Kapuze
@@ -558,6 +575,14 @@ function drawChest(g, ch) {
     g.fillStyle = '#7a4a22'; g.fillRect(X - w / 2, Y - h - d * 1.6, w, d * 0.9);
     g.fillStyle = '#d9b04a'; g.fillRect(X - w / 2, Y - h - d * 1.6, w, d * 0.15);
   }
+}
+
+function drawShield(g, x, y, s, fill) {
+  g.beginPath();
+  g.moveTo(x, y); g.lineTo(x + s * 0.42, y + s * 0.12); g.lineTo(x + s * 0.38, y + s * 0.55);
+  g.quadraticCurveTo(x + s * 0.25, y + s * 0.85, x, y + s); g.quadraticCurveTo(x - s * 0.25, y + s * 0.85, x - s * 0.38, y + s * 0.55);
+  g.lineTo(x - s * 0.42, y + s * 0.12); g.closePath();
+  g.fillStyle = fill; g.fill();
 }
 
 function drawHeartShape(g, x, y, s) {

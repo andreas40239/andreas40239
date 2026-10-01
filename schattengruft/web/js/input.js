@@ -135,6 +135,17 @@ function drawHUD(g) {
       g.restore();
     }
   }
+  // Rüstung
+  const arm = ARMORS[p.armor];
+  if (arm) {
+    const x = 16 + hs * 0.5 + hearts * hs * 1.1 + 4, y = 12;
+    drawShield(g, x + 1.5, y + 1.5, hs, 'rgba(0,0,0,0.45)');
+    drawShield(g, x, y, hs, arm.color);
+    g.strokeStyle = arm.trim; g.lineWidth = 2; g.stroke();
+    g.font = 'bold 11px sans-serif'; g.textAlign = 'left';
+    g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillText('−' + Math.round(arm.red * 100) + '%', x + hs * 0.55 + 1, y + hs * 0.7 + 1);
+    g.fillStyle = '#e4ebff'; g.fillText('−' + Math.round(arm.red * 100) + '%', x + hs * 0.55, y + hs * 0.7);
+  }
   // Mana + EP
   const bw = clamp(VW * 0.2, 110, 220), by = 14 + hs * 1.05;
   g.fillStyle = 'rgba(10,8,25,0.7)'; roundRect(g, 14, by, bw + 4, 14, 5); g.fill();

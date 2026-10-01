@@ -13,7 +13,7 @@ function newPlayer() {
   return {
     x: 0, y: 0, r: 0.28, hp: 10, maxHp: 10, mana: 6, maxMana: 10, xp: 0, lvl: 1,
     face: Math.PI / 2, moving: false, anim: 0, speed: 3.4,
-    weapons: { sword: 1, axe: 0, bow: 0 }, cds: {}, atk: null, held: 'sword',
+    weapons: { sword: 1, axe: 0, bow: 0 }, armor: 0, cds: {}, atk: null, held: 'sword',
     inv: 0, stepT: 0, castT: 0, castKind: null, kx: 0, ky: 0
   };
 }
@@ -63,7 +63,8 @@ function spawnMonster(type, x, y, small) {
     aggro: false, atkCd: 0.5, shootCd: 1.5 + Math.random(), para: 0, slow: 0, hurt: 0,
     kx: 0, ky: 0, wander: Math.random() * TAU, wanderT: 0, growlT: 2 + Math.random() * 4,
     seed: Math.random() * 100, moving: false, bones: false, reviveT: 0, revived: false,
-    dmgBonus: Math.floor((G.level - 1) / 3)
+    dmgBonus: Math.floor((G.level - 1) / 3),
+    homeX: x, homeY: y, trail: [], lastTile: -1, lostT: 0, calmT: 0, returning: false, retT: 0, hitT: 99
   };
 }
 
@@ -339,7 +340,7 @@ function damageMonster(m, base, type, kx, ky, knock) {
   if (m.bones || m.hp <= 0) return;
   const mult = m.def.mult[type] == null ? 1 : m.def.mult[type];
   const dmg = Math.round(base * mult);
-  m.hp -= dmg; m.hurt = 0.12; m.aggro = true;
+  m.hp -= dmg; m.hurt = 0.12; m.aggro = true; m.hitT = 0;
   const kb = (knock || 0) * (m.def.heavy ? 0.25 : 1) * 6;
   m.kx += kx * kb; m.ky += ky * kb;
   if (mult >= 1.4) { floatText(m.x, m.y, dmg + ' SCHWACH!', '#ffe14a', true); Sound.play('weak'); }
@@ -370,20 +371,23 @@ function killMonster(m, type) {
       G.monsters.push(c);
     }
   }
-  if (Math.random() < 0.18) G.drops.push({ kind: Math.random() < 0.6 ? 'heart' : 'mana', x: m.x, y: m.y });
+  const hard = G.level >= 3;
+  if (Math.random() < (hard ? 0.3 : 0.18)) G.drops.push({ kind: Math.random() < (hard ? 0.7 : 0.6) ? 'heart' : 'mana', x: m.x, y: m.y });
 }
 
 function hurtPlayer(dmg, fromX, fromY) {
   const p = G.player;
   if (p.inv > 0 || G.state !== 'play') return;
-  p.hp -= dmg; p.inv = 1.0;
+  const armor = ARMORS[p.armor];
+  const eff = armor ? dmg * (1 - armor.red) : dmg;
+  p.hp -= eff; p.inv = 1.0;
   const a = Math.atan2(p.y - fromY, p.x - fromX);
   p.kx += Math.cos(a) * 5; p.ky += Math.sin(a) * 5;
   G.shake = 0.25; G.hurtFlash = 0.35;
   Sound.play('playerHurt');
   try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) { }
-  floatText(p.x, p.y - 0.3, '-' + dmg + ' ♥', '#ff6070');
-  if (p.hp <= 0) {
+  floatText(p.x, p.y - 0.3, '-' + fmtNum(eff / 2) + ' ♥', '#ff6070');
+  if (p.hp <= 0.001) {
     p.hp = 0;
     G.state = 'dead';
     Sound.play('gameOver');
@@ -401,7 +405,7 @@ function gainXp(n, x, y) {
     p.lvl++;
     p.maxMana += 2; p.mana = p.maxMana;
     if (p.lvl % 2 === 0) { p.maxHp += 2; }
-    p.hp = Math.min(p.maxHp, p.hp + 2);
+    p.hp = Math.min(p.maxHp, p.hp + 4);
     Sound.play('levelUp');
     toast('Stufe ' + p.lvl + ' erreicht!', '#ffe14a');
     burst(p.x, p.y, 40, '255,225,120', { speed: 3.5, life: 1, vz: 3 });
@@ -432,6 +436,7 @@ function openChest(ch) {
     c = ids.length ? 'up:' + pick(ids) : 'heartmax';
   }
   if (c === 'axe' || c === 'bow') c = 'up:' + c;
+  if (c === 'armor' && p.armor >= ARMORS.length - 1) c = 'heartmax';
   setTimeout(() => {
     if (c.startsWith('up:')) {
       const w = c.slice(3);
@@ -446,6 +451,12 @@ function openChest(ch) {
         floatText(ch.x, ch.y, WEAPONS[w].name + ' +' + (p.weapons[w] - 1), '#ffe14a', true);
       }
       Sound.play('upgrade');
+    } else if (c === 'armor') {
+      p.armor++;
+      const a = ARMORS[p.armor];
+      toast('Rüstung: ' + a.name + ' (−' + Math.round(a.red * 100) + '% Schaden)', '#c9d8ff');
+      floatText(ch.x, ch.y, a.name + '!', '#c9d8ff', true);
+      Sound.play('armor');
     } else if (c === 'heart' || c === 'heartmax') {
       if (c === 'heartmax' || Math.random() < 0.25) {
         p.maxHp += 2; p.hp = Math.min(p.maxHp, p.hp + 4);
@@ -511,7 +522,7 @@ function updateTransition(dt) {
     G.fade = 1; G.fadeDir = -1;
     G.level++;
     const p = G.player;
-    p.hp = Math.min(p.maxHp, p.hp + 2);
+    p.hp = Math.min(p.maxHp, p.hp + (G.level >= 3 ? 4 : 2));
     startLevel();
     toast('Ebene ' + G.level, '#ffe14a');
   } else if (G.fadeDir < 0 && G.fade <= 0) {
@@ -543,6 +554,31 @@ function updatePlayer(dt) {
   G.cam.x = p.x; G.cam.y = p.y;
 }
 
+function tileOf(x, y) { return Math.floor(y) * G.map.W + Math.floor(x); }
+
+// Merkt sich den Weg während der Verfolgung (Schleifen werden abgeschnitten), damit das Monster zurückfindet.
+function recordTrail(m) {
+  const ti = tileOf(m.x, m.y);
+  if (ti === m.lastTile) return;
+  m.lastTile = ti;
+  if (!m.trail.length) m.trail.push(tileOf(m.homeX, m.homeY));
+  if (G.map.t[ti] === 1 || G.map.t[ti] === 2) return;
+  const k = m.trail.indexOf(ti);
+  if (k >= 0) m.trail.length = k + 1;
+  else if (m.trail.length < 400) m.trail.push(ti);
+}
+
+// Weglänge zum Spieler; steht das Monster im Randbereich einer Wandkachel, zählen die Nachbarn.
+function monsterFlow(m) {
+  let best = flowAt(m.x, m.y);
+  const tx = Math.floor(m.x), ty = Math.floor(m.y);
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const f = flowAt(tx + ox + 0.5, ty + oy + 0.5);
+    if (f >= 0 && (best < 0 || f + 1 < best)) best = f + 1;
+  }
+  return best;
+}
+
 function updateMonsters(dt) {
   const p = G.player;
   for (const m of G.monsters) {
@@ -572,13 +608,32 @@ function updateMonsters(dt) {
       G.seenTypes.add(m.type);
       toast(def.name + ': schwach gegen ' + def.weak + ' – ' + def.trait, '#ffb27a');
     }
+    m.calmT = Math.max(0, m.calmT - dt);
+    m.hitT += dt;
+    if (m.aggro && m.returning) m.returning = false; // durch Treffer/Zauber wieder wütend
     if (!m.aggro) {
       const fd = flowAt(m.x, m.y);
-      if ((vis && d < def.aggro) || (fd >= 0 && fd <= 3)) {
-        m.aggro = true;
+      const near = m.calmT > 0 ? (vis && d < 3) : ((vis && d < def.aggro) || (fd >= 0 && fd <= 3));
+      if (near) {
+        m.aggro = true; m.returning = false; m.lostT = 0;
+        if (!m.trail.length) m.trail.push(tileOf(m.homeX, m.homeY));
         Sound.play('growl_' + m.type);
       }
-    } else if (d > 18) m.aggro = false;
+    } else {
+      // Spieler weit genug weg und außer Sicht -> Verfolgung aufgeben und zurückgehen
+      // "weit weg" = Weglänge durchs Labyrinth (nicht Luftlinie); Geister messen Luftlinie
+      const pf = def.phase ? -2 : monsterFlow(m);
+      const farPath = def.phase ? d > 10 : (pf < 0 || pf > 14);
+      if (d > 13 || (farPath && !vis)) m.lostT += dt;
+      else m.lostT = Math.max(0, m.lostT - dt * 2);
+      // Leine: zu weit vom Revier entfernt und länger nicht getroffen -> umkehren
+      const leash = (m.trail.length > 18 || dist(m.x, m.y, m.homeX, m.homeY) > 14) && m.hitT > 4;
+      if (m.lostT > 2.5 || d > 16 || leash) {
+        m.aggro = false; m.returning = true; m.calmT = 4; m.lostT = 0; m.retT = 0;
+        if (vis) floatText(m.x, m.y, '?', '#d0c8ff');
+      }
+    }
+    if (m.aggro) recordTrail(m);
 
     let dx = 0, dy = 0, speed = def.speed * (m.slow > 0 ? 0.45 : 1);
     if (G.state !== 'play') speed *= 0.3;
@@ -613,10 +668,28 @@ function updateMonsters(dt) {
       }
       m.growlT -= dt;
       if (m.growlT <= 0 && vis) { m.growlT = 3 + Math.random() * 5; Sound.play('growl_' + m.type); }
+    } else if (m.returning) {
+      // Spur rückwärts zum Ausgangspunkt ablaufen und dabei Wunden lecken
+      m.retT += dt;
+      m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.08 * dt);
+      let tx = m.homeX, ty = m.homeY;
+      while (m.trail.length) {
+        const ti = m.trail[m.trail.length - 1], W = G.map.W;
+        tx = ti % W + 0.5; ty = ((ti / W) | 0) + 0.5;
+        if (dist(m.x, m.y, tx, ty) < 0.35) { m.trail.pop(); tx = m.homeX; ty = m.homeY; continue; }
+        break;
+      }
+      const dd = dist(m.x, m.y, tx, ty);
+      if ((!m.trail.length && dd < 0.3) || m.retT > 25) { m.returning = false; m.trail.length = 0; m.lastTile = -1; }
+      else { dx = (tx - m.x) / dd * 0.8; dy = (ty - m.y) / dd * 0.8; }
     } else {
       m.wanderT -= dt;
       if (m.wanderT <= 0) { m.wanderT = 1 + Math.random() * 2; m.wander = Math.random() * TAU; }
       dx = Math.cos(m.wander) * 0.35; dy = Math.sin(m.wander) * 0.35;
+      if (dist(m.x, m.y, m.homeX, m.homeY) > 2.5) { // nicht zu weit vom Revier wegbummeln
+        const dd = dist(m.x, m.y, m.homeX, m.homeY);
+        dx = (m.homeX - m.x) / dd * 0.35; dy = (m.homeY - m.y) / dd * 0.35;
+      }
     }
     m.moving = dx || dy;
     moveEntity(m, dx * speed * dt, dy * speed * dt, def.phase);

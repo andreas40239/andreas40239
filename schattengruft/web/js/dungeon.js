@@ -105,13 +105,19 @@ function generateDungeon(level, seed) {
   }
   shuffle(deadEnds, rng); shuffle(others, rng);
   const chestCells = deadEnds.concat(others);
-  const nChests = Math.min(chestCells.length, 3 + level);
+  // Ab Ebene 3 wird es härter: mehr Truhen, mehr Herzen, garantierter Herzcontainer.
+  const hard = level >= 3;
+  const nChests = Math.min(chestCells.length, 3 + level + (hard ? 2 : 0));
   const contents = [];
   if (level === 1) contents.push('axe');
   if (level === 2) contents.push('bow');
+  if (level === 3) contents.push('armor');
+  if (hard) contents.push('heartmax');
   while (contents.length < nChests) {
     const r = rng();
-    contents.push(r < 0.38 ? 'heart' : r < 0.68 ? 'mana' : 'upgrade');
+    const pHeart = hard ? 0.5 : 0.38, pMana = pHeart + (hard ? 0.22 : 0.3);
+    const pArmor = level >= 2 ? 0.12 : 0;
+    contents.push(r < pHeart ? 'heart' : r < pMana ? 'mana' : r < pMana + pArmor ? 'armor' : 'upgrade');
   }
   shuffle(contents, rng);
   const chests = [];

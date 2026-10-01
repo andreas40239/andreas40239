@@ -5,8 +5,9 @@
   const g = canvas.getContext('2d', { alpha: false });
 
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const vw = window.innerWidth, vh = window.innerHeight;
+    // Pixelbudget (~1920x1200): große Tablets nicht in voller Auflösung rendern, spart CPU/GPU.
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2.3e6 / (vw * vh))));
     canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
     canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px';
     resizeRender(vw, vh, dpr);

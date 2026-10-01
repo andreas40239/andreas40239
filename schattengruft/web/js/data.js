@@ -99,4 +99,16 @@ const MONSTERS = {
   }
 };
 
+// ---------- Rüstungen (Stufe 0 = keine) ----------
+// red: Anteil, um den Monsterschaden verringert wird
+const ARMORS = [
+  null,
+  { name: 'Lederrüstung', red: 0.15, color: '#7a4a26', trim: '#a8743e' },
+  { name: 'Kettenhemd', red: 0.3, color: '#8e97ab', trim: '#c3cad8' },
+  { name: 'Schuppenpanzer', red: 0.4, color: '#4f8a84', trim: '#9fd3c9' },
+  { name: 'Plattenrüstung', red: 0.5, color: '#c9d0de', trim: '#f0e2a0' }
+];
+
+function fmtNum(x) { return (Math.round(x * 10) / 10).toString().replace('.', ','); }
+
 function xpNeeded(lvl) { return 8 + (lvl - 1) * 8; }
