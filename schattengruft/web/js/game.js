@@ -6,7 +6,7 @@ const G = {
   seen: null, vis: null, visGen: 1, visTimer: 0, flow: null, flowFrom: -1,
   slots: ['sword', null, null], time: 0, cam: { x: 0, y: 0 }, shake: 0, hurtFlash: 0,
   toasts: [], seenTypes: new Set(), minimapDirty: true, bigMap: false, fade: 0, fadeDir: 0,
-  stats: { kills: 0 }
+  stats: { kills: 0, time: 0, deaths: 0 }, activeSlot: null, levelSeed: 0
 };
 
 function newPlayer() {
@@ -23,16 +23,22 @@ function newGame() {
   G.slots = ['sword', null, null];
   G.level = 1;
   G.seenTypes = new Set();
-  G.stats = { kills: 0 };
+  G.stats = { kills: 0, time: 0, deaths: 0 };
   G.demo = false;
   startLevel();
   G.state = 'play';
   toast('Ebene 1 – finde die Treppe nach unten!');
   toast('Tipp: Aktionstaste lange drücken zum Belegen');
+  // Neues Spiel bekommt den ersten freien Speicherplatz für automatisches Speichern
+  const free = Save.firstFree();
+  G.activeSlot = free >= 0 ? free : null;
+  if (free >= 0) { Save.write(free); toast('Automatisches Speichern auf Platz ' + (free + 1), '#b8aee6'); }
+  else toast('Alle Speicherplätze belegt – speichern im Pausemenü', '#ffb27a');
 }
 
 function startLevel(demoSeed) {
   const seed = demoSeed || (Math.random() * 1e9) | 0;
+  G.levelSeed = seed;
   const map = generateDungeon(G.level, seed);
   G.map = map;
   const N = map.W * map.H;
@@ -485,6 +491,7 @@ function update(dt) {
   if (G.state === 'transition') { updateTransition(dt); return; }
   if (G.state !== 'play' && G.state !== 'dead') return;
   const p = G.player;
+  if (G.state === 'play') G.stats.time += dt;
 
   if (G.state === 'play') updatePlayer(dt);
   G.visTimer -= dt;
@@ -527,6 +534,7 @@ function updateTransition(dt) {
     toast('Ebene ' + G.level, '#ffe14a');
   } else if (G.fadeDir < 0 && G.fade <= 0) {
     G.fade = 0; G.fadeDir = 0; G.state = 'play';
+    if (Save.autosave()) toast('Automatisch gespeichert (Platz ' + (G.activeSlot + 1) + ')', '#b8aee6');
   }
 }
 
@@ -625,6 +633,7 @@ function updateMonsters(dt) {
       const pf = def.phase ? -2 : monsterFlow(m);
       const farPath = def.phase ? d > 10 : (pf < 0 || pf > 14);
       if (d > 13 || (farPath && !vis)) m.lostT += dt;
+      else if (farPath) m.lostT += dt * 0.5; // sieht dich, kommt aber nicht (kurz) hin
       else m.lostT = Math.max(0, m.lostT - dt * 2);
       // Leine: zu weit vom Revier entfernt und länger nicht getroffen -> umkehren
       const leash = (m.trail.length > 18 || dist(m.x, m.y, m.homeX, m.homeY) > 14) && m.hitT > 4;

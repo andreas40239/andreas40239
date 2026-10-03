@@ -1,4 +1,4 @@
-# Schattengruft – Labyrinth-Dungeon (Prototyp v0.2)
+# Schattengruft – Labyrinth-Dungeon (Prototyp v0.3)
 
 Düsterer Dungeon-Crawler für Android (arm64) in 3/4-Ansicht: lila Steinmauern mit Säulen und orangefarbener Sandboden.
 
@@ -27,6 +27,8 @@ Düsterer Dungeon-Crawler für Android (arm64) in 3/4-Ansicht: lila Steinmauern 
 * **Schatztruhen:** Herzen (auch Herzcontainer), Mana (auch Manakristalle), neue Waffen, Waffen-Upgrades und Rüstungen.
 * **Rüstungen** (zufällig in Truhen ab Ebene 2, garantiert auf Ebene 3): Leder −15 %, Kettenhemd −30 %, Schuppenpanzer −40 %, Platte −50 % Monsterschaden.
 * **Ab Ebene 3:** mehr Truhen, höhere Herzchance, ein garantierter Herzcontainer pro Ebene, häufigere Herz-Drops, mehr Heilung beim Treppenabstieg.
+* **Tod ohne Frust:** Du erwachst am Eingang derselben Ebene mit vollen Herzen. Labyrinth, besiegte Monster, geöffnete Truhen, aufgedeckte Karte, Gegenstände und Erfahrung bleiben erhalten. Überlebende Monster kehren geheilt in ihr Revier zurück.
+* **5 Speicherplätze:** Speichern im Pausemenü, Laden und „Fortsetzen“ im Hauptmenü. Jeder Platz zeigt Ebene, Stufe, Herzen, Rüstung, Waffen, Zauber, besiegte Monster, Tode, Spielzeit und Datum. Der aktive Platz speichert automatisch (Treppe, Hauptmenü, App im Hintergrund, nach dem Tod). Ein neues Spiel belegt automatisch den ersten freien Platz.
 * **Monster geben auf:** Wer weit genug wegläuft, wird nicht mehr verfolgt. Das Monster läuft seinen Weg zurück ins Revier und regeneriert dabei.
 * **Audio:** alles wird live per WebAudio synthetisiert, es gibt keine Audiodateien. Dazu gehören düstere Hintergrundmusik (D-Moll-Drone, Pads, Glocken, Herzschlag) sowie Sounds für Waffen, Magie, Schritte, jedes Monster und das Menü. Die Engine ist auf schwächere Geräte ausgelegt: großer Audiopuffer, günstiger Delay-Hall, Stimmenbegrenzung und ein Wächter, der einen hängenden Audiokontext automatisch neu startet.
 
@@ -39,6 +41,7 @@ web/        Spiel (HTML5 Canvas + JavaScript, keine Abhängigkeiten)
   js/dungeon.js  Labyrinth-Generator
   js/render.js   Grafik (Wände, Boden, Figuren, Effekte)
   js/game.js     Spiellogik
+  js/save.js     Speicherplätze + Wiedereinstieg nach dem Tod
   js/input.js    Touch/Tastatur + HUD + Mini-Karte
   js/ui.js       Menüs
 android/    Schlanke WebView-App (Java, keine AndroidX), lädt web/ als Assets

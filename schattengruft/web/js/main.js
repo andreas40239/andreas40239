@@ -62,6 +62,7 @@
   // Android-WebView-Brücke
   window.onAndroidBack = () => UI.back();
   window.onAppPause = () => {
+    Save.autosave();
     Sound.suspend();
     if (G.state === 'play') UI.pause();
   };

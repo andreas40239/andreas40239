@@ -14,10 +14,12 @@
   <div class="panel title">
     <h1>Schattengruft</h1>
     <p class="sub">Steig hinab in das Labyrinth der Finsternis</p>
+    <button data-act="continue" class="big" id="btnContinue">Fortsetzen</button>
     <button data-act="new" class="big">Neues Spiel</button>
+    <button data-act="loadMenu" id="btnLoad">Spiel laden</button>
     <button data-act="help">Anleitung &amp; Bestiarium</button>
     <div class="row"><button data-act="music" class="small">Musik: An</button><button data-act="sfx" class="small">Effekte: An</button></div>
-    <p class="ver">Prototyp v0.2</p>
+    <p class="ver">Prototyp v0.3</p>
   </div>
 </div>
 
@@ -32,6 +34,8 @@
       <li>Das Labyrinth wird erst beim Erkunden sichtbar. Finde die <b>Treppe</b> zur nächsten Ebene.</li>
       <li><b>Truhen</b> enthalten Herzen, Mana, neue Waffen, Waffen-Upgrades und <b>Rüstungen</b>.</li>
       <li><b>Rüstungen</b> verringern Monsterschaden: Leder −15%, Kettenhemd −30%, Schuppenpanzer −40%, Platte −50%</li>
+      <li><b>Tod:</b> Du erwachst am Eingang derselben Ebene. Besiegte Monster, Gegenstände und Erfahrung bleiben.</li>
+      <li><b>Speichern:</b> 5 Speicherplätze im Pausemenü. Der zuletzt genutzte Platz speichert automatisch (Treppe, Hauptmenü, App im Hintergrund).</li>
       <li>Läufst du weit genug weg, geben Monster die Verfolgung auf und kehren in ihr Revier zurück.</li>
       <li><b>Waffen:</b> Schwert (Schnitt), Axt (Wucht), Bogen (Stich, Fernkampf)</li>
       <li><b>Zauber</b> lernst du mit Stufen: Lähmung (2), Feuerwand (3), Eisregen (5)</li>
@@ -47,6 +51,7 @@
   <div class="panel">
     <h2>Pause</h2>
     <button data-act="resume" class="big">Weiter</button>
+    <button data-act="saveMenu">Spiel speichern</button>
     <button data-act="assignMenu">Tasten belegen</button>
     <button data-act="help">Anleitung &amp; Bestiarium</button>
     <div class="row"><button data-act="music" class="small">Musik: An</button><button data-act="sfx" class="small">Effekte: An</button></div>
@@ -62,6 +67,15 @@
   </div>
 </div>
 
+<div id="saves" class="overlay">
+  <div class="panel wide saves">
+    <h2 id="savesTitle">Spiel speichern</h2>
+    <p id="savesHint" class="sub small"></p>
+    <div id="saveList" class="savegrid"></div>
+    <button data-act="backSaves">Zurück</button>
+  </div>
+</div>
+
 <div id="assign" class="overlay">
   <div class="panel wide">
     <h2 id="assignTitle">Taste belegen</h2>
@@ -74,7 +88,9 @@
   <div class="panel">
     <h1 class="red">Du bist gefallen</h1>
     <p id="goStats" class="sub"></p>
-    <button data-act="retry" class="big">Nochmal</button>
+    <p class="sub small">Besiegte Monster bleiben besiegt, Gegenstände und Erfahrung bleiben erhalten.</p>
+    <button data-act="respawn" class="big" id="btnRespawn">Weiter</button>
+    <button data-act="loadMenu">Spiel laden</button>
     <button data-act="toMenu" class="ghost">Hauptmenü</button>
   </div>
 </div>
@@ -84,6 +100,7 @@
 <script src="js/dungeon.js"></script>
 <script src="js/render.js"></script>
 <script src="js/game.js"></script>
+<script src="js/save.js"></script>
 <script src="js/input.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

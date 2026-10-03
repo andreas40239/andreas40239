@@ -3,6 +3,7 @@
 const UI = (() => {
   const $ = id => document.getElementById(id);
   let assignSlot = 0, assignReturn = null;
+  let savesMode = 'save', savesReturn = 'pause', confirmSlot = -1, confirmDel = -1;
 
   function show(id) {
     for (const el of document.querySelectorAll('.overlay')) el.classList.toggle('show', el.id === id);
@@ -34,7 +35,15 @@ const UI = (() => {
       case 'resume': Sound.play('menuBack'); hideAll(); G.state = 'play'; break;
       case 'assignMenu': Sound.play('menuSelect'); buildSlots(); show('slots'); break;
       case 'toMenu': Sound.play('menuBack'); toMenu(); break;
-      case 'retry': Sound.play('menuSelect'); hideAll(); newGame(); break;
+      case 'respawn': Sound.play('menuSelect'); hideAll(); respawn(); break;
+      case 'continue': {
+        const i = Save.newest();
+        if (i >= 0 && Save.load(i)) { Sound.play('menuSelect'); Sound.startMusic(); hideAll(); toast('Spielstand ' + (i + 1) + ' geladen – Ebene ' + G.level, '#d9cfff'); }
+        break;
+      }
+      case 'loadMenu': Sound.play('menuSelect'); openSaves('load'); break;
+      case 'saveMenu': Sound.play('menuSelect'); openSaves('save'); break;
+      case 'backSaves': Sound.play('menuBack'); show(savesReturn); break;
       case 'backHelp': Sound.play('menuBack'); show(G.demo ? 'menu' : 'pause'); break;
       case 'backSlots': Sound.play('menuBack'); show('pause'); break;
       case 'closeAssign': Sound.play('menuBack'); closeAssign(); break;
@@ -42,9 +51,104 @@ const UI = (() => {
   }
 
   function toMenu() {
+    Save.autosave();
     G.demo = true; G.state = 'menu'; G.level = 1 + Math.floor(Math.random() * 3);
     startLevel(12345 + G.level);
+    refreshMenu();
     show('menu');
+  }
+
+  function refreshMenu() {
+    const n = Save.newest(), has = n >= 0;
+    $('btnContinue').style.display = has ? '' : 'none';
+    if (has) $('btnContinue').textContent = 'Fortsetzen · Ebene ' + Save.read(n).level;
+    $('btnLoad').style.display = has ? '' : 'none';
+  }
+
+  // ---------- Speicherplätze ----------
+  function fmtTime(sec) {
+    const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = Math.floor(sec) % 60;
+    return 'Spielzeit ' + (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+  }
+
+  function slotDetails(i, d) {
+    const p = d.player;
+    const arm = ARMORS[p.armor] ? ARMORS[p.armor].name : 'keine Rüstung';
+    const weps = Object.keys(WEAPONS).filter(k => p.weapons[k] > 0)
+      .map(k => WEAPONS[k].name + (p.weapons[k] > 1 ? ' +' + (p.weapons[k] - 1) : '')).join(', ');
+    const spells = Object.keys(SPELLS).filter(k => p.lvl >= SPELLS[k].lvl).map(k => SPELLS[k].name).join(', ') || 'keine';
+    const date = new Date(d.savedAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const st = d.stats || {};
+    const deaths = st.deaths || 0;
+    return `<span class="sh"><span class="sn">Platz ${i + 1}</span>Ebene ${d.level} · Stufe ${p.lvl} · ♥ ${fmtNum(p.hp / 2)}/${p.maxHp / 2} · ${arm}${G.activeSlot === i && !G.demo ? '<span class="act">AKTIV</span>' : ''}</span>
+      <span class="sd">${weps} · Zauber: ${spells} · ${st.kills || 0} Monster · ${deaths} ${deaths === 1 ? 'Tod' : 'Tode'} · ${fmtTime(st.time || 0)} · ${date}</span>`;
+  }
+
+  function openSaves(mode) {
+    const open = document.querySelector('.overlay.show');
+    if (open && open.id !== 'saves') savesReturn = open.id;
+    savesMode = mode; confirmSlot = -1; confirmDel = -1;
+    buildSaves();
+    show('saves');
+  }
+
+  function buildSaves() {
+    $('savesTitle').textContent = savesMode === 'save' ? 'Spiel speichern' : 'Spiel laden';
+    $('savesHint').textContent = savesMode === 'save'
+      ? 'Der gewählte Platz speichert danach automatisch weiter (Treppe, Hauptmenü, App im Hintergrund).'
+      : '';
+    $('savesHint').style.display = $('savesHint').textContent ? '' : 'none';
+    const box = $('saveList');
+    box.innerHTML = '';
+    Save.list().forEach((d, i) => {
+      const card = document.createElement('div');
+      card.className = 'slot' + (G.activeSlot === i && !G.demo ? ' active' : '') + (confirmSlot === i ? ' confirm' : '');
+      const main = document.createElement('button');
+      main.className = 'slotMain';
+      main.innerHTML = d ? slotDetails(i, d) : `<span class="sh"><span class="sn">Platz ${i + 1}</span></span><span class="sd empty">– leer –</span>`;
+      if (confirmSlot === i) main.innerHTML += '<span class="warn">Nochmal tippen zum Überschreiben</span>';
+      if (savesMode === 'load' && !d) main.disabled = true;
+      main.addEventListener('click', () => slotClicked(i, d));
+      card.appendChild(main);
+      if (d) {
+        const del = document.createElement('button');
+        del.className = 'del' + (confirmDel === i ? ' armed' : '');
+        del.textContent = confirmDel === i ? 'Wirklich löschen?' : 'Löschen';
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          if (confirmDel === i) {
+            Save.remove(i); confirmDel = -1;
+            if (G.activeSlot === i) G.activeSlot = null;
+            Sound.play('menuBack');
+          } else { confirmDel = i; confirmSlot = -1; Sound.play('menuMove'); }
+          buildSaves(); refreshMenu();
+        });
+        card.appendChild(del);
+      }
+      box.appendChild(card);
+    });
+    wireSounds(box);
+  }
+
+  function slotClicked(i, d) {
+    confirmDel = -1;
+    if (savesMode === 'save') {
+      if (d && confirmSlot !== i && G.activeSlot !== i) { confirmSlot = i; Sound.play('menuMove'); buildSaves(); return; }
+      if (Save.write(i)) {
+        G.activeSlot = i;
+        Sound.play('chest');
+        toast('Gespeichert auf Platz ' + (i + 1), '#ffe14a');
+        confirmSlot = -1;
+        show(savesReturn);
+      } else { Sound.play('noMana'); $('savesHint').textContent = 'Speichern fehlgeschlagen (Speicher voll?)'; }
+      return;
+    }
+    if (!d) return;
+    if (Save.load(i)) {
+      Sound.play('menuSelect'); Sound.startMusic();
+      hideAll();
+      toast('Spielstand ' + (i + 1) + ' geladen – Ebene ' + G.level, '#d9cfff');
+    } else { Sound.play('noMana'); $('savesHint').textContent = 'Spielstand konnte nicht geladen werden.'; }
   }
 
   function pause() {
@@ -122,7 +226,8 @@ const UI = (() => {
 
   function showGameOver() {
     const p = G.player;
-    $('goStats').textContent = `Ebene ${G.level} erreicht · Stufe ${p.lvl} · ${G.stats.kills} Monster besiegt`;
+    $('goStats').textContent = `Ebene ${G.level} · Stufe ${p.lvl} · ${G.stats.kills} Monster besiegt`;
+    $('btnRespawn').textContent = 'Weiter – Ebene ' + G.level + ' neu betreten';
     show('gameover');
   }
 
@@ -135,7 +240,8 @@ const UI = (() => {
       case 'assign': act('closeAssign'); return true;
       case 'slots': act('backSlots'); return true;
       case 'help': act('backHelp'); return true;
-      case 'gameover': act('toMenu'); return true;
+      case 'gameover': act('respawn'); return true;
+      case 'saves': act('backSaves'); return true;
       default: return false;
     }
   }
@@ -144,6 +250,7 @@ const UI = (() => {
     for (const b of document.querySelectorAll('[data-act]')) b.addEventListener('click', () => act(b.dataset.act));
     wireSounds(document);
     refreshAudioLabels();
+    refreshMenu();
     show('menu');
   }
 
