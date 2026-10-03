@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_248bh"]
+
+[resource]
+script = ExtResource("1_248bh")
+id = &"troepfli"
+display_name = "Tröpfli"
+need_type = 2
+max_need = 90.0
+base_speed = 50.0
+chaos_value = 1
+reward = 25
+body_color = Color(0.309804, 0.560784, 0.909804, 1)
+size_scale = 1.0
+effect_resistances = {
+&"music": -0.3
+}
+description = "Ist traurig. Musik hilft besonders gut!"

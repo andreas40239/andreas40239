@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_na58x"]
+
+[resource]
+script = ExtResource("1_na58x")
+id = &"keksstand"
+display_name = "Keksstand"
+short_name = "Keks"
+supported_needs = Array[int]([0])
+need_strengths = {
+0: 20.0
+}
+mismatch_factor = 0.2
+cost = 150
+upgrade_cost = 120
+help_range = 125.0
+cooldown = 0.6
+is_aura = false
+effect_tag = &"food"
+slow_amount = 0.0
+slow_duration = 0.0
+target_strategy = 2
+color = Color(0.909804, 0.635294, 0.290196, 1)
+projectile = &"cookie"
+description = "Füttert hungrige Monster."

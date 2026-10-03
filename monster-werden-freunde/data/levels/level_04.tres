@@ -1,0 +1,204 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=31 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_jgec1"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_om1gp"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_nfk8x"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_e3sg4"]
+
+[sub_resource type="Resource" id="Resource_fopq4"]
+script = ExtResource("2_om1gp")
+text = "Flitzi ist überdreht.
+Der Ventilator bremst Flitzi!"
+trigger = "station_built:ventilator"
+highlight = "card:ventilator"
+
+[sub_resource type="Resource" id="Resource_v0rku"]
+script = ExtResource("2_om1gp")
+text = "Musik beruhigt Flitzi auch
+ein kleines bisschen."
+trigger = "time:7"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_mgs8d"]
+script = ExtResource("2_om1gp")
+text = "Tippe auf  Los!"
+trigger = "wave_started"
+highlight = "start"
+
+[sub_resource type="Resource" id="Resource_uhysw"]
+script = ExtResource("2_om1gp")
+text = "Zwischen den Wellen kannst du
+mit  Los!  früher starten."
+trigger = "time:9"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_nhqtn"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 2.5
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_0pplu"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_nhqtn")])
+
+[sub_resource type="Resource" id="Resource_s7v18"]
+script = ExtResource("4_e3sg4")
+monster_id = &"knurri"
+count = 5
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_838o1"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 2.2
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_204o3"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_s7v18"), SubResource("Resource_838o1")])
+
+[sub_resource type="Resource" id="Resource_ua2ly"]
+script = ExtResource("4_e3sg4")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.9
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_k4agv"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 2.0
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gqx72"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_ua2ly"), SubResource("Resource_k4agv")])
+
+[sub_resource type="Resource" id="Resource_jsb0x"]
+script = ExtResource("4_e3sg4")
+monster_id = &"matschi"
+count = 5
+spawn_interval = 1.9
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_o8iby"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 5
+spawn_interval = 1.6
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_bhprp"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_jsb0x"), SubResource("Resource_o8iby")])
+
+[sub_resource type="Resource" id="Resource_j3q07"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_yqgxa"]
+script = ExtResource("4_e3sg4")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_vgm7p"]
+script = ExtResource("4_e3sg4")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_t5wnu"]
+script = ExtResource("4_e3sg4")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.8
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_7nh5x"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_j3q07"), SubResource("Resource_yqgxa"), SubResource("Resource_vgm7p"), SubResource("Resource_t5wnu")])
+
+[sub_resource type="Resource" id="Resource_evh75"]
+script = ExtResource("4_e3sg4")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_qbdx2"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 1.4
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_7i7u8"]
+script = ExtResource("4_e3sg4")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.6
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_m62ky"]
+script = ExtResource("4_e3sg4")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.4
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_48uoj"]
+script = ExtResource("4_e3sg4")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gsyjd"]
+script = ExtResource("3_nfk8x")
+entries = Array[ExtResource("4_e3sg4")]([SubResource("Resource_evh75"), SubResource("Resource_qbdx2"), SubResource("Resource_7i7u8"), SubResource("Resource_m62ky"), SubResource("Resource_48uoj")])
+
+[resource]
+script = ExtResource("1_jgec1")
+id = &"level_04"
+number = 4
+display_name = "Flitzis Wirbelwind"
+world_name = "Sonnental"
+starting_currency = 460
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 680, 380, 680, 380, 260, 860, 260, 860, 620, 1260, 620, 1260, 240, 1560, 240, 1560, 560, 1760, 560)
+build_spots = PackedVector2Array(280, 580, 480, 360, 760, 360, 960, 520, 1160, 520, 1360, 340, 1460, 420, 1660, 460, 620, 380, 1060, 720, 150, 580)
+waves = Array[ExtResource("3_nfk8x")]([SubResource("Resource_0pplu"), SubResource("Resource_204o3"), SubResource("Resource_gqx72"), SubResource("Resource_bhprp"), SubResource("Resource_7nh5x"), SubResource("Resource_gsyjd")])
+available_station_ids = Array[StringName]([&"seifenblasen", &"musikbox", &"keksstand", &"ventilator"])
+new_monster_ids = Array[StringName]([&"flitzi"])
+tutorial_steps = Array[ExtResource("2_om1gp")]([SubResource("Resource_fopq4"), SubResource("Resource_v0rku"), SubResource("Resource_mgs8d"), SubResource("Resource_uhysw")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 10.0
+early_start = true
+decor_seed = 5348

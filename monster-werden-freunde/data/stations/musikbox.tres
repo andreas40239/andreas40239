@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_iyi30"]
+
+[resource]
+script = ExtResource("1_iyi30")
+id = &"musikbox"
+display_name = "Musikbox"
+short_name = "Musik"
+supported_needs = Array[int]([2, 4])
+need_strengths = {
+2: 14.0,
+4: 7.0
+}
+mismatch_factor = 0.2
+cost = 120
+upgrade_cost = 100
+help_range = 135.0
+cooldown = 0.0
+is_aura = true
+effect_tag = &"music"
+slow_amount = 0.0
+slow_duration = 0.0
+target_strategy = 2
+color = Color(0.913725, 0.541176, 0.815686, 1)
+projectile = &""
+description = "Beruhigt traurige und überdrehte Monster."

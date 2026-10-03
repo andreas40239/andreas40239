@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_uxulk"]
+
+[resource]
+script = ExtResource("1_uxulk")
+id = &"flitzi"
+display_name = "Flitzi"
+need_type = 4
+max_need = 75.0
+base_speed = 74.0
+chaos_value = 1
+reward = 25
+body_color = Color(0.960784, 0.72549, 0.180392, 1)
+size_scale = 0.92
+effect_resistances = {}
+description = "Ist ganz überdreht. Der Ventilator bremst Flitzi."

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/monster/Monster.gd" id="1_monster"]
+
+[node name="Monster" type="PathFollow2D"]
+rotates = false
+loop = false
+script = ExtResource("1_monster")

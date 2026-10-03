@@ -1,0 +1,147 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=23 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_2lq7d"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_fqbei"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_6wkqx"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_xg06x"]
+
+[sub_resource type="Resource" id="Resource_bsgu1"]
+script = ExtResource("2_fqbei")
+text = "Matschi ist schmutzig.
+Seifenblasen helfen!"
+trigger = "station_built:seifenblasen"
+highlight = "card:seifenblasen"
+
+[sub_resource type="Resource" id="Resource_ri5om"]
+script = ExtResource("2_fqbei")
+text = "Das Bild über dem Monster zeigt,
+was es braucht."
+trigger = "time:7"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_pd480"]
+script = ExtResource("2_fqbei")
+text = "Tippe auf  Los!"
+trigger = "wave_started"
+highlight = "start"
+
+[sub_resource type="Resource" id="Resource_cls38"]
+script = ExtResource("2_fqbei")
+text = "Apfel = Hunger,  Blase = schmutzig."
+trigger = "time:8"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_c3pel"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 4
+spawn_interval = 2.0
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_mpxrr"]
+script = ExtResource("3_6wkqx")
+entries = Array[ExtResource("4_xg06x")]([SubResource("Resource_c3pel")])
+
+[sub_resource type="Resource" id="Resource_wl3ub"]
+script = ExtResource("4_xg06x")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.6
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_cbk50"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 2.0
+start_delay = 1.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_tmxp7"]
+script = ExtResource("3_6wkqx")
+entries = Array[ExtResource("4_xg06x")]([SubResource("Resource_wl3ub"), SubResource("Resource_cbk50")])
+
+[sub_resource type="Resource" id="Resource_6lfad"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.6
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_sor5y"]
+script = ExtResource("4_xg06x")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.4
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_c7m3g"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.6
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_0ofsp"]
+script = ExtResource("3_6wkqx")
+entries = Array[ExtResource("4_xg06x")]([SubResource("Resource_6lfad"), SubResource("Resource_sor5y"), SubResource("Resource_c7m3g")])
+
+[sub_resource type="Resource" id="Resource_agkup"]
+script = ExtResource("4_xg06x")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_qgl00"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.4
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_erj6y"]
+script = ExtResource("4_xg06x")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_iuxu2"]
+script = ExtResource("4_xg06x")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.4
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_o6eby"]
+script = ExtResource("3_6wkqx")
+entries = Array[ExtResource("4_xg06x")]([SubResource("Resource_agkup"), SubResource("Resource_qgl00"), SubResource("Resource_erj6y"), SubResource("Resource_iuxu2")])
+
+[resource]
+script = ExtResource("1_2lq7d")
+id = &"level_02"
+number = 2
+display_name = "Matschis Pfützen"
+world_name = "Sonnental"
+starting_currency = 320
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 560, 360, 560, 360, 250, 820, 250, 820, 760, 1300, 760, 1300, 300, 1620, 300, 1620, 560, 1760, 560)
+build_spots = PackedVector2Array(260, 460, 460, 350, 720, 350, 920, 660, 1200, 660, 1400, 400, 1520, 400, 1720, 460, 590, 360, 1060, 650)
+waves = Array[ExtResource("3_6wkqx")]([SubResource("Resource_mpxrr"), SubResource("Resource_tmxp7"), SubResource("Resource_0ofsp"), SubResource("Resource_o6eby")])
+available_station_ids = Array[StringName]([&"seifenblasen", &"keksstand"])
+new_monster_ids = Array[StringName]([&"matschi"])
+tutorial_steps = Array[ExtResource("2_fqbei")]([SubResource("Resource_bsgu1"), SubResource("Resource_ri5om"), SubResource("Resource_pd480"), SubResource("Resource_cls38")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 7.0
+early_start = false
+decor_seed = 2674

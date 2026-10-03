@@ -1,0 +1,168 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=26 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_7aiuv"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_hij7b"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_ilbil"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_0bqj5"]
+
+[sub_resource type="Resource" id="Resource_ba1yj"]
+script = ExtResource("2_hij7b")
+text = "Tröpfli ist traurig.
+Musik hilft!"
+trigger = "station_built:musikbox"
+highlight = "card:musikbox"
+
+[sub_resource type="Resource" id="Resource_etu6v"]
+script = ExtResource("2_hij7b")
+text = "Der Kreis zeigt, wie weit
+eine Station helfen kann."
+trigger = "time:7"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_a50vx"]
+script = ExtResource("2_hij7b")
+text = "Tipp: Plätze in Kurven
+helfen am längsten."
+trigger = "time:7"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_n7jmt"]
+script = ExtResource("2_hij7b")
+text = "Neu: Mit  ▶▶  geht es schneller."
+trigger = "time:8"
+highlight = "speed"
+
+[sub_resource type="Resource" id="Resource_kt86t"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 5
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_74b62"]
+script = ExtResource("3_ilbil")
+entries = Array[ExtResource("4_0bqj5")]([SubResource("Resource_kt86t")])
+
+[sub_resource type="Resource" id="Resource_l2ttr"]
+script = ExtResource("4_0bqj5")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.5
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_o4n63"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.6
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_oc01v"]
+script = ExtResource("3_ilbil")
+entries = Array[ExtResource("4_0bqj5")]([SubResource("Resource_l2ttr"), SubResource("Resource_o4n63")])
+
+[sub_resource type="Resource" id="Resource_gghgy"]
+script = ExtResource("4_0bqj5")
+monster_id = &"matschi"
+count = 4
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_adeyp"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 5
+spawn_interval = 1.4
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_km01a"]
+script = ExtResource("3_ilbil")
+entries = Array[ExtResource("4_0bqj5")]([SubResource("Resource_gghgy"), SubResource("Resource_adeyp")])
+
+[sub_resource type="Resource" id="Resource_ukf6o"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 6
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gwv3r"]
+script = ExtResource("4_0bqj5")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_qbsrf"]
+script = ExtResource("3_ilbil")
+entries = Array[ExtResource("4_0bqj5")]([SubResource("Resource_ukf6o"), SubResource("Resource_gwv3r")])
+
+[sub_resource type="Resource" id="Resource_kq1n8"]
+script = ExtResource("4_0bqj5")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.3
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_tllml"]
+script = ExtResource("4_0bqj5")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_qnifh"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.3
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ccn1x"]
+script = ExtResource("4_0bqj5")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_6ejew"]
+script = ExtResource("4_0bqj5")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_trwwg"]
+script = ExtResource("3_ilbil")
+entries = Array[ExtResource("4_0bqj5")]([SubResource("Resource_kq1n8"), SubResource("Resource_tllml"), SubResource("Resource_qnifh"), SubResource("Resource_ccn1x"), SubResource("Resource_6ejew")])
+
+[resource]
+script = ExtResource("1_7aiuv")
+id = &"level_03"
+number = 3
+display_name = "Tröpflis Regentag"
+world_name = "Sonnental"
+starting_currency = 340
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 250, 620, 250, 620, 520, 220, 520, 220, 790, 1080, 790, 1080, 430, 1480, 430, 1480, 690, 1760, 690)
+build_spots = PackedVector2Array(520, 350, 320, 420, 320, 620, 110, 650, 650, 690, 980, 690, 1180, 530, 1380, 530, 1580, 590, 1280, 330)
+waves = Array[ExtResource("3_ilbil")]([SubResource("Resource_74b62"), SubResource("Resource_oc01v"), SubResource("Resource_km01a"), SubResource("Resource_qbsrf"), SubResource("Resource_trwwg")])
+available_station_ids = Array[StringName]([&"seifenblasen", &"musikbox", &"keksstand"])
+new_monster_ids = Array[StringName]([&"troepfli"])
+tutorial_steps = Array[ExtResource("2_hij7b")]([SubResource("Resource_ba1yj"), SubResource("Resource_etu6v"), SubResource("Resource_a50vx"), SubResource("Resource_n7jmt")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 7.0
+early_start = false
+decor_seed = 4011

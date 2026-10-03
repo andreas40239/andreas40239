@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_w06uf"]
+
+[resource]
+script = ExtResource("1_w06uf")
+id = &"knurri"
+display_name = "Knurri"
+need_type = 0
+max_need = 100.0
+base_speed = 55.0
+chaos_value = 1
+reward = 25
+body_color = Color(0.941176, 0.376471, 0.301961, 1)
+size_scale = 1.0
+effect_resistances = {}
+description = "Sucht nach Essen. Kekse helfen!"

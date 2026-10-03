@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_l1pcc"]
+
+[resource]
+script = ExtResource("1_l1pcc")
+id = &"ventilator"
+display_name = "Ventilator"
+short_name = "Ventilator"
+supported_needs = Array[int]([4])
+need_strengths = {
+4: 12.0
+}
+mismatch_factor = 0.2
+cost = 180
+upgrade_cost = 140
+help_range = 165.0
+cooldown = 0.55
+is_aura = false
+effect_tag = &"wind"
+slow_amount = 0.25
+slow_duration = 1.5
+target_strategy = 2
+color = Color(0.560784, 0.827451, 0.780392, 1)
+projectile = &"wind"
+description = "Pustet überdrehte Monster langsamer."

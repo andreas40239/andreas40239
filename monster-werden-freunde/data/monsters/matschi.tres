@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_ylphw"]
+
+[resource]
+script = ExtResource("1_ylphw")
+id = &"matschi"
+display_name = "Matschi"
+need_type = 1
+max_need = 120.0
+base_speed = 45.0
+chaos_value = 1
+reward = 30
+body_color = Color(0.611765, 0.478431, 0.329412, 1)
+size_scale = 1.08
+effect_resistances = {
+&"slow": 0.5
+}
+description = "Ist ganz schmutzig. Seifenblasen helfen!"

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_vhhkp"]
+
+[resource]
+script = ExtResource("1_vhhkp")
+id = &"schlummi"
+display_name = "Schlummi"
+need_type = 3
+max_need = 115.0
+base_speed = 40.0
+chaos_value = 1
+reward = 35
+body_color = Color(0.607843, 0.435294, 0.862745, 1)
+size_scale = 1.05
+effect_resistances = {
+&"rest": -0.3
+}
+description = "Ist sehr müde. Die Ruhe-Station hilft!"

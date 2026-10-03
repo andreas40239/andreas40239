@@ -1,0 +1,212 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=32 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_6rc03"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_d0j32"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_0apti"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_5r5cg"]
+
+[sub_resource type="Resource" id="Resource_q3eeg"]
+script = ExtResource("2_d0j32")
+text = "Schlummi ist müde.
+Die Ruhe-Station hilft!"
+trigger = "station_built:ruhe"
+highlight = "card:ruhe"
+
+[sub_resource type="Resource" id="Resource_c8ufq"]
+script = ExtResource("2_d0j32")
+text = "Tippe auf eine Station,
+um sie zu verbessern."
+trigger = "station_selected"
+highlight = "station"
+
+[sub_resource type="Resource" id="Resource_nbnpc"]
+script = ExtResource("2_d0j32")
+text = "Wähle:  Weiter  oder  Stärker."
+trigger = "station_upgraded"
+highlight = "upgrade"
+
+[sub_resource type="Resource" id="Resource_qtwck"]
+script = ExtResource("2_d0j32")
+text = "Verkaufen gibt dir 3/4
+der Punkte zurück."
+trigger = "time:8"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_aig56"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 4
+spawn_interval = 2.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_sfg1t"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_aig56")])
+
+[sub_resource type="Resource" id="Resource_wfxhq"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 4
+spawn_interval = 2.5
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_1l242"]
+script = ExtResource("4_5r5cg")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.8
+start_delay = 0.8
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_bptje"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_wfxhq"), SubResource("Resource_1l242")])
+
+[sub_resource type="Resource" id="Resource_sb27g"]
+script = ExtResource("4_5r5cg")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 1.9
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_cvho1"]
+script = ExtResource("4_5r5cg")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.8
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_174gl"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_sb27g"), SubResource("Resource_cvho1")])
+
+[sub_resource type="Resource" id="Resource_4qi8o"]
+script = ExtResource("4_5r5cg")
+monster_id = &"matschi"
+count = 5
+spawn_interval = 1.9
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_dpa0n"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 4
+spawn_interval = 2.2
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_yrohg"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_4qi8o"), SubResource("Resource_dpa0n")])
+
+[sub_resource type="Resource" id="Resource_rsw2g"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 3
+spawn_interval = 2.0
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_4n8vh"]
+script = ExtResource("4_5r5cg")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_scdwa"]
+script = ExtResource("4_5r5cg")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_fu0gi"]
+script = ExtResource("4_5r5cg")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_i573e"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_rsw2g"), SubResource("Resource_4n8vh"), SubResource("Resource_scdwa"), SubResource("Resource_fu0gi")])
+
+[sub_resource type="Resource" id="Resource_b7cmd"]
+script = ExtResource("4_5r5cg")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_5jhm7"]
+script = ExtResource("4_5r5cg")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.6
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ik6ht"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 3
+spawn_interval = 1.9
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_f17n3"]
+script = ExtResource("4_5r5cg")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_je84j"]
+script = ExtResource("4_5r5cg")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_c1a3m"]
+script = ExtResource("4_5r5cg")
+monster_id = &"schlummi"
+count = 2
+spawn_interval = 1.9
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gp01m"]
+script = ExtResource("3_0apti")
+entries = Array[ExtResource("4_5r5cg")]([SubResource("Resource_b7cmd"), SubResource("Resource_5jhm7"), SubResource("Resource_ik6ht"), SubResource("Resource_f17n3"), SubResource("Resource_je84j"), SubResource("Resource_c1a3m")])
+
+[resource]
+script = ExtResource("1_6rc03")
+id = &"level_05"
+number = 5
+display_name = "Schlummis Mittagsschlaf"
+world_name = "Sonnental"
+starting_currency = 600
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 420, 300, 420, 300, 780, 760, 780, 760, 230, 1180, 230, 1180, 700, 1540, 700, 1540, 400, 1760, 400)
+build_spots = PackedVector2Array(200, 520, 400, 680, 660, 680, 860, 330, 1080, 330, 1280, 600, 1440, 600, 1640, 500, 530, 680, 970, 330, 660, 420, 1640, 300)
+waves = Array[ExtResource("3_0apti")]([SubResource("Resource_sfg1t"), SubResource("Resource_bptje"), SubResource("Resource_174gl"), SubResource("Resource_yrohg"), SubResource("Resource_i573e"), SubResource("Resource_gp01m")])
+available_station_ids = Array[StringName]([&"seifenblasen", &"musikbox", &"keksstand", &"ventilator", &"ruhe"])
+new_monster_ids = Array[StringName]([&"schlummi"])
+tutorial_steps = Array[ExtResource("2_d0j32")]([SubResource("Resource_q3eeg"), SubResource("Resource_c8ufq"), SubResource("Resource_nbnpc"), SubResource("Resource_qtwck")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 10.0
+early_start = true
+decor_seed = 6685

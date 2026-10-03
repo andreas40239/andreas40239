@@ -1,0 +1,50 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/game/Game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/game/MapView.gd" id="2_map"]
+[ext_resource type="Script" path="res://scripts/game/RangeIndicator.gd" id="3_range"]
+[ext_resource type="Script" path="res://scripts/game/WaveManager.gd" id="4_wave"]
+[ext_resource type="Script" path="res://scripts/game/BuildManager.gd" id="5_build"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="6_hud"]
+
+[node name="Game" type="Node2D"]
+process_mode = 3
+script = ExtResource("1_game")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="Map" type="Node2D" parent="World"]
+script = ExtResource("2_map")
+
+[node name="Spots" type="Node2D" parent="World"]
+
+[node name="Range" type="Node2D" parent="World"]
+script = ExtResource("3_range")
+
+[node name="Field" type="Node2D" parent="World"]
+process_mode = 1
+y_sort_enabled = true
+
+[node name="Path2D" type="Path2D" parent="World/Field"]
+y_sort_enabled = true
+
+[node name="Stations" type="Node2D" parent="World/Field"]
+y_sort_enabled = true
+
+[node name="Projectiles" type="Node2D" parent="World/Field"]
+z_index = 5
+
+[node name="Fx" type="Node2D" parent="World/Field"]
+z_index = 10
+
+[node name="UiFx" type="Node2D" parent="World"]
+z_index = 20
+
+[node name="WaveManager" type="Node" parent="."]
+process_mode = 1
+script = ExtResource("4_wave")
+
+[node name="BuildManager" type="Node" parent="."]
+script = ExtResource("5_build")
+
+[node name="HUD" parent="." instance=ExtResource("6_hud")]

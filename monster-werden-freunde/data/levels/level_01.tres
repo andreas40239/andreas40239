@@ -1,0 +1,99 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_6jrhh"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_edcfl"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_vjtlv"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_y1woe"]
+
+[sub_resource type="Resource" id="Resource_qg5lk"]
+script = ExtResource("2_edcfl")
+text = "Knurri hat Hunger!
+Tippe auf ein  +"
+trigger = "spot_selected"
+highlight = "spot:0"
+
+[sub_resource type="Resource" id="Resource_bcktr"]
+script = ExtResource("2_edcfl")
+text = "Tippe auf den Keksstand."
+trigger = "station_built"
+highlight = "card:keksstand"
+
+[sub_resource type="Resource" id="Resource_6r1wk"]
+script = ExtResource("2_edcfl")
+text = "Super! Baue noch einen Keksstand."
+trigger = "station_built"
+highlight = "spot:2"
+
+[sub_resource type="Resource" id="Resource_8rkjy"]
+script = ExtResource("2_edcfl")
+text = "Tippe auf  Los!"
+trigger = "wave_started"
+highlight = "start"
+
+[sub_resource type="Resource" id="Resource_c0wg5"]
+script = ExtResource("2_edcfl")
+text = "Kekse machen Knurri satt und froh!"
+trigger = "time:7"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_a27lr"]
+script = ExtResource("2_edcfl")
+text = "Freunde bringen dir Sonnenpunkte.
+Damit kannst du mehr bauen."
+trigger = "time:8"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_0duyb"]
+script = ExtResource("4_y1woe")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_0crcv"]
+script = ExtResource("3_vjtlv")
+entries = Array[ExtResource("4_y1woe")]([SubResource("Resource_0duyb")])
+
+[sub_resource type="Resource" id="Resource_cr4qp"]
+script = ExtResource("4_y1woe")
+monster_id = &"knurri"
+count = 6
+spawn_interval = 1.5
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_wjnqv"]
+script = ExtResource("3_vjtlv")
+entries = Array[ExtResource("4_y1woe")]([SubResource("Resource_cr4qp")])
+
+[sub_resource type="Resource" id="Resource_yk1dp"]
+script = ExtResource("4_y1woe")
+monster_id = &"knurri"
+count = 8
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ed6kk"]
+script = ExtResource("3_vjtlv")
+entries = Array[ExtResource("4_y1woe")]([SubResource("Resource_yk1dp")])
+
+[resource]
+script = ExtResource("1_6jrhh")
+id = &"level_01"
+number = 1
+display_name = "Knurris Hunger"
+world_name = "Sonnental"
+starting_currency = 300
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 330, 480, 330, 480, 700, 1000, 700, 1000, 380, 1450, 380, 1450, 620, 1760, 620)
+build_spots = PackedVector2Array(380, 430, 580, 600, 900, 600, 1100, 480, 1350, 480, 1550, 520, 740, 590, 740, 810, 1220, 270, 230, 220, 1650, 730)
+waves = Array[ExtResource("3_vjtlv")]([SubResource("Resource_0crcv"), SubResource("Resource_wjnqv"), SubResource("Resource_ed6kk")])
+available_station_ids = Array[StringName]([&"keksstand"])
+new_monster_ids = Array[StringName]([&"knurri"])
+tutorial_steps = Array[ExtResource("2_edcfl")]([SubResource("Resource_qg5lk"), SubResource("Resource_bcktr"), SubResource("Resource_6r1wk"), SubResource("Resource_8rkjy"), SubResource("Resource_c0wg5"), SubResource("Resource_a27lr")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 8.0
+early_start = false
+decor_seed = 1337
