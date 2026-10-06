@@ -14,4 +14,6 @@ reward = 25
 body_color = Color(0.941176, 0.376471, 0.301961, 1)
 size_scale = 1.0
 effect_resistances = {}
+friend_speed_mult = 1.6
+friend_flies = false
 description = "Sucht nach Essen. Kekse helfen!"

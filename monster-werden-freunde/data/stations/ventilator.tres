@@ -23,4 +23,5 @@ slow_duration = 1.5
 target_strategy = 2
 color = Color(0.560784, 0.827451, 0.780392, 1)
 projectile = &"wind"
+dance_duration = 0.0
 description = "Pustet überdrehte Monster langsamer."

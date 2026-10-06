@@ -1,0 +1,203 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=30 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_sehm2"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_w47rq"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_gcqu2"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_fm5p5"]
+
+[sub_resource type="Resource" id="Resource_gf10t"]
+script = ExtResource("4_fm5p5")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.9
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_0sde4"]
+script = ExtResource("4_fm5p5")
+monster_id = &"bibber"
+count = 3
+spawn_interval = 2.0
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_6clwk"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_gf10t"), SubResource("Resource_0sde4")])
+
+[sub_resource type="Resource" id="Resource_ydsts"]
+script = ExtResource("4_fm5p5")
+monster_id = &"fluegel"
+count = 4
+spawn_interval = 1.6
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_be7e3"]
+script = ExtResource("4_fm5p5")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.5
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_vrwtk"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_ydsts"), SubResource("Resource_be7e3")])
+
+[sub_resource type="Resource" id="Resource_33ehr"]
+script = ExtResource("4_fm5p5")
+monster_id = &"knurri"
+count = 4
+spawn_interval = 1.4
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_s204b"]
+script = ExtResource("4_fm5p5")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_uisgh"]
+script = ExtResource("4_fm5p5")
+monster_id = &"flocki"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_t6phk"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_33ehr"), SubResource("Resource_s204b"), SubResource("Resource_uisgh")])
+
+[sub_resource type="Resource" id="Resource_4gnbr"]
+script = ExtResource("4_fm5p5")
+monster_id = &"fluegel"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_0yo5d"]
+script = ExtResource("4_fm5p5")
+monster_id = &"troepfli"
+count = 3
+spawn_interval = 1.3
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_fqlw0"]
+script = ExtResource("4_fm5p5")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_kbwyb"]
+script = ExtResource("4_fm5p5")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_5k26k"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_4gnbr"), SubResource("Resource_0yo5d"), SubResource("Resource_fqlw0"), SubResource("Resource_kbwyb")])
+
+[sub_resource type="Resource" id="Resource_7hiqg"]
+script = ExtResource("4_fm5p5")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_xgq75"]
+script = ExtResource("4_fm5p5")
+monster_id = &"fluegel"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_8h1op"]
+script = ExtResource("4_fm5p5")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_u0qgi"]
+script = ExtResource("4_fm5p5")
+monster_id = &"knurri"
+count = 3
+spawn_interval = 1.1
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_6kxsn"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_7hiqg"), SubResource("Resource_xgq75"), SubResource("Resource_8h1op"), SubResource("Resource_u0qgi")])
+
+[sub_resource type="Resource" id="Resource_fbe2f"]
+script = ExtResource("4_fm5p5")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.1
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_7ed8l"]
+script = ExtResource("4_fm5p5")
+monster_id = &"troepfli"
+count = 4
+spawn_interval = 1.1
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_im1bp"]
+script = ExtResource("4_fm5p5")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.1
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_hq263"]
+script = ExtResource("4_fm5p5")
+monster_id = &"fluegel"
+count = 4
+spawn_interval = 1.1
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_1pnab"]
+script = ExtResource("3_gcqu2")
+entries = Array[ExtResource("4_fm5p5")]([SubResource("Resource_fbe2f"), SubResource("Resource_7ed8l"), SubResource("Resource_im1bp"), SubResource("Resource_hq263")])
+
+[resource]
+script = ExtResource("1_sehm2")
+id = &"level_14"
+number = 14
+display_name = "Gipfelsturm"
+world_name = "Schnee und Berge"
+world = 3
+theme = &"snow"
+starting_currency = 600
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 230, 700, 230, 700, 480, 200, 480, 200, 780, 1000, 780, 1000, 450, 1350, 450, 1350, 250, 1760, 250)
+build_spots = PackedVector2Array(600, 330, 300, 580, 900, 680, 1100, 550, 1250, 350, 1450, 350, 190.8, 338, 449.2, 338, 808, 355, 450, 588, 92, 630, 736, 672)
+waves = Array[ExtResource("3_gcqu2")]([SubResource("Resource_6clwk"), SubResource("Resource_vrwtk"), SubResource("Resource_t6phk"), SubResource("Resource_5k26k"), SubResource("Resource_6kxsn"), SubResource("Resource_1pnab")])
+available_station_ids = Array[StringName]([&"musikbox", &"keksstand", &"fluegelladen", &"kakao", &"schneemann"])
+new_monster_ids = Array[StringName]([])
+tutorial_steps = Array[ExtResource("2_w47rq")]([])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 10.0
+early_start = true
+decor_seed = 18718

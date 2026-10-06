@@ -14,4 +14,6 @@ reward = 25
 body_color = Color(0.960784, 0.72549, 0.180392, 1)
 size_scale = 0.92
 effect_resistances = {}
+friend_speed_mult = 1.6
+friend_flies = false
 description = "Ist ganz überdreht. Der Ventilator bremst Flitzi."

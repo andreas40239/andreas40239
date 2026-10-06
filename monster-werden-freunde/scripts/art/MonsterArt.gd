@@ -5,7 +5,7 @@ extends RefCounted
 
 
 static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: float, mood: float,
-		t: float, facing: float = 1.0, walking: bool = true) -> void:
+		t: float, facing: float = 1.0, walking: bool = true, flying: bool = false) -> void:
 	var R := radius
 	var happy := clampf(mood, 0.0, 1.0)
 	var body_col := base.lerp(base.lightened(0.3), happy)
@@ -16,6 +16,8 @@ static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: 
 	var step: float = sin(t * speed) if walking else sin(t * 2.0) * 0.3
 	var bob := absf(step) * R * 0.08
 	var c := Vector2(0, -R * 1.0 - bob)
+	if kind == &"bibber" and happy < 0.7:
+		c.x += sin(t * 45.0) * R * 0.05 * (1.0 - happy)
 
 	# Schatten
 	Icons.ellipse(ci, Vector2(0, 2), R * 0.85, R * 0.22, Color(0, 0, 0, 0.16))
@@ -46,6 +48,23 @@ static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: 
 					var y := c.y - R * 0.3 + i * R * 0.3
 					var x0 := -facing * R * (1.25 + 0.1 * i)
 					ci.draw_line(Vector2(x0, y), Vector2(x0 - facing * R * 0.5, y), Color(1, 1, 1, 0.7 * (1.0 - happy * 2.0)), R * 0.07, true)
+
+	match kind:
+		&"elektro":
+			# Antenne mit Blitz-Kugel (leuchtet, je voller die Batterie)
+			var a0 := c + Vector2(0, -R * 0.9)
+			var a1 := a0 + Vector2(R * 0.15, -R * 0.55)
+			ci.draw_line(a0, a1, base.darkened(0.5), R * 0.08, true)
+			var glow := Color(1.0, 0.9, 0.2).lerp(Color(0.6, 0.6, 0.6), 1.0 - happy)
+			ci.draw_circle(a1, R * (0.17 + 0.04 * sin(t * 12.0) * happy), glow)
+		&"fluegel":
+			_wings(ci, c, R, happy, t, flying)
+		&"flocki":
+			var top := c + Vector2(0, -R * 1.05)
+			for i in 3:
+				var a := i * PI / 3.0 + t * 0.3
+				var d := Vector2(cos(a), sin(a)) * R * 0.3
+				ci.draw_line(top - d, top + d, Color("9fd3ff"), R * 0.08, true)
 
 	# Arme
 	var arm_col := body_col.darkened(0.08)
@@ -94,6 +113,38 @@ static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: 
 			ci.draw_colored_polygon(drop, base.lightened(0.45))
 			ci.draw_polyline(drop, dark, R * 0.04, true)
 
+	match kind:
+		&"elektro":
+			# Batterie-Anzeige auf dem Bauch: füllt sich beim Aufladen
+			var br := Rect2(c + Vector2(-R * 0.32, R * 0.2), Vector2(R * 0.64, R * 0.36))
+			Icons.rounded_rect(ci, br.grow(R * 0.05), R * 0.08, base.darkened(0.55))
+			Icons.rounded_rect(ci, br, R * 0.06, Color(0.15, 0.2, 0.25))
+			ci.draw_rect(Rect2(br.end.x + R * 0.04, br.position.y + br.size.y * 0.3, R * 0.07, br.size.y * 0.4), base.darkened(0.55))
+			if happy > 0.02:
+				var col := Color("ff6b6b").lerp(Color("5fd068"), happy)
+				ci.draw_rect(Rect2(br.position + Vector2(R * 0.04, R * 0.04), Vector2((br.size.x - R * 0.08) * happy, br.size.y - R * 0.08)), col)
+		&"bibber":
+			# Schal
+			var sc := c + Vector2(0, R * 0.42)
+			Icons.ellipse(ci, sc, R * 0.78, R * 0.16, Color("e84a5f"))
+			Icons.ellipse(ci, sc + Vector2(R * 0.45, R * 0.28), R * 0.13, R * 0.3, Color("e84a5f"), 0.3)
+			for i in 4:
+				ci.draw_line(sc + Vector2(-R * 0.55 + i * R * 0.35, -R * 0.12), sc + Vector2(-R * 0.55 + i * R * 0.35, R * 0.12), Color("ffd6dc"), R * 0.05)
+			# Bommelmütze
+			var hc := c + Vector2(0, -R * 0.8)
+			Icons.ellipse(ci, hc, R * 0.62, R * 0.32, Color("4f8fe8"))
+			ci.draw_circle(hc + Vector2(0, -R * 0.36), R * 0.17, Color.WHITE)
+			if happy < 0.5:
+				for i in 2:
+					var sp := c + Vector2((i * 2 - 1) * R * 1.25, -R * 0.2 + sin(t * 8.0 + i) * R * 0.1)
+					Icons.snowflake(ci, sp, R * 0.35, Color(0.75, 0.9, 1.0, 0.9))
+		&"fluegel":
+			# kleiner Schnabel-Mund-Bereich: Federbüschel oben
+			var tuft := c + Vector2(0, -R * 0.95)
+			for i in 3:
+				var a := -PI * 0.5 + (i - 1) * 0.4
+				Icons.ellipse(ci, tuft + Vector2(cos(a), sin(a)) * R * 0.2, R * 0.08, R * 0.22, base.darkened(0.15), a + PI * 0.5)
+
 	# Gesicht
 	var fx := facing * R * 0.1
 	var eye_y := c.y - R * 0.12
@@ -112,13 +163,13 @@ static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: 
 		ci.draw_circle(pupil, pr, Color("232338"))
 		ci.draw_circle(pupil + Vector2(-pr * 0.35, -pr * 0.4), pr * 0.36, Color.WHITE)
 		# Augenlider (müde) bzw. Augenbrauen (mürrisch / traurig)
-		if kind == &"schlummi" and happy < 0.75:
+		if (kind == &"schlummi" or kind == &"elektro") and happy < 0.75:
 			var cover := 0.62 * (1.0 - happy / 0.75)
 			_eyelid(ci, e, er * 1.04, cover, body_col.darkened(0.1), dark)
 		elif happy < 0.35:
 			var outer: Vector2 = e + Vector2(sx * er * 0.95, -er * 1.3)
 			var inner: Vector2 = e + Vector2(-sx * er * 0.7, -er * 0.95)
-			if kind == &"troepfli":
+			if kind == &"troepfli" or kind == &"flocki":
 				outer = e + Vector2(sx * er * 0.95, -er * 0.95)
 				inner = e + Vector2(-sx * er * 0.7, -er * 1.45)
 			Icons.thick_line(ci, outer, inner, dark, R * 0.09)
@@ -158,6 +209,9 @@ static func draw_monster(ci: CanvasItem, kind: StringName, base: Color, radius: 
 				Icons.ellipse(ci, m + Vector2(0, R * 0.02), R * 0.12, R * (0.08 + 0.1 * yawn), Color("5a2a4a"))
 			&"flitzi":
 				Icons.ellipse(ci, m + Vector2(0, R * 0.02), R * 0.13, R * 0.13, Color("8c2b3c"))
+			&"bibber":
+				var shiver := sin(t * 40.0) * R * 0.02
+				Icons.ellipse(ci, m + Vector2(shiver, R * 0.03), R * 0.1, R * 0.08, Color("6a3a5a"))
 			_:
 				ci.draw_arc(m + Vector2(0, R * 0.2), R * 0.24, PI * 1.22, PI * 1.78, 12, dark, mw, true)
 
@@ -194,3 +248,20 @@ static func _eyelid(ci: CanvasItem, e: Vector2, r: float, cover: float, col: Col
 	if pts.size() >= 3:
 		ci.draw_colored_polygon(pts, col)
 		ci.draw_line(pts[0], pts[pts.size() - 1], line, r * 0.18, true)
+
+
+static func _wings(ci: CanvasItem, c: Vector2, R: float, happy: float, t: float, flying: bool) -> void:
+	# Ohne Flügel nur kleine Stummel; als Freund große, schlagende Federflügel.
+	var big := happy >= 1.0
+	var flap := sin(t * (14.0 if flying else 5.0)) * (0.45 if flying else 0.15)
+	for sx in [-1.0, 1.0]:
+		var root: Vector2 = c + Vector2(sx * R * 0.8, -R * 0.15)
+		if big:
+			var ang: float = (-0.5 + flap) * sx
+			for k in 3:
+				var len := R * (1.25 - k * 0.22)
+				var d := Vector2(sx * cos(ang - k * 0.28 * sx), sin(ang - k * 0.28 * sx) - 0.25)
+				Icons.ellipse(ci, root + d * len * 0.55, len * 0.55, R * 0.2, Color(1, 1, 1, 0.95), d.angle())
+				Icons.ellipse_outline(ci, root + d * len * 0.55, len * 0.55, R * 0.2, Color(0.8, 0.82, 0.9), R * 0.04, d.angle())
+		else:
+			Icons.ellipse(ci, root + Vector2(sx * R * 0.18, 0), R * 0.24, R * 0.14, Color(1, 1, 1, 0.9), sx * (0.4 + flap))

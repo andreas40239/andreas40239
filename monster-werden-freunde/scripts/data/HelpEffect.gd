@@ -10,6 +10,8 @@ var fallback_amount: float = 0.0
 var tag: StringName
 var slow_amount: float = 0.0
 var slow_duration: float = 0.0
+## > 0: Tanz-Effekt (Disco). Ändert need_value nicht, hält das Monster nur an.
+var dance_duration: float = 0.0
 
 
 func helps(need: int) -> bool:

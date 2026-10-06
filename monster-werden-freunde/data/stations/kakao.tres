@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_bwbkn"]
+
+[resource]
+script = ExtResource("1_bwbkn")
+id = &"kakao"
+display_name = "Kakaostand"
+short_name = "Kakao"
+supported_needs = Array[int]([7])
+need_strengths = {
+7: 20.0
+}
+mismatch_factor = 0.2
+cost = 150
+upgrade_cost = 120
+help_range = 125.0
+cooldown = 0.6
+is_aura = false
+effect_tag = &"warm"
+slow_amount = 0.0
+slow_duration = 0.0
+target_strategy = 2
+color = Color(0.788235, 0.545098, 0.309804, 1)
+projectile = &"mug"
+dance_duration = 0.0
+description = "Wärmt frierende Monster mit Kakao."

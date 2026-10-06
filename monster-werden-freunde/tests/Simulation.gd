@@ -17,7 +17,9 @@ func _ready() -> void:
 
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
-	var levels: Array[int] = [1, 2, 3, 4, 5]
+	var levels: Array[int] = []
+	for i in DataRegistry.level_count():
+		levels.append(i + 1)
 	var strategies: Array[String] = ["greedy", "modest"]
 	if args.size() >= 1:
 		levels = [int(args[0])]
@@ -75,6 +77,11 @@ func _play(n: int, strat: String) -> void:
 			"stress":
 				if rng.randf() < 0.02:
 					_bot_build(g, baked, "greedy", 1)
+				if rng.randf() < 0.01 and g.level.available_station_ids.has(&"disco"):
+					var free := g.build_manager.first_free_spot(rng.randi() % g.build_manager.spots.size())
+					if free:
+						GameState.earn(140)
+						g.build_station(free, &"disco")
 				if rng.randf() < 0.005 and not g.build_manager.stations.is_empty():
 					g.build_manager.sell(g.build_manager.stations[rng.randi() % g.build_manager.stations.size()])
 				if rng.randf() < 0.003:

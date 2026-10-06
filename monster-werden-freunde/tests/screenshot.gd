@@ -21,6 +21,9 @@ func _initialize() -> void:
 
 func _process(delta: float) -> bool:
 	_frames += 1
+	if _frames == 3 and OS.has_environment("SHOT_LANG"):
+		root.get_node("I18n").set_language(OS.get_environment("SHOT_LANG"), false)
+		root.get_node("GameState").goto_screen(&"title")
 	if _frames == 5:
 		var screen := StringName(_args[0])
 		var level := int(_args[2]) if _args.size() > 2 else 1
@@ -77,5 +80,7 @@ func _run_actions(spec: String) -> void:
 				root.get_node("GameState").chaos = 2
 				_game.friends_count = 16
 				_game.end_level(true)
+			"panel":
+				_game._select_station(_game.build_manager.stations[0])
 			"fast":
 				_game.toggle_speed()

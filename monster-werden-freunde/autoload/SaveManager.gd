@@ -69,6 +69,26 @@ func is_level_unlocked(level_number: int) -> bool:
 	return level_number <= 1 or get_stars(level_number - 1) > 0
 
 
+## Eine Welt ist offen, wenn das letzte Level der vorherigen Welt geschafft wurde.
+func is_world_unlocked(world: int) -> bool:
+	if world <= 1:
+		return true
+	var prev: Array = DataRegistry.world_levels(world - 1)
+	return get_stars(prev[prev.size() - 1]) > 0
+
+
+func is_world_completed(world: int) -> bool:
+	var levels: Array = DataRegistry.world_levels(world)
+	return get_stars(levels[levels.size() - 1]) > 0
+
+
+func world_stars(world: int) -> int:
+	var n := 0
+	for l in DataRegistry.world_levels(world):
+		n += get_stars(l)
+	return n
+
+
 ## 1x/2x wird nach Tutorial-Level 2 freigeschaltet (GDD 2.3).
 func is_speed_unlocked() -> bool:
 	return get_stars(2) > 0

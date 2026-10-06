@@ -98,14 +98,26 @@ def make_sfx():
     s["lose"] = mix(1.3, [(0, bell(midi(67), 0.5, 4)), (0.25, bell(midi(64), 0.5, 4)), (0.5, bell(midi(60), 0.8, 3))])
     s["deny"] = mix(0.25, [(0, tone(392, 0.1, 25)), (0.1, tone(330, 0.12, 25))])
     s["need_info"] = mix(0.3, [(0, bell(midi(81), 0.25, 9))])
+    # Neue Welten
+    t = tt(0.25)
+    zap = np.sin(2 * np.pi * np.cumsum(900 + 700 * np.sin(2 * np.pi * 30 * t)) / SR) * np.exp(-14 * t)
+    s["zap"] = zap + 0.3 * sweep(400, 1800, 0.25, 10)
+    s["charge"] = mix(0.9, [(i * 0.06, bell(midi(n), 0.4, 7)) for i, n in enumerate([60, 64, 67, 72, 76, 79, 84])])
+    fl = lowpass(rng.uniform(-1, 1, int(SR * 0.12)), 12) * np.sin(np.pi * tt(0.12) / 0.12)
+    s["flap"] = mix(0.3, [(0, fl), (0.13, 0.8 * fl)])
+    s["fly"] = mix(0.9, [(0, sweep(300, 1400, 0.6, 2.5)), (0.1, 0.5 * lowpass(rng.uniform(-1, 1, int(SR * 0.6)), 20))])
+    s["cocoa"] = mix(0.3, [(0, sweep(500, 260, 0.12, 18)), (0.1, 0.6 * sweep(600, 320, 0.12, 18))])
+    groove = [(0.0, 60), (0.15, 64), (0.3, 67), (0.45, 64), (0.6, 72)]
+    items = [(st, tone(midi(n), 0.2, 10, ((1, 1), (2, 0.4), (3, 0.2)))) for st, n in groove]
+    items += [(st, 0.5 * tone(midi(36), 0.15, 18, ((1, 1),))) for st in (0.0, 0.3, 0.6)]
+    s["disco"] = mix(0.9, items)
     for name, sig in s.items():
         write(os.path.join(SFX_DIR, name + ".wav"), sig, 0.8 if name not in ("wind", "cookie") else 0.6)
     print("SFX:", ", ".join(sorted(s)))
 
 
-def make_music():
+def make_music(track="sonnental", bpm=100, seed=42, octave=0, bell_decay=3.0):
     os.makedirs(MUSIC_DIR, exist_ok=True)
-    bpm = 100
     beat = 60.0 / bpm
     bar = 4 * beat
     chords = {
@@ -130,7 +142,7 @@ def make_music():
             buf[: n - k] += amp * sig[k:]
 
     penta = [60, 62, 64, 67, 69, 72, 74, 76, 79]
-    motif_rng = np.random.default_rng(42)
+    motif_rng = np.random.default_rng(seed)
     motifs = {}
     for key in ("a1", "a2", "b1", "b2"):
         notes = []
@@ -173,13 +185,15 @@ def make_music():
                 if pos % 2 == 0:  # betonte Zaehlzeiten: Akkordton bevorzugen
                     cands = [n for n in penta if n % 12 in [c % 12 for c in cur_chord]]
                     note = min(cands, key=lambda n: abs(n - note))
-                add(start, bell(midi(note), dur * beat + 0.4, 3.0), 0.22)
-                add(start, bell(midi(note + 12), dur * beat + 0.2, 5.0), 0.04)
+                add(start, bell(midi(note + octave), dur * beat + 0.4, bell_decay), 0.22)
+                add(start, bell(midi(note + 12 + octave), dur * beat + 0.2, 5.0), 0.04)
 
-    write(os.path.join(MUSIC_DIR, "sonnental.wav"), buf, 0.75)
+    write(os.path.join(MUSIC_DIR, track + ".wav"), buf, 0.75)
     print("Musik: %.1f s" % (length / SR))
 
 
 if __name__ == "__main__":
     make_sfx()
-    make_music()
+    make_music("sonnental", 100, 42)
+    make_music("strand", 112, 7, 0, 4.5)
+    make_music("schnee", 88, 21, 12, 2.2)

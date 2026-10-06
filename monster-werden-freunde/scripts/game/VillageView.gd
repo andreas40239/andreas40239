@@ -3,6 +3,7 @@ extends Node2D
 ## Das Dorf am Pfadende: Torbogen "Willkommen!", Häuser und winkende Dorfbewohner.
 
 var _t := 0.0
+var theme: StringName = &"meadow"
 var _cheer := 0.0
 var _surprise := 0.0
 var _villagers := [
@@ -31,7 +32,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	# Dorfplatz
-	Icons.ellipse(self, Vector2(120, 0), 150, 130, Color("e9d3a3"))
+	Icons.ellipse(self, Vector2(120, 0), 150, 130, SceneryArt.colors(theme)["plaza"])
 	Icons.ellipse_outline(self, Vector2(120, 0), 150, 130, Color("c99d62"), 6.0)
 	# Brunnen
 	var f := Vector2(150, 40)
@@ -58,9 +59,20 @@ func _house(p: Vector2, wall: Color, roof: Color) -> void:
 	Icons.ellipse(self, p + Vector2(0, 6), 80, 16, Color(0, 0, 0, 0.15))
 	draw_rect(Rect2(p + Vector2(-60, -90), Vector2(120, 90)), wall)
 	draw_rect(Rect2(p + Vector2(-60, -90), Vector2(120, 90)), wall.darkened(0.3), false, 4.0)
+	if theme == &"beach":
+		wall = wall.lerp(Color("fff7e0"), 0.4)
+		roof = Color("e0b85a")
+	elif theme == &"snow":
+		wall = Color("b07a4a").lerp(wall, 0.2)
 	var r := PackedVector2Array([p + Vector2(-78, -86), p + Vector2(0, -160), p + Vector2(78, -86)])
 	draw_colored_polygon(r, roof)
 	draw_polyline(PackedVector2Array([r[0], r[1], r[2], r[0]]), roof.darkened(0.3), 4.0, true)
+	if theme == &"snow":
+		draw_colored_polygon(PackedVector2Array([p + Vector2(-50, -112), p + Vector2(0, -160), p + Vector2(50, -112),
+			p + Vector2(30, -104), p + Vector2(8, -116), p + Vector2(-16, -102)]), Color.WHITE)
+	elif theme == &"beach":
+		for k in 4:
+			draw_line(p + Vector2(-60 + k * 20, -92), p + Vector2(-44 + k * 20, -120), roof.darkened(0.2), 2.0)
 	Icons.rounded_rect(self, Rect2(p + Vector2(-16, -52), Vector2(32, 52)), 12, Color("8d5f3a"))
 	draw_rect(Rect2(p + Vector2(22, -70), Vector2(28, 26)), Color("bfe6ff"))
 	draw_rect(Rect2(p + Vector2(22, -70), Vector2(28, 26)), wall.darkened(0.35), false, 3.0)
@@ -115,5 +127,5 @@ func _gate(p: Vector2) -> void:
 		draw_line(tops[0] + Vector2(0, -36), tops[0] + Vector2(0, -10), wood, 6.0)
 	Icons.rounded_rect(self, board.grow(4), 18, wood.darkened(0.35))
 	Icons.rounded_rect(self, board, 14, Color("ffe7b0"))
-	draw_string(UiTheme.get_bold(), board.position + Vector2(0, 41), "Willkommen!", HORIZONTAL_ALIGNMENT_CENTER,
+	draw_string(UiTheme.get_bold(), board.position + Vector2(0, 41), tr("Willkommen!"), HORIZONTAL_ALIGNMENT_CENTER,
 		board.size.x, 32, Color("8d4a1f"))

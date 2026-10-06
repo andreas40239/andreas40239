@@ -147,13 +147,89 @@ func _run() -> void:
 	check(SaveManager.get_stars(1) == 2 and SaveManager.is_level_unlocked(2) and not SaveManager.is_level_unlocked(3),
 		"AT-09 Sterne/Freischaltung werden geladen (beste Wertung bleibt)")
 
-	# Datenmodell: 5 Monster, 5 Stationen, 5 Level
-	check(DataRegistry.MONSTERS.size() == 5 and DataRegistry.STATIONS.size() == 5 and DataRegistry.level_count() == 5,
-		"MVP-Inhalte: 5 Monster, 5 Stationen, 5 Level")
+	# Datenmodell: 3 Welten, 15 Level, 9 Monster, 10 Stationen
+	check(DataRegistry.MONSTERS.size() == 9 and DataRegistry.STATIONS.size() == 10 and DataRegistry.level_count() == 15
+		and DataRegistry.world_count() == 3, "Inhalte: 3 Welten, 15 Level, 9 Monster, 10 Stationen")
 	for n in DataRegistry.level_count():
 		var lv := DataRegistry.level(n + 1)
-		check(lv.waves.size() >= 3 and lv.waves.size() <= 8 and lv.available_station_ids.size() <= 5,
-			"Level %d: %d Wellen, %d Stationen" % [lv.number, lv.waves.size(), lv.available_station_ids.size()])
+		check(lv.waves.size() >= 3 and lv.waves.size() <= 8 and lv.available_station_ids.size() <= 5
+			and lv.monster_types().size() <= 5 and lv.world == DataRegistry.world_of_level(n + 1),
+			"Level %d (Welt %d): %d Wellen, %d Stationen, %d Monstertypen (max. 5)" % [lv.number, lv.world, lv.waves.size(),
+			lv.available_station_ids.size(), lv.monster_types().size()])
+		var helpable := true
+		for mid in lv.monster_types():
+			var need := DataRegistry.monster(mid).need_type
+			var ok := false
+			for sid in lv.available_station_ids:
+				if DataRegistry.station(sid).helps_need(need):
+					ok = true
+			helpable = helpable and ok
+		check(helpable, "Level %d: für jedes Monster gibt es eine passende Station" % lv.number)
+
+	# Neue Mechaniken: Elektro (3x schneller), Flügel (fliegt), Disco (tanzen ohne Zustandsänderung)
+	g = _new_game(6)
+	await get_tree().process_frame
+	var el := g._spawn_monster(&"elektro")
+	el.apply_help(HelpEffect.simple(Needs.Type.CHARGE, 200.0))
+	check(el.state == Monster.State.FRIEND and is_equal_approx(el.get_current_speed(), el.data.base_speed * 3.0),
+		"Elektro: aufgeladen rennt es 3x so schnell")
+	var fl := g._spawn_monster(&"fluegel")
+	fl.apply_help(HelpEffect.simple(Needs.Type.FLY, 200.0))
+	check(fl.is_flying(), "Flügel: bekommt Flügel und fliegt direkt ins Dorf")
+	var dancer := g._spawn_monster(&"knurri")
+	var disco := DataRegistry.station(&"disco")
+	var dance := HelpEffect.new()
+	dance.dance_duration = disco.dance_duration
+	var need_before := dancer.need_value
+	dancer.apply_help(dance)
+	check(dancer.is_dancing() and dancer.get_current_speed() == 0.0 and dancer.need_value == need_before
+		and dancer.state == Monster.State.WILD, "Disco: Monster tanzt, bleibt stehen, Zustand unverändert")
+	for i in 5:
+		await get_tree().process_frame
+	var prog := dancer.progress
+	for i in 5:
+		await get_tree().process_frame
+	check(is_equal_approx(dancer.progress, prog), "Disco: tanzendes Monster läuft nicht weiter")
+	dancer._dance_left = 0.0
+	check(not dancer.start_dance(2.0), "Disco: danach kurze Pause, kein Dauer-Festhalten")
+	await _free_game(g)
+
+	# Welten freischalten
+	SaveManager.reset_progress()
+	check(SaveManager.is_world_unlocked(1) and not SaveManager.is_world_unlocked(2), "Welt 2 zu Beginn gesperrt")
+	for n in range(1, 6):
+		SaveManager.record_result(n, 1)
+	check(SaveManager.is_world_unlocked(2) and not SaveManager.is_world_unlocked(3) and SaveManager.is_level_unlocked(6),
+		"Welt 2 offen nach Welt 1, Welt 3 noch zu")
+
+	# Übersetzungen vollständig (Englisch und Griechisch)
+	var same_ok := ["Pause", "Disco", "%s %s.", "station|Disco"]
+	var texts: Array[String] = []
+	for mid in DataRegistry.MONSTERS:
+		var md := DataRegistry.monster(mid)
+		texts.append(md.display_name)
+		texts.append(Needs.LABELS[md.need_type])
+	for sid in DataRegistry.STATIONS:
+		var sd := DataRegistry.station(sid)
+		texts.append(sd.display_name)
+		texts.append(sd.description)
+		texts.append("station|" + sd.short_name)
+	for n in DataRegistry.level_count():
+		var lv := DataRegistry.level(n + 1)
+		texts.append(lv.display_name)
+		for step in lv.tutorial_steps:
+			texts.append(step.text)
+	for w in DataRegistry.world_count():
+		texts.append(DataRegistry.world_name(w + 1))
+	for lang in ["en", "el"]:
+		TranslationServer.set_locale(lang)
+		var missing: Array[String] = []
+		for t in texts:
+			var tr_text := TranslationServer.translate(t)
+			if (tr_text == t or tr_text == t.get_slice("|", 1)) and not same_ok.has(t):
+				missing.append(t)
+		check(missing.is_empty(), "Übersetzung %s vollständig %s" % [lang, missing])
+	TranslationServer.set_locale("de")
 
 	SaveManager.data = saved
 	SaveManager.save_game()

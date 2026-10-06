@@ -16,4 +16,6 @@ size_scale = 1.05
 effect_resistances = {
 &"rest": -0.3
 }
+friend_speed_mult = 1.6
+friend_flies = false
 description = "Ist sehr müde. Die Ruhe-Station hilft!"

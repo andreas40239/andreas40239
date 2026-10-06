@@ -9,11 +9,13 @@ var currency: int = 0
 var chaos: int = 0
 var chaos_limit: int = 10
 var current_level: int = 1
+var current_world: int = 1
 
 
 ## Setzt Sonnenpunkte und Chaos für einen Levelstart zurück.
 func reset_for_level(level: LevelData) -> void:
 	current_level = level.number
+	current_world = level.world
 	chaos_limit = level.chaos_limit
 	set_currency(level.starting_currency)
 	chaos = 0

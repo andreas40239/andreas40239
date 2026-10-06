@@ -18,8 +18,19 @@ const SFX := {
 	&"lose": preload("res://audio/sfx/lose.wav"),
 	&"deny": preload("res://audio/sfx/deny.wav"),
 	&"need_info": preload("res://audio/sfx/need_info.wav"),
+	&"zap": preload("res://audio/sfx/zap.wav"),
+	&"charge": preload("res://audio/sfx/charge.wav"),
+	&"flap": preload("res://audio/sfx/flap.wav"),
+	&"fly": preload("res://audio/sfx/fly.wav"),
+	&"cocoa": preload("res://audio/sfx/cocoa.wav"),
+	&"disco": preload("res://audio/sfx/disco.wav"),
 }
-const MUSIC := preload("res://audio/music/sonnental.wav")
+## Musik pro Welt (1 Sonnental, 2 Strand und Meer, 3 Schnee und Berge).
+const MUSIC := {
+	1: preload("res://audio/music/sonnental.wav"),
+	2: preload("res://audio/music/strand.wav"),
+	3: preload("res://audio/music/schnee.wav"),
+}
 const POOL_SIZE := 10
 
 var _players: Array[AudioStreamPlayer] = []
@@ -39,7 +50,7 @@ func _ready() -> void:
 		_players.append(p)
 	_music = AudioStreamPlayer.new()
 	_music.bus = "Music"
-	_music.stream = MUSIC
+	_music.stream = MUSIC[1]
 	_music.volume_db = -4.0
 	_music.finished.connect(_music.play)
 	add_child(_music)
@@ -56,8 +67,12 @@ func _ensure_bus(bus_name: String) -> void:
 	AudioServer.set_bus_send(idx, "Master")
 
 
-func play_music() -> void:
-	if not _music.playing:
+func play_music(world: int = 1) -> void:
+	var stream: AudioStream = MUSIC.get(world, MUSIC[1])
+	if _music.stream != stream:
+		_music.stream = stream
+		_music.play()
+	elif not _music.playing:
 		_music.play()
 
 

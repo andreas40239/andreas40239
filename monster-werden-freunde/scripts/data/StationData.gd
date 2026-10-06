@@ -28,8 +28,15 @@ enum TargetStrategy { FIRST, MOST_NEED, MATCHING_FIRST, FASTEST }
 @export var color: Color = Color.WHITE
 ## Sichtbares Hilfs-Objekt: &"bubble", &"cookie", &"wind" (keine Waffen).
 @export var projectile: StringName
+## Disco: Monster bleiben so lange stehen und tanzen (Zustand ändert sich nicht).
+## Bei Disco-Stationen ist 'cooldown' der Abstand zwischen zwei Tanz-Impulsen.
+@export var dance_duration: float = 0.0
 @export_multiline var description: String = ""
 
 
 func helps_need(need: int) -> bool:
 	return supported_needs.has(need)
+
+
+func is_disco() -> bool:
+	return dance_duration > 0.0

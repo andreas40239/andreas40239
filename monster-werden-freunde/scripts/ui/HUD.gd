@@ -176,13 +176,13 @@ func _build_tray_and_panel() -> void:
 	_sp_info = Label.new()
 	_sp_info.label_settings = UiTheme.label_settings(26, UiTheme.INK.lightened(0.25))
 	info.add_child(_sp_info)
-	_sp_range_btn = RichButton.make(&"range", "Weiter", UiTheme.BLUE, Vector2(230, 128))
+	_sp_range_btn = RichButton.make(&"range", tr("upgrade|Weiter"), UiTheme.BLUE, Vector2(230, 128))
 	_sp_range_btn.pressed.connect(func() -> void: upgrade_pressed.emit(&"range"))
 	row.add_child(_sp_range_btn)
-	_sp_power_btn = RichButton.make(&"power", "Stärker", UiTheme.ORANGE, Vector2(230, 128))
+	_sp_power_btn = RichButton.make(&"power", tr("Stärker"), UiTheme.ORANGE, Vector2(230, 128))
 	_sp_power_btn.pressed.connect(func() -> void: upgrade_pressed.emit(&"power"))
 	row.add_child(_sp_power_btn)
-	_sp_sell_btn = RichButton.make(&"coins", "Verkaufen", Color("e8e2d4"), Vector2(250, 128), UiTheme.INK)
+	_sp_sell_btn = RichButton.make(&"coins", tr("Verkaufen"), Color("e8e2d4"), Vector2(250, 128), UiTheme.INK)
 	_sp_sell_btn.pressed.connect(_on_sell_button)
 	row.add_child(_sp_sell_btn)
 	var close := IconButton.make(&"close", Color("f0f0f0"), Vector2(96, 96), "", UiTheme.INK)
@@ -190,7 +190,7 @@ func _build_tray_and_panel() -> void:
 	close.pressed.connect(func() -> void: station_panel_closed.emit())
 	row.add_child(close)
 
-	_start_btn = IconButton.make(&"play", UiTheme.GREEN, Vector2(270, 150), "Los!", Color.WHITE, 52)
+	_start_btn = IconButton.make(&"play", UiTheme.GREEN, Vector2(270, 150), tr("Los!"), Color.WHITE, 52)
 	_start_btn.icon_size = 64
 	_anchor(_start_btn, 1.0, 1.0, -MARGIN, -MARGIN)
 	_start_btn.pressed.connect(func() -> void: start_pressed.emit())
@@ -232,12 +232,12 @@ func _build_overlays() -> void:
 	pv.add_theme_constant_override("separation", 0)
 	_pause_banner.add_child(pv)
 	var pl := Label.new()
-	pl.text = "Pause"
+	pl.text = tr("Pause")
 	pl.label_settings = UiTheme.label_settings(52, UiTheme.BLUE, 0, Color.WHITE, true)
 	pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pv.add_child(pl)
 	var ps := Label.new()
-	ps.text = "Bauen geht trotzdem!"
+	ps.text = tr("Bauen geht trotzdem!")
 	ps.label_settings = UiTheme.label_settings(28, UiTheme.INK)
 	ps.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pv.add_child(ps)
@@ -293,12 +293,14 @@ func setup(level: LevelData, speed_unlocked: bool) -> void:
 	_speed_btn.visible = speed_unlocked
 	if not level.new_monster_ids.is_empty():
 		_tutorial_face.monster_id = level.new_monster_ids[0]
+	elif not level.monster_types().is_empty():
+		_tutorial_face.monster_id = level.monster_types()[0]
 	_on_currency_changed(GameState.currency)
 	_on_chaos_changed(GameState.chaos, GameState.chaos_limit)
 
 
 func set_wave(index: int, total: int) -> void:
-	_wave_label.text = "Welle %d/%d" % [maxi(index, 1), total]
+	_wave_label.text = tr("Welle %d/%d") % [maxi(index, 1), total]
 
 
 func set_cards_active(active: bool) -> void:
@@ -336,11 +338,11 @@ func update_station_panel() -> void:
 	_sp_preview.station_id = st.data.id
 	_sp_preview.level = st.level
 	_sp_preview.upgrade_path = st.upgrade_path
-	_sp_title.text = st.data.display_name
+	_sp_title.text = tr(st.data.display_name)
 	if st.level >= 2:
-		_sp_info.text = "Stufe 2 · " + ("mehr Reichweite" if st.upgrade_path == &"range" else "stärkere Hilfe")
+		_sp_info.text = tr("Stufe 2 · ") + (tr("mehr Reichweite") if st.upgrade_path == &"range" else tr("stärkere Hilfe"))
 	else:
-		_sp_info.text = "Stufe 1 · " + st.data.description
+		_sp_info.text = tr("Stufe 1 · ") + tr(st.data.description)
 	_sp_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_sp_info.custom_minimum_size.x = 250
 	var can_upgrade := st.level < 2
@@ -353,7 +355,7 @@ func update_station_panel() -> void:
 		var afford := GameState.can_afford(cost)
 		_sp_range_btn.modulate.a = 1.0 if afford else 0.55
 		_sp_power_btn.modulate.a = 1.0 if afford else 0.55
-	_sp_sell_btn.set_title("Sicher?" if _sell_confirm_left > 0.0 else "Verkaufen")
+	_sp_sell_btn.set_title(tr("Sicher?") if _sell_confirm_left > 0.0 else tr("Verkaufen"))
 	_sp_sell_btn.set_cost(st.get_sell_value(), "+")
 
 
@@ -378,13 +380,13 @@ func set_start_state(state: StringName, seconds: float = 0.0, can_press: bool = 
 		&"start":
 			_start_btn.visible = true
 			_start_btn.disabled = false
-			_start_btn.text = "Los!"
+			_start_btn.text = tr("Los!")
 			_start_btn.icon_name = &"play"
 		&"countdown":
 			_start_btn.visible = true
 			_start_btn.disabled = not can_press
 			_start_btn.icon_name = &"play" if can_press else &"flag"
-			_start_btn.text = ("Los! %d" if can_press else "Gleich %d") % ceili(maxf(seconds, 0.0))
+			_start_btn.text = (tr("Los! %d") if can_press else tr("Gleich %d")) % ceili(maxf(seconds, 0.0))
 
 
 func set_paused(paused: bool) -> void:
@@ -502,7 +504,7 @@ func show_intro(monster_ids: Array[StringName], station_ids: Array[StringName]) 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
-	v.add_child(_title_label("Neu!", 64, UiTheme.ORANGE))
+	v.add_child(_title_label(tr("Neu!"), 64, UiTheme.ORANGE))
 	for mid in monster_ids:
 		var md := DataRegistry.monster(mid)
 		var helper: StationData = null
@@ -524,10 +526,10 @@ func show_intro(monster_ids: Array[StringName], station_ids: Array[StringName]) 
 			row.add_child(StationPreview.make(helper.id, Vector2(230, 250), 1.25))
 			row.add_child(IconRect.make(&"play", 70, UiTheme.GREEN))
 			row.add_child(MonsterPreview.make(mid, Vector2(200, 250), 1.0, 2.0))
-		v.add_child(_text_label("%s %s." % [md.display_name, Needs.label_for(md.need_type)], 42))
+		v.add_child(_text_label(tr("%s %s.") % [tr(md.display_name), Needs.label_for(md.need_type)], 42))
 		if helper:
-			v.add_child(_text_label("%s hilft!" % helper.display_name, 36))
-	var ok := IconButton.make(&"check", UiTheme.GREEN, Vector2(340, 120), "Los geht's!", Color.WHITE, 44)
+			v.add_child(_text_label(tr("%s hilft!") % tr(helper.display_name), 36))
+	var ok := IconButton.make(&"check", UiTheme.GREEN, Vector2(340, 120), tr("Los geht's!"), Color.WHITE, 44)
 	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	ok.pressed.connect(func() -> void:
 		_close_modal()
@@ -544,16 +546,16 @@ func _open_menu() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 18)
 	panel.add_child(v)
-	v.add_child(_title_label("Pause", 64, UiTheme.BLUE))
-	var resume := IconButton.make(&"play", UiTheme.GREEN, Vector2(440, 116), "Weiter", Color.WHITE, 42)
+	v.add_child(_title_label(tr("Pause"), 64, UiTheme.BLUE))
+	var resume := IconButton.make(&"play", UiTheme.GREEN, Vector2(440, 116), tr("Weiter"), Color.WHITE, 42)
 	resume.pressed.connect(func() -> void:
 		_close_modal()
 		menu_closed.emit())
 	v.add_child(resume)
-	var retry := IconButton.make(&"retry", UiTheme.ORANGE, Vector2(440, 116), "Nochmal", Color.WHITE, 42)
+	var retry := IconButton.make(&"retry", UiTheme.ORANGE, Vector2(440, 116), tr("Nochmal"), Color.WHITE, 42)
 	retry.pressed.connect(func() -> void: retry_pressed.emit())
 	v.add_child(retry)
-	var map := IconButton.make(&"map", UiTheme.BLUE, Vector2(440, 116), "Zur Karte", Color.WHITE, 42)
+	var map := IconButton.make(&"map", UiTheme.BLUE, Vector2(440, 116), tr("Zur Karte"), Color.WHITE, 42)
 	map.pressed.connect(func() -> void: map_pressed.emit())
 	v.add_child(map)
 	v.add_child(SettingsWidgets.volume_sliders())
@@ -587,29 +589,29 @@ func show_result(won: bool, stars: int, friends: int, total: int, has_next: bool
 	v.add_theme_constant_override("separation", 16)
 	panel.add_child(v)
 	if won:
-		v.add_child(_title_label("Super gemacht!", 76, UiTheme.GREEN))
+		v.add_child(_title_label(tr("Super gemacht!"), 76, UiTheme.GREEN))
 		v.add_child(StarsView.make(stars, 110, true))
-		v.add_child(_text_label("%d von %d Monstern sind jetzt Freunde!" % [friends, total], 40))
+		v.add_child(_text_label(tr("%d von %d Monstern sind jetzt Freunde!") % [friends, total], 40))
 	else:
-		v.add_child(_title_label("Oh, so ein Trubel!", 70, UiTheme.PURPLE))
+		v.add_child(_title_label(tr("Oh, so ein Trubel!"), 70, UiTheme.PURPLE))
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		for id in [&"knurri", &"troepfli", &"matschi"]:
+		for id in _level.monster_types().slice(0, 3):
 			row.add_child(MonsterPreview.make(id, Vector2(150, 170), 0.5, 1.6))
 		v.add_child(row)
-		v.add_child(_text_label("Die Monster brauchen noch ein bisschen Hilfe.\nProbier es gleich nochmal!", 38))
+		v.add_child(_text_label(tr("Die Monster brauchen noch ein bisschen Hilfe.\nProbier es gleich nochmal!"), 38))
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 22)
 	v.add_child(buttons)
-	var map := IconButton.make(&"map", UiTheme.BLUE, Vector2(270, 120), "Karte", Color.WHITE, 40)
+	var map := IconButton.make(&"map", UiTheme.BLUE, Vector2(270, 120), tr("Karte"), Color.WHITE, 40)
 	map.pressed.connect(func() -> void: map_pressed.emit())
 	buttons.add_child(map)
-	var retry := IconButton.make(&"retry", UiTheme.ORANGE, Vector2(300, 120), "Nochmal", Color.WHITE, 40)
+	var retry := IconButton.make(&"retry", UiTheme.ORANGE, Vector2(300, 120), tr("Nochmal"), Color.WHITE, 40)
 	retry.pressed.connect(func() -> void: retry_pressed.emit())
 	buttons.add_child(retry)
 	if won and has_next:
-		var next := IconButton.make(&"play", UiTheme.GREEN, Vector2(290, 120), "Weiter", Color.WHITE, 40)
+		var next := IconButton.make(&"play", UiTheme.GREEN, Vector2(290, 120), tr("Weiter"), Color.WHITE, 40)
 		next.pressed.connect(func() -> void: next_pressed.emit())
 		buttons.add_child(next)
 	_open_modal(panel)

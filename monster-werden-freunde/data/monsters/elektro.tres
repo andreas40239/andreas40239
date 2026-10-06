@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_x7eci"]
+
+[resource]
+script = ExtResource("1_x7eci")
+id = &"elektro"
+display_name = "Elektro"
+need_type = 5
+max_need = 100.0
+base_speed = 42.0
+chaos_value = 1
+reward = 25
+body_color = Color(0.211765, 0.760784, 0.705882, 1)
+size_scale = 1.0
+effect_resistances = {}
+friend_speed_mult = 3.0
+friend_flies = false
+description = "Ist ganz leer. Aufgeladen rennt es dreimal so schnell ins Dorf!"

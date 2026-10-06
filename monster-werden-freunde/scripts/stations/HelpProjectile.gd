@@ -46,7 +46,7 @@ func _process(delta: float) -> void:
 			var fx_kind := Fx.Kind.BUBBLES
 			if kind == &"cookie":
 				fx_kind = Fx.Kind.CRUMBS
-			elif kind == &"wind":
+			elif kind in [&"wind", &"battery", &"feather", &"mug"]:
 				fx_kind = Fx.Kind.SPARKLE
 			Fx.spawn(_fx_root, fx_kind, _fx_root.to_local(goal))
 		queue_free()
@@ -70,5 +70,13 @@ func _draw() -> void:
 			for i in 3:
 				var a := _t * 14.0 + i * TAU / 3.0
 				draw_arc(Vector2.ZERO, 8.0 + i * 5.0, a, a + 2.2, 10, Color(1, 1, 1, 0.9 - i * 0.2), 3.5, true)
+		&"battery":
+			draw_set_transform(Vector2.ZERO, sin(_t * 10.0) * 0.4)
+			Icons.battery(self, Vector2.ZERO, 30, 1.0)
+			draw_set_transform(Vector2.ZERO)
+		&"feather":
+			Icons.feather(self, Vector2(sin(_t * 9.0) * 4.0, 0), 30, sin(_t * 6.0) * 0.6)
+		&"mug":
+			Icons.mug(self, Vector2.ZERO, 28, _t)
 		_:
 			Icons.sparkle(self, Vector2.ZERO, 22, Color(1, 1, 0.7))

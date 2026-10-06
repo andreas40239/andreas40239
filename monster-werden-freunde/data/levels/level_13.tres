@@ -1,0 +1,166 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=25 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_qchey"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_lrrg8"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_irawm"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_no42g"]
+
+[sub_resource type="Resource" id="Resource_rv6xg"]
+script = ExtResource("2_lrrg8")
+text = "Die Disco hält auch im Schnee
+alle Monster kurz an."
+trigger = "time:8"
+highlight = ""
+
+[sub_resource type="Resource" id="Resource_nyu6w"]
+script = ExtResource("4_no42g")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 2.0
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_xujay"]
+script = ExtResource("4_no42g")
+monster_id = &"flitzi"
+count = 3
+spawn_interval = 2.0
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_pgs5n"]
+script = ExtResource("3_irawm")
+entries = Array[ExtResource("4_no42g")]([SubResource("Resource_nyu6w"), SubResource("Resource_xujay")])
+
+[sub_resource type="Resource" id="Resource_30o0o"]
+script = ExtResource("4_no42g")
+monster_id = &"elektro"
+count = 4
+spawn_interval = 1.7
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_btow0"]
+script = ExtResource("4_no42g")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.6
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_1orle"]
+script = ExtResource("3_irawm")
+entries = Array[ExtResource("4_no42g")]([SubResource("Resource_30o0o"), SubResource("Resource_btow0")])
+
+[sub_resource type="Resource" id="Resource_qy5yc"]
+script = ExtResource("4_no42g")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 1.4
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_t5awp"]
+script = ExtResource("4_no42g")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_cvqjy"]
+script = ExtResource("4_no42g")
+monster_id = &"elektro"
+count = 3
+spawn_interval = 1.6
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_j37v2"]
+script = ExtResource("3_irawm")
+entries = Array[ExtResource("4_no42g")]([SubResource("Resource_qy5yc"), SubResource("Resource_t5awp"), SubResource("Resource_cvqjy")])
+
+[sub_resource type="Resource" id="Resource_nsfdd"]
+script = ExtResource("4_no42g")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ujdo8"]
+script = ExtResource("4_no42g")
+monster_id = &"elektro"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_mobor"]
+script = ExtResource("4_no42g")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gwvf5"]
+script = ExtResource("3_irawm")
+entries = Array[ExtResource("4_no42g")]([SubResource("Resource_nsfdd"), SubResource("Resource_ujdo8"), SubResource("Resource_mobor")])
+
+[sub_resource type="Resource" id="Resource_1cclg"]
+script = ExtResource("4_no42g")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_8s5ko"]
+script = ExtResource("4_no42g")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ehj1x"]
+script = ExtResource("4_no42g")
+monster_id = &"elektro"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_onivx"]
+script = ExtResource("4_no42g")
+monster_id = &"flitzi"
+count = 4
+spawn_interval = 1.1
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_oeb37"]
+script = ExtResource("3_irawm")
+entries = Array[ExtResource("4_no42g")]([SubResource("Resource_1cclg"), SubResource("Resource_8s5ko"), SubResource("Resource_ehj1x"), SubResource("Resource_onivx")])
+
+[resource]
+script = ExtResource("1_qchey")
+id = &"level_13"
+number = 13
+display_name = "Lawinen-Disco"
+world_name = "Schnee und Berge"
+world = 3
+theme = &"snow"
+starting_currency = 500
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 500, 300, 500, 300, 220, 700, 220, 700, 780, 1100, 780, 1100, 420, 1450, 420, 1450, 740, 1760, 740)
+build_spots = PackedVector2Array(200, 400, 400, 320, 600, 320, 800, 680, 1000, 680, 1200, 520, 1350, 520, 1550, 640, 120, 608, 808, 404.8, 592, 595.2, 1275, 312)
+waves = Array[ExtResource("3_irawm")]([SubResource("Resource_pgs5n"), SubResource("Resource_1orle"), SubResource("Resource_j37v2"), SubResource("Resource_gwvf5"), SubResource("Resource_oeb37")])
+available_station_ids = Array[StringName]([&"ventilator", &"batterie", &"kakao", &"schneemann", &"disco"])
+new_monster_ids = Array[StringName]([])
+tutorial_steps = Array[ExtResource("2_lrrg8")]([SubResource("Resource_rv6xg")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 9.0
+early_start = true
+decor_seed = 17381

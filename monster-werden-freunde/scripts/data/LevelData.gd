@@ -6,6 +6,10 @@ extends Resource
 @export var number: int = 1
 @export var display_name: String = ""
 @export var world_name: String = "Sonnental"
+## Welt 1 = Sonnental (Wiese), 2 = Strand und Meer, 3 = Schnee und Berge.
+@export var world: int = 1
+## Grafik-Thema: &"meadow", &"beach", &"snow"
+@export var theme: StringName = &"meadow"
 @export var starting_currency: int = 300
 @export var chaos_limit: int = 10
 @export var path_points: PackedVector2Array
@@ -41,3 +45,13 @@ func total_monsters() -> int:
 	for w in waves:
 		n += w.monster_count()
 	return n
+
+
+## Alle Monstertypen dieses Levels (GDD-Ergänzung: höchstens 5 pro Level).
+func monster_types() -> Array[StringName]:
+	var types: Array[StringName] = []
+	for w in waves:
+		for e in w.entries:
+			if not types.has(e.monster_id):
+				types.append(e.monster_id)
+	return types

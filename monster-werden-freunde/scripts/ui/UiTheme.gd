@@ -16,14 +16,22 @@ static var theme: Theme
 
 static func get_font() -> Font:
 	if font == null:
-		font = load("res://art/fonts/Fredoka-SemiBold.woff2")
+		font = _with_greek(load("res://art/fonts/Fredoka-SemiBold.woff2"))
 	return font
 
 
 static func get_bold() -> Font:
 	if font_bold == null:
-		font_bold = load("res://art/fonts/Fredoka-Bold.woff2")
+		font_bold = _with_greek(load("res://art/fonts/Fredoka-Bold.woff2"))
 	return font_bold
+
+
+## Fredoka hat keine griechischen Zeichen: M PLUS Rounded 1c (ebenfalls rund) springt ein.
+static func _with_greek(f: Font) -> Font:
+	var greek: Font = load("res://art/fonts/MPlusRounded1c-Greek-Bold.woff2")
+	var fallbacks: Array[Font] = [greek]
+	f.fallbacks = fallbacks
+	return f
 
 
 static func box(bg: Color, border: Color = Color(0, 0, 0, 0), radius: int = 24, border_w: int = 0,

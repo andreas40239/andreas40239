@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_gsx7a"]
+
+[resource]
+script = ExtResource("1_gsx7a")
+id = &"fluegel"
+display_name = "Flügel"
+need_type = 6
+max_need = 95.0
+base_speed = 50.0
+chaos_value = 1
+reward = 25
+body_color = Color(1, 0.560784, 0.694118, 1)
+size_scale = 1.0
+effect_resistances = {}
+friend_speed_mult = 1.6
+friend_flies = true
+description = "Möchte fliegen. Mit Flügeln fliegt es direkt ins Dorf!"

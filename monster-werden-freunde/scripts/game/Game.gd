@@ -52,7 +52,8 @@ func _ready() -> void:
 	GameState.reset_for_level(level)
 	_layout_world()
 	var smooth := _build_path()
-	map_view.setup(smooth, level.build_spots, level.decor_seed)
+	map_view.setup(smooth, level.build_spots, level.decor_seed, level.theme)
+	AudioManager.play_music(level.world)
 	build_manager.setup(spots_root, stations_root, projectiles_root, fx_root)
 	build_manager.create_spots(level.build_spots)
 	wave_manager.setup(level.waves, _spawn_monster)
@@ -156,7 +157,7 @@ func start_next_wave() -> void:
 
 func _on_wave_started(index: int, total: int) -> void:
 	hud.set_wave(index, total)
-	hud.wave_banner("Welle %d" % index)
+	hud.wave_banner(tr("Welle %d") % index)
 	AudioManager.play(&"wave", 0.0)
 	_tutorial_event("wave_started")
 
@@ -175,6 +176,11 @@ func _on_monster_friend(m: Monster) -> void:
 	friends_count += 1
 	Fx.spawn(fx_root, Fx.Kind.HEARTS, m.position + Vector2(0, -50))
 	AudioManager.play(&"friend", 0.08, -3.0)
+	if m.data.friend_flies:
+		AudioManager.play(&"fly", 0.05, -4.0)
+	elif m.data.friend_speed_mult > 2.0:
+		AudioManager.play(&"charge", 0.05, -4.0)
+		Fx.spawn(fx_root, Fx.Kind.SPARKLE, m.position + Vector2(0, -40))
 	_tutorial_event("friend")
 
 
@@ -190,7 +196,7 @@ func _on_monster_arrived(m: Monster, was_friend: bool) -> void:
 	else:
 		GameState.add_chaos(m.data.chaos_value)
 		Fx.spawn(ui_fx_root, Fx.Kind.POOF, m.position + Vector2(60, -40))
-		Fx.spawn(ui_fx_root, Fx.Kind.TEXT, pos, {"text": "Trubel!", "color": Color("e0c3ff")})
+		Fx.spawn(ui_fx_root, Fx.Kind.TEXT, pos, {"text": tr("Trubel!"), "color": Color("e0c3ff")})
 		map_view.village.surprise()
 		AudioManager.play(&"chaos", 0.05)
 		if GameState.is_chaos_full():
@@ -263,7 +269,7 @@ func _monster_at(p: Vector2) -> Monster:
 
 
 func _show_monster_info(m: Monster) -> void:
-	var txt := "%s %s" % [m.data.display_name, Needs.label_for(m.data.need_type)]
+	var txt := "%s %s" % [tr(m.data.display_name), Needs.label_for(m.data.need_type)]
 	Fx.spawn(ui_fx_root, Fx.Kind.TEXT, m.position + Vector2(0, -150), {"text": txt, "size": 32, "life": 1.8,
 		"icon": Needs.icon_for(m.data.need_type)})
 	AudioManager.play(&"need_info")
@@ -309,12 +315,12 @@ func _deselect_all() -> void:
 func _on_card_pressed(id: StringName) -> void:
 	var data := DataRegistry.station(id)
 	if selected_spot == null:
-		hud.toast("Tippe zuerst auf ein  +  auf der Wiese.")
+		hud.toast(tr("Tippe zuerst auf ein  +  neben dem Weg."))
 		build_manager.pulse_free_spots()
 		AudioManager.play(&"deny")
 		return
 	if not GameState.can_afford(data.cost):
-		hud.toast("Dafür fehlen noch Sonnenpunkte.\nHilf Monstern, dann bekommst du mehr!", 3.2)
+		hud.toast(tr("Dafür fehlen noch Sonnenpunkte.\nHilf Monstern, dann bekommst du mehr!"), 3.2)
 		hud.shake_card(id)
 		AudioManager.play(&"deny")
 		return
@@ -339,7 +345,7 @@ func _on_upgrade_pressed(path: StringName) -> void:
 	if st == null:
 		return
 	if not GameState.can_afford(st.data.upgrade_cost):
-		hud.toast("Dafür fehlen noch Sonnenpunkte.", 2.4)
+		hud.toast(tr("Dafür fehlen noch Sonnenpunkte."), 2.4)
 		AudioManager.play(&"deny")
 		return
 	if build_manager.upgrade(st, path):
@@ -368,7 +374,7 @@ func _on_weak_help(m: Monster) -> void:
 		return
 	_weak_hint_cooldown = 7.0
 	Fx.spawn(ui_fx_root, Fx.Kind.TEXT, m.position + Vector2(0, -150),
-		{"text": "Das hilft %s nur ein bisschen." % m.data.display_name, "size": 30, "life": 2.2})
+		{"text": tr("Das hilft %s nur ein bisschen.") % tr(m.data.display_name), "size": 30, "life": 2.2})
 
 
 # --- Pause / Tempo / Menü --------------------------------------------------------
@@ -428,7 +434,7 @@ func _advance_tutorial() -> void:
 	if step.trigger == "wave_started" and phase != Phase.PREP:
 		_advance_tutorial()
 		return
-	hud.show_tutorial(step.text, _highlight_provider(step.highlight))
+	hud.show_tutorial(tr(step.text), _highlight_provider(step.highlight))
 
 
 func _tutorial_event(ev: String) -> void:

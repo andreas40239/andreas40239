@@ -8,14 +8,24 @@ var village_pos := Vector2.ZERO
 var village: VillageView
 var _decor: Array[Dictionary] = []
 var _patches: Array[Dictionary] = []
+var theme: StringName = &"meadow"
+var _colors: Dictionary = {}
 
 
-func setup(smooth_path: PackedVector2Array, spot_positions: PackedVector2Array, decor_seed: int) -> void:
+func setup(smooth_path: PackedVector2Array, spot_positions: PackedVector2Array, decor_seed: int,
+		level_theme: StringName = &"meadow") -> void:
+	theme = level_theme
+	_colors = SceneryArt.colors(theme)
+	if theme != &"meadow":
+		var top := TopScenery.new()
+		top.theme = theme
+		add_child(top)
 	path_points = smooth_path
 	spots = spot_positions
 	village_pos = path_points[path_points.size() - 1]
 	_build_path_lines()
 	village = VillageView.new()
+	village.theme = theme
 	village.position = village_pos
 	add_child(village)
 	_generate_decor(decor_seed)
@@ -23,7 +33,7 @@ func setup(smooth_path: PackedVector2Array, spot_positions: PackedVector2Array, 
 
 
 func _build_path_lines() -> void:
-	var specs := [[118.0, Color("c99d62")], [100.0, Color("edd3a0")], [44.0, Color(0.98, 0.9, 0.74, 0.7)]]
+	var specs := [[118.0, _colors["path_border"]], [100.0, _colors["path"]], [44.0, _colors["path_mid"]]]
 	for spec in specs:
 		var line := Line2D.new()
 		line.points = path_points
@@ -51,7 +61,7 @@ func _generate_decor(decor_seed: int) -> void:
 	for i in 70:
 		_patches.append({"p": Vector2(rng.randf_range(-900, 2800), rng.randf_range(-500, 1600)),
 			"rx": rng.randf_range(60, 180), "ry": rng.randf_range(30, 80),
-			"c": Color(0.62, 0.86, 0.5, 0.35) if rng.randf() < 0.5 else Color(0.45, 0.74, 0.38, 0.25)})
+			"c": _colors["patch_a"] if rng.randf() < 0.5 else _colors["patch_b"]})
 	var tries := 0
 	while _decor.size() < 95 and tries < 900:
 		tries += 1
@@ -69,6 +79,9 @@ func _generate_decor(decor_seed: int) -> void:
 		elif roll < 0.58:
 			kind = "rock"
 			clearance = 80.0
+		# Am Strand und im Schnee gibt es oben Meer bzw. Berge
+		if theme != &"meadow" and p.y < 190.0:
+			continue
 		if _distance_to_path(p) < clearance:
 			continue
 		var near_spot := false
@@ -86,10 +99,26 @@ func _generate_decor(decor_seed: int) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(-2000, -1400, 6000, 4000), Color("8fd16a"))
+	draw_rect(Rect2(-2000, -1400, 6000, 4000), _colors.get("ground", Color("8fd16a")))
 	for p in _patches:
 		Icons.ellipse(self, p.p, p.rx, p.ry, p.c)
 	for d in _decor:
+		if theme == &"beach":
+			match d.k:
+				"tree": SceneryArt.palm(self, d.p, d.s, 0.0)
+				"bush": SceneryArt.umbrella(self, d.p, d.s * 0.9, d.c)
+				"rock": SceneryArt.sandcastle(self, d.p, d.s)
+				_:
+					SceneryArt.shell(self, d.p, d.s, d.c.lightened(0.3))
+					SceneryArt.starfish(self, d.p + Vector2(26, 12), d.s * 0.8)
+			continue
+		if theme == &"snow":
+			match d.k:
+				"tree": SceneryArt.pine(self, d.p, d.s)
+				"bush": SceneryArt.snow_pile(self, d.p, d.s)
+				"rock": SceneryArt.snowy_rock(self, d.p, d.s)
+				_: SceneryArt.ice_flowers(self, d.p, d.s)
+			continue
 		match d.k:
 			"tree": _tree(d.p, d.s, d.h)
 			"bush": _bush(d.p, d.s)
@@ -134,3 +163,21 @@ func _flowers(p: Vector2, s: float, col: Color) -> void:
 			var a := TAU * i / 5.0
 			draw_circle(c + Vector2(cos(a), sin(a)) * 5.0 * s, 4.0 * s, col)
 		draw_circle(c, 3.0 * s, Color("ffd23f"))
+
+
+
+class TopScenery extends Node2D:
+	## Meer (Strand) bzw. Bergkette (Schnee) am oberen Bildrand.
+	var theme: StringName = &"beach"
+	var _t := 0.0
+
+	func _process(delta: float) -> void:
+		if theme == &"beach":
+			_t += delta
+			queue_redraw()
+
+	func _draw() -> void:
+		if theme == &"beach":
+			SceneryArt.sea(self, -1500, 3500, 135, _t)
+		else:
+			SceneryArt.mountains(self, -1500, 3500, 150)

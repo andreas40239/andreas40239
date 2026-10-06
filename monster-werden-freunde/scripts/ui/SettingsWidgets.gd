@@ -6,8 +6,8 @@ extends RefCounted
 static func volume_sliders() -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
-	v.add_child(_slider_row(&"note", "Musik", "music", 0.7, func(x: float) -> void: AudioManager.set_music_volume(x)))
-	v.add_child(_slider_row(&"bubble", "Geräusche", "sfx", 0.9, func(x: float) -> void: AudioManager.set_sfx_volume(x)))
+	v.add_child(_slider_row(&"note", TranslationServer.translate("Musik"), "music", 0.7, func(x: float) -> void: AudioManager.set_music_volume(x)))
+	v.add_child(_slider_row(&"bubble", TranslationServer.translate("Geräusche"), "sfx", 0.9, func(x: float) -> void: AudioManager.set_sfx_volume(x)))
 	return v
 
 

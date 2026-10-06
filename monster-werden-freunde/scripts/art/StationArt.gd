@@ -17,6 +17,11 @@ static func draw_station(ci: CanvasItem, id: StringName, t: float, activity: flo
 		&"musikbox": _musikbox(ci, t, activity)
 		&"ventilator": _ventilator(ci, t, activity)
 		&"ruhe": _ruhe(ci, t, activity)
+		&"batterie": _booth(ci, t, activity, Color("3cc6a0"), Color("e8fff8"), &"battery")
+		&"fluegelladen": _booth(ci, t, activity, Color("ff8fb1"), Color("fff0f5"), &"wing")
+		&"kakao": _booth(ci, t, activity, Color("8d5f3a"), Color("fff1dc"), &"mug")
+		&"disco": _disco(ci, t, activity)
+		&"schneemann": _schneemann(ci, t, activity)
 	if level >= 2:
 		var badge := Vector2(44, -112)
 		ci.draw_circle(badge, 21, Color.WHITE)
@@ -152,3 +157,82 @@ static func _ruhe(ci: CanvasItem, t: float, activity: float) -> void:
 	Icons.moon(ci, Vector2(0, -110 + sin(t * 1.2) * 4), 34, Color("ffd84d"))
 	if activity > 0.05:
 		Icons.zzz(ci, Vector2(30, -128 - fmod(t * 20.0, 20.0)), 16, Color(0.48, 0.38, 0.75, activity))
+
+
+
+## Verkaufsstand mit gestreifter Markise und Schild (Batterie-, Flügel-, Kakaostand).
+static func _booth(ci: CanvasItem, t: float, activity: float, stripe_a: Color, stripe_b: Color, sign_icon: StringName) -> void:
+	ci.draw_rect(Rect2(-42, -96, 8, 70), Color("a8693a"))
+	ci.draw_rect(Rect2(34, -96, 8, 70), Color("a8693a"))
+	_box(ci, Rect2(-46, -40, 92, 42), Color("d9c3a0"), 6)
+	ci.draw_rect(Rect2(-46, -40, 92, 10), Color("efe0c4"))
+	var top := -112.0
+	var bottom := -88.0
+	for i in 6:
+		var x0 := -52.0 + i * 104.0 / 6.0
+		var x1 := x0 + 104.0 / 6.0
+		var col: Color = stripe_a if i % 2 == 0 else stripe_b
+		ci.draw_colored_polygon(PackedVector2Array([Vector2(x0 + 4, top), Vector2(x1 + 4, top), Vector2(x1, bottom), Vector2(x0, bottom)]), col)
+		ci.draw_circle(Vector2((x0 + x1) * 0.5, bottom), 104.0 / 12.0, col)
+	ci.draw_line(Vector2(-48, top), Vector2(56, top), OUTLINE, 3.0, true)
+	var bounce := -sin(activity * PI) * 8.0
+	match sign_icon:
+		&"battery":
+			for i in 3:
+				Icons.battery(ci, Vector2(-26 + i * 26, -50), 22, 1.0)
+			Icons.battery(ci, Vector2(0, -136 + bounce), 46, 0.5 + 0.5 * sin(t * 3.0))
+		&"wing":
+			for i in 2:
+				Icons.feather(ci, Vector2(-18 + i * 36, -50), 26, 0.4 * i)
+			Icons.wing(ci, Vector2(0, -134 + bounce), 46)
+		&"mug":
+			for i in 3:
+				Icons.mug(ci, Vector2(-26 + i * 26, -52), 20, t + i)
+			Icons.mug(ci, Vector2(0, -136 + bounce), 40, t)
+
+
+static func _disco(ci: CanvasItem, t: float, activity: float) -> void:
+	# bunte Tanzfläche
+	for i in 3:
+		for j in 2:
+			var col := Color.from_hsv(fmod((i + j * 3) / 6.0 + t * (0.1 + activity * 0.5), 1.0), 0.55, 1.0)
+			var p := Vector2(-45 + i * 30, -18 + j * 14)
+			ci.draw_colored_polygon(PackedVector2Array([p, p + Vector2(30, 0), p + Vector2(30, 14), p + Vector2(0, 14)]), col)
+	ci.draw_rect(Rect2(-45, -18, 90, 28), OUTLINE, false, 3.0)
+	# Mast und Kugel
+	ci.draw_rect(Rect2(-4, -100, 8, 82), Color("6c7a89"))
+	ci.draw_line(Vector2(0, -100), Vector2(0, -108), Color("6c7a89"), 3.0)
+	Icons.discoball(ci, Vector2(0, -128), 52, t * (1.0 + activity * 3.0))
+	# Lichtstrahlen beim Tanz-Impuls
+	if activity > 0.05:
+		for i in 6:
+			var a := t * 2.0 + i * TAU / 6.0
+			var col := Color.from_hsv(i / 6.0, 0.6, 1.0, 0.45 * activity)
+			ci.draw_line(Vector2(0, -128), Vector2(0, -128) + Vector2(cos(a), sin(a) * 0.6) * 80, col, 6.0, true)
+
+
+static func _schneemann(ci: CanvasItem, t: float, activity: float) -> void:
+	var sway := sin(t * 2.0) * 2.0
+	ci.draw_circle(Vector2(0, -26), 30, Color("f4f9ff"))
+	ci.draw_arc(Vector2(0, -26), 30, 0, TAU, 28, Color("a9c4dd"), 3.0, true)
+	ci.draw_circle(Vector2(sway * 0.5, -72), 23, Color("f4f9ff"))
+	ci.draw_arc(Vector2(sway * 0.5, -72), 23, 0, TAU, 24, Color("a9c4dd"), 3.0, true)
+	var h := Vector2(sway, -108)
+	ci.draw_circle(h, 18, Color("f4f9ff"))
+	ci.draw_arc(h, 18, 0, TAU, 20, Color("a9c4dd"), 3.0, true)
+	ci.draw_circle(h + Vector2(-6, -3), 2.5, Color("2f2f3a"))
+	ci.draw_circle(h + Vector2(6, -3), 2.5, Color("2f2f3a"))
+	ci.draw_colored_polygon(PackedVector2Array([h + Vector2(0, 2), h + Vector2(16, 5), h + Vector2(0, 7)]), Color("ff8f3c"))
+	ci.draw_arc(h + Vector2(0, 6), 7, 0.4, PI - 0.4, 8, Color("2f2f3a"), 2.0, true)
+	# Mütze und Schal
+	ci.draw_rect(Rect2(h + Vector2(-14, -22), Vector2(28, 8)), Color("2f3b5c"))
+	ci.draw_rect(Rect2(h + Vector2(-9, -38), Vector2(18, 17)), Color("2f3b5c"))
+	Icons.ellipse(ci, Vector2(sway * 0.7, -90), 22, 6, Color("e84a5f"))
+	# winkende Ast-Arme
+	var wave := sin(t * (2.0 + activity * 6.0)) * 0.4
+	ci.draw_line(Vector2(-20, -76), Vector2(-20, -76) + Vector2(-cos(0.5 + wave), -sin(0.5 + wave)) * 30, Color("8d5f3a"), 3.5, true)
+	ci.draw_line(Vector2(20, -76), Vector2(48, -88), Color("8d5f3a"), 3.5, true)
+	for i in 3:
+		ci.draw_circle(Vector2(0, -40 + i * 12), 3, Color("2f2f3a"))
+	if activity > 0.05:
+		Icons.heart(ci, Vector2(34, -130 - fmod(t * 20.0, 20.0)), 18, Color(1.0, 0.35, 0.53, activity))

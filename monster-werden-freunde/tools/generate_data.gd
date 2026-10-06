@@ -9,12 +9,18 @@ const D := Needs.Type.DIRTY
 const S := Needs.Type.SAD
 const T := Needs.Type.TIRED
 const Y := Needs.Type.HYPER
+const C := Needs.Type.CHARGE
+const F := Needs.Type.FLY
+const K := Needs.Type.COLD
+const L := Needs.Type.LONELY
 
 
 func _init() -> void:
 	_make_monsters()
 	_make_stations()
 	_make_levels()
+	_make_world2()
+	_make_world3()
 	print("Daten erzeugt.")
 	quit()
 
@@ -28,7 +34,7 @@ func _save(res: Resource, path: String) -> void:
 # --- Monster (GDD Kap. 3) -------------------------------------------------------
 
 func _monster(id: StringName, name: String, need: int, max_need: float, speed: float, reward: int,
-		color: Color, res: Dictionary, desc: String, scale := 1.0) -> void:
+		color: Color, res: Dictionary, desc: String, scale := 1.0, friend_speed := 1.6, flies := false) -> void:
 	var m := MonsterData.new()
 	m.id = id
 	m.display_name = name
@@ -41,6 +47,8 @@ func _monster(id: StringName, name: String, need: int, max_need: float, speed: f
 	m.size_scale = scale
 	m.effect_resistances = res
 	m.description = desc
+	m.friend_speed_mult = friend_speed
+	m.friend_flies = flies
 	_save(m, "res://data/monsters/%s.tres" % id)
 
 
@@ -54,13 +62,23 @@ func _make_monsters() -> void:
 			"Ist sehr müde. Die Ruhe-Station hilft!", 1.05)
 	_monster(&"flitzi", "Flitzi", Y, 75, 74, 25, Color("f5b92e"), {},
 			"Ist ganz überdreht. Der Ventilator bremst Flitzi.", 0.92)
+	# Welt 2 - Strand und Meer
+	_monster(&"elektro", "Elektro", C, 100, 42, 25, Color("36c2b4"), {},
+			"Ist ganz leer. Aufgeladen rennt es dreimal so schnell ins Dorf!", 1.0, 3.0)
+	_monster(&"fluegel", "Flügel", F, 95, 50, 25, Color("ff8fb1"), {},
+			"Möchte fliegen. Mit Flügeln fliegt es direkt ins Dorf!", 1.0, 1.6, true)
+	# Welt 3 - Schnee und Berge
+	_monster(&"bibber", "Bibber", K, 110, 46, 30, Color("9fd8f5"), {},
+			"Friert ganz doll. Warmer Kakao hilft!", 1.02)
+	_monster(&"flocki", "Flocki", L, 100, 50, 25, Color("e6e9ff"), {&"friends": -0.2},
+			"Ist einsam. Ein Schneemann wird sein Freund!", 0.98)
 
 
 # --- Stationen (GDD Kap. 4) -----------------------------------------------------
 
 func _station(id: StringName, name: String, short: String, needs: Array[int], strengths: Dictionary,
 		cost: int, upgrade: int, rng: float, cooldown: float, aura: bool, tag: StringName,
-		projectile: StringName, color: Color, desc: String, slow := 0.0, slow_dur := 0.0) -> void:
+		projectile: StringName, color: Color, desc: String, slow := 0.0, slow_dur := 0.0, dance := 0.0) -> void:
 	var s := StationData.new()
 	s.id = id
 	s.display_name = name
@@ -78,6 +96,7 @@ func _station(id: StringName, name: String, short: String, needs: Array[int], st
 	s.description = desc
 	s.slow_amount = slow
 	s.slow_duration = slow_dur
+	s.dance_duration = dance
 	s.target_strategy = StationData.TargetStrategy.MATCHING_FIRST
 	_save(s, "res://data/stations/%s.tres" % id)
 
@@ -93,6 +112,16 @@ func _make_stations() -> void:
 			165, 0.55, false, &"wind", &"wind", Color("8fd3c7"), "Pustet überdrehte Monster langsamer.", 0.25, 1.5)
 	_station(&"ruhe", "Ruhe-Station", "Ruhe", [T] as Array[int], {T: 16.0}, 160, 130,
 			140, 0.0, true, &"rest", &"", Color("b59cf0"), "Lässt müde Monster entspannen.")
+	_station(&"batterie", "Batterieladen", "Batterie", [C] as Array[int], {C: 20.0}, 150, 120,
+			130, 0.6, false, &"charge", &"battery", Color("3cc6a0"), "Lädt leere Monster wieder auf.")
+	_station(&"fluegelladen", "Flügelladen", "Flügel", [F] as Array[int], {F: 19.0}, 150, 120,
+			135, 0.6, false, &"wings", &"feather", Color("ff8fb1"), "Schenkt Monstern Flügel zum Fliegen.")
+	_station(&"disco", "Disco", "Disco", [] as Array[int], {}, 140, 110,
+			140, 4.0, false, &"dance", &"", Color("c86bfa"), "Monster bleiben stehen und tanzen eine Weile.", 0.0, 0.0, 2.5)
+	_station(&"kakao", "Kakaostand", "Kakao", [K] as Array[int], {K: 20.0}, 150, 120,
+			125, 0.6, false, &"warm", &"mug", Color("c98b4f"), "Wärmt frierende Monster mit Kakao.")
+	_station(&"schneemann", "Schneemann-Werkstatt", "Schneemann", [L] as Array[int], {L: 15.0}, 160, 130,
+			140, 0.0, true, &"friends", &"", Color("b8d8f0"), "Baut Schneemänner als Freunde für einsame Monster.")
 
 
 # --- Level (GDD Kap. 5 und 9) ---------------------------------------------------
@@ -145,8 +174,70 @@ func _level(n: int, name: String, start: int, path: Array, spots: Array, waves: 
 	l.early_start = early
 	l.wave_break = wave_break
 	l.decor_seed = n * 1337
+	l.world = DataRegistry.world_of_level(n)
+	l.world_name = DataRegistry.world_name(l.world)
+	l.theme = DataRegistry.world_theme(l.world)
+	if l.build_spots.is_empty():
+		l.build_spots = _auto_spots(l.path_points)
+	if l.monster_types().size() > 5:
+		push_error("Level %d hat mehr als 5 Monstertypen: %s" % [n, l.monster_types()])
+	if l.available_station_ids.size() > 5:
+		push_error("Level %d hat mehr als 5 Stationen" % n)
 	_check_layout(l)
+	print("Level %d: %d Bauplätze, Typen %s" % [n, l.build_spots.size(), l.monster_types()])
 	_save(l, "res://data/levels/level_%02d.tres" % n)
+
+
+## Erzeugt Bauplätze automatisch: Innenseiten der Kurven zuerst, dann neben langen Geraden.
+func _auto_spots(path: PackedVector2Array) -> PackedVector2Array:
+	var cands: Array[Vector2] = []
+	for i in range(1, path.size() - 1):
+		var a := (path[i] - path[i - 1]).normalized()
+		var b := (path[i + 1] - path[i]).normalized()
+		cands.append(path[i] - a * 100.0 + b * 100.0)
+	for i in path.size() - 1:
+		var seg := path[i + 1] - path[i]
+		var n := Vector2(-seg.y, seg.x).normalized()
+		var ks: Array[float] = []
+		if seg.length() >= 520.0:
+			ks = [0.33, 0.67]
+		elif seg.length() >= 250.0:
+			ks = [0.5]
+		for k in ks:
+			for sgn in [1.0, -1.0]:
+				cands.append(path[i].lerp(path[i + 1], k) + n * 108.0 * sgn)
+	for i in range(1, path.size() - 1):
+		var a := (path[i] - path[i - 1]).normalized()
+		var b := (path[i + 1] - path[i]).normalized()
+		cands.append(path[i] + a * 105.0 - b * 105.0)
+	var result := PackedVector2Array()
+	for p in cands:
+		if result.size() >= 12:
+			break
+		if p.x < 70 or p.x > 1690 or p.y < 185 or p.y > 840:
+			continue
+		if p.y < 240 and (p.x < 900 or p.x > 1580):
+			continue
+		if p.y > 790 and p.x > 360 and p.x < 1580:
+			continue
+		var d := _path_distance(p, path)
+		if d < 95.0 or d > 130.0:
+			continue
+		var ok := true
+		for q in result:
+			if q.distance_to(p) < 118.0:
+				ok = false
+				break
+		if ok:
+			result.append(p)
+	return result
+
+
+func _path_distance(p: Vector2, path: PackedVector2Array) -> float:
+	var best := INF
+	for k in path.size() - 1:
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, path[k], path[k + 1])))
+	return best
 
 
 func _check_layout(l: LevelData) -> void:
@@ -219,7 +310,7 @@ func _make_levels() -> void:
 			_step("Tröpfli ist traurig.\nMusik hilft!", "station_built:musikbox", "card:musikbox"),
 			_step("Der Kreis zeigt, wie weit\neine Station helfen kann.", "time:7"),
 			_step("Tipp: Plätze in Kurven\nhelfen am längsten.", "time:7"),
-			_step("Neu: Mit  ▶▶  geht es schneller.", "time:8", "speed"),
+			_step("Neu: Der Knopf  >>  macht schneller.", "time:8", "speed"),
 		], false, 7.0)
 
 	# Level 4 - Ventilator, gemischte Wellen
@@ -268,3 +359,160 @@ func _make_levels() -> void:
 			_step("Wähle:  Weiter  oder  Stärker.", "station_upgraded", "upgrade"),
 			_step("Verkaufen gibt dir 3/4\nder Punkte zurück.", "time:8"),
 		], true, 10.0)
+
+
+
+# --- Welt 2: Strand und Meer -----------------------------------------------------
+
+func _make_world2() -> void:
+	var start_hint := _step("Tippe auf  Los!", "wave_started", "start")
+	_level(6, "Elektros Ladestation", 380,
+		[Vector2(-60, 300), Vector2(400, 300), Vector2(400, 650), Vector2(800, 650), Vector2(800, 300), Vector2(1200, 300),
+			Vector2(1200, 700), Vector2(1550, 700), Vector2(1550, 450), Vector2(1760, 450)], [],
+		[
+			_wave([[&"elektro", 4, 2.2]]),
+			_wave([[&"knurri", 4, 1.6], [&"elektro", 3, 2.0, 0.8]]),
+			_wave([[&"matschi", 4, 1.8], [&"elektro", 4, 1.8, 0.8]]),
+			_wave([[&"elektro", 3, 1.6], [&"knurri", 3, 1.4, 0.6], [&"matschi", 3, 1.6, 0.6]]),
+			_wave([[&"elektro", 5, 1.4], [&"knurri", 4, 1.3, 0.5], [&"matschi", 3, 1.5, 0.5]]),
+		],
+		[&"seifenblasen", &"keksstand", &"batterie"] as Array[StringName], [&"elektro"] as Array[StringName],
+		[
+			_step("Elektro ist ganz leer.\nDer Batterieladen lädt es auf!", "station_built:batterie", "card:batterie"),
+			start_hint,
+			_step("Aufgeladen rennt Elektro\ndreimal so schnell ins Dorf!", "time:8"),
+		], true, 9.0)
+	_level(7, "Flügels großer Traum", 420,
+		[Vector2(-60, 700), Vector2(350, 700), Vector2(350, 330), Vector2(700, 330), Vector2(700, 620), Vector2(1050, 620),
+			Vector2(1050, 250), Vector2(1420, 250), Vector2(1420, 560), Vector2(1760, 560)], [],
+		[
+			_wave([[&"fluegel", 4, 2.0]]),
+			_wave([[&"fluegel", 3, 1.8], [&"troepfli", 4, 1.6, 0.8]]),
+			_wave([[&"elektro", 4, 1.8], [&"fluegel", 4, 1.6, 0.6]]),
+			_wave([[&"knurri", 4, 1.4], [&"troepfli", 3, 1.5, 0.5], [&"fluegel", 3, 1.5, 0.5]]),
+			_wave([[&"fluegel", 4, 1.3], [&"elektro", 3, 1.5, 0.5], [&"knurri", 3, 1.3, 0.5], [&"troepfli", 3, 1.3, 0.5]]),
+		],
+		[&"musikbox", &"keksstand", &"batterie", &"fluegelladen"] as Array[StringName], [&"fluegel"] as Array[StringName],
+		[
+			_step("Flügel möchte fliegen.\nIm Flügelladen gibt es Flügel!", "station_built:fluegelladen", "card:fluegelladen"),
+			start_hint,
+			_step("Mit Flügeln fliegt es\ndirekt ins Dorf!", "time:8"),
+		], true, 9.0)
+	_level(8, "Disco am Strand", 540,
+		[Vector2(-60, 450), Vector2(300, 450), Vector2(300, 220), Vector2(650, 220), Vector2(650, 760), Vector2(1000, 760),
+			Vector2(1000, 420), Vector2(1350, 420), Vector2(1350, 720), Vector2(1600, 720), Vector2(1600, 380), Vector2(1760, 380)], [],
+		[
+			_wave([[&"flitzi", 4, 2.0], [&"elektro", 3, 2.0, 0.8]]),
+			_wave([[&"matschi", 4, 1.6], [&"fluegel", 4, 1.6, 0.6]]),
+			_wave([[&"flitzi", 4, 1.4], [&"elektro", 4, 1.5, 0.5]]),
+			_wave([[&"fluegel", 4, 1.3], [&"matschi", 4, 1.4, 0.5], [&"flitzi", 3, 1.3, 0.5]]),
+			_wave([[&"elektro", 4, 1.2], [&"flitzi", 4, 1.2, 0.4], [&"fluegel", 4, 1.2, 0.4], [&"matschi", 3, 1.4, 0.4]]),
+		],
+		[&"seifenblasen", &"ventilator", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
+		[
+			_step("Neu: die Disco!\nMonster bleiben stehen und tanzen.", "station_built:disco", "card:disco"),
+			_step("Tanzende Monster laufen nicht weiter.\nSo hast du mehr Zeit zum Helfen!", "time:9"),
+		], true, 9.0)
+	_level(9, "Muschelsuche", 500,
+		[Vector2(-60, 250), Vector2(500, 250), Vector2(500, 520), Vector2(150, 520), Vector2(150, 780), Vector2(900, 780),
+			Vector2(900, 450), Vector2(1250, 450), Vector2(1250, 220), Vector2(1600, 220), Vector2(1600, 600), Vector2(1760, 600)], [],
+		[
+			_wave([[&"schlummi", 4, 2.4]]),
+			_wave([[&"troepfli", 5, 1.5], [&"elektro", 3, 1.8, 0.6]]),
+			_wave([[&"fluegel", 4, 1.5], [&"schlummi", 3, 2.0, 0.6]]),
+			_wave([[&"elektro", 4, 1.4], [&"troepfli", 4, 1.3, 0.5], [&"schlummi", 3, 1.8, 0.5]]),
+			_wave([[&"fluegel", 4, 1.2], [&"schlummi", 3, 1.6, 0.4], [&"elektro", 4, 1.3, 0.4], [&"troepfli", 4, 1.2, 0.4]]),
+			_wave([[&"schlummi", 3, 1.6], [&"fluegel", 4, 1.2, 0.4], [&"troepfli", 3, 1.2, 0.4], [&"elektro", 3, 1.2, 0.4]]),
+		],
+		[&"musikbox", &"ruhe", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
+		[
+			_step("Tipp: Baue die Disco dort,\nwo viele Monster vorbeikommen.", "time:9"),
+		], true, 9.0)
+	_level(10, "Großes Strandfest", 560,
+		[Vector2(-60, 600), Vector2(250, 600), Vector2(250, 250), Vector2(600, 250), Vector2(600, 780), Vector2(950, 780),
+			Vector2(950, 330), Vector2(1300, 330), Vector2(1300, 700), Vector2(1560, 700), Vector2(1560, 300), Vector2(1760, 300)], [],
+		[
+			_wave([[&"elektro", 4, 1.8], [&"fluegel", 3, 1.8, 0.6]]),
+			_wave([[&"matschi", 4, 1.5], [&"knurri", 4, 1.4, 0.5]]),
+			_wave([[&"fluegel", 4, 1.3], [&"elektro", 4, 1.4, 0.5], [&"knurri", 3, 1.3, 0.5]]),
+			_wave([[&"matschi", 4, 1.4], [&"fluegel", 4, 1.2, 0.4], [&"elektro", 4, 1.3, 0.4]]),
+			_wave([[&"knurri", 4, 1.1], [&"elektro", 4, 1.2, 0.4], [&"matschi", 3, 1.3, 0.4], [&"fluegel", 4, 1.1, 0.4]]),
+			_wave([[&"elektro", 5, 1.1], [&"fluegel", 5, 1.1, 0.4], [&"knurri", 4, 1.0, 0.4], [&"matschi", 3, 1.3, 0.4]]),
+		],
+		[&"seifenblasen", &"keksstand", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
+		[], true, 10.0)
+
+
+# --- Welt 3: Schnee und Berge ------------------------------------------------------
+
+func _make_world3() -> void:
+	var start_hint := _step("Tippe auf  Los!", "wave_started", "start")
+	_level(11, "Bibbers kalte Füße", 580,
+		[Vector2(-60, 700), Vector2(450, 700), Vector2(450, 300), Vector2(900, 300), Vector2(900, 700), Vector2(1350, 700),
+			Vector2(1350, 350), Vector2(1760, 350)], [],
+		[
+			_wave([[&"bibber", 4, 2.2]]),
+			_wave([[&"knurri", 4, 1.6], [&"bibber", 3, 2.0, 0.8]]),
+			_wave([[&"troepfli", 4, 1.6], [&"bibber", 4, 1.8, 0.6]]),
+			_wave([[&"bibber", 4, 1.5], [&"knurri", 3, 1.4, 0.5], [&"troepfli", 3, 1.4, 0.5]]),
+			_wave([[&"bibber", 5, 1.3], [&"troepfli", 4, 1.2, 0.4], [&"knurri", 4, 1.2, 0.4]]),
+		],
+		[&"musikbox", &"keksstand", &"kakao"] as Array[StringName], [&"bibber"] as Array[StringName],
+		[
+			_step("Bibber friert.\nWarmer Kakao hilft!", "station_built:kakao", "card:kakao"),
+			start_hint,
+		], true, 9.0)
+	_level(12, "Flockis Schneemann", 600,
+		[Vector2(-60, 250), Vector2(350, 250), Vector2(350, 750), Vector2(700, 750), Vector2(700, 300), Vector2(1050, 300),
+			Vector2(1050, 750), Vector2(1400, 750), Vector2(1400, 450), Vector2(1760, 450)], [],
+		[
+			_wave([[&"flocki", 4, 2.0]]),
+			_wave([[&"bibber", 4, 1.8], [&"flocki", 3, 1.8, 0.6]]),
+			_wave([[&"schlummi", 3, 2.2], [&"matschi", 4, 1.6, 0.6]]),
+			_wave([[&"flocki", 4, 1.4], [&"bibber", 4, 1.5, 0.5], [&"matschi", 3, 1.5, 0.5]]),
+			_wave([[&"schlummi", 3, 1.8], [&"flocki", 4, 1.2, 0.4], [&"bibber", 4, 1.3, 0.4], [&"matschi", 3, 1.4, 0.4]]),
+		],
+		[&"seifenblasen", &"ruhe", &"kakao", &"schneemann"] as Array[StringName], [&"flocki"] as Array[StringName],
+		[
+			_step("Flocki ist einsam.\nEin Schneemann wird sein Freund!", "station_built:schneemann", "card:schneemann"),
+			start_hint,
+		], true, 9.0)
+	_level(13, "Lawinen-Disco", 500,
+		[Vector2(-60, 500), Vector2(300, 500), Vector2(300, 220), Vector2(700, 220), Vector2(700, 780), Vector2(1100, 780),
+			Vector2(1100, 420), Vector2(1450, 420), Vector2(1450, 740), Vector2(1760, 740)], [],
+		[
+			_wave([[&"bibber", 4, 2.0], [&"flitzi", 3, 2.0, 0.6]]),
+			_wave([[&"elektro", 4, 1.7], [&"flocki", 4, 1.6, 0.6]]),
+			_wave([[&"flitzi", 4, 1.4], [&"bibber", 4, 1.5, 0.5], [&"elektro", 3, 1.6, 0.5]]),
+			_wave([[&"flocki", 4, 1.3], [&"elektro", 4, 1.3, 0.4], [&"flitzi", 4, 1.2, 0.4]]),
+			_wave([[&"bibber", 4, 1.2], [&"flocki", 4, 1.2, 0.4], [&"elektro", 4, 1.2, 0.4], [&"flitzi", 4, 1.1, 0.4]]),
+		],
+		[&"ventilator", &"batterie", &"kakao", &"schneemann", &"disco"] as Array[StringName], [] as Array[StringName],
+		[_step("Die Disco hält auch im Schnee\nalle Monster kurz an.", "time:8")], true, 9.0)
+	_level(14, "Gipfelsturm", 600,
+		[Vector2(-60, 230), Vector2(700, 230), Vector2(700, 480), Vector2(200, 480), Vector2(200, 780), Vector2(1000, 780),
+			Vector2(1000, 450), Vector2(1350, 450), Vector2(1350, 250), Vector2(1760, 250)], [],
+		[
+			_wave([[&"flocki", 4, 1.9], [&"bibber", 3, 2.0, 0.6]]),
+			_wave([[&"fluegel", 4, 1.6], [&"troepfli", 4, 1.5, 0.6]]),
+			_wave([[&"knurri", 4, 1.4], [&"bibber", 4, 1.5, 0.5], [&"flocki", 3, 1.5, 0.5]]),
+			_wave([[&"fluegel", 4, 1.3], [&"troepfli", 3, 1.3, 0.4], [&"bibber", 4, 1.3, 0.4], [&"knurri", 3, 1.2, 0.4]]),
+			_wave([[&"flocki", 4, 1.2], [&"fluegel", 4, 1.2, 0.4], [&"bibber", 4, 1.2, 0.4], [&"knurri", 3, 1.1, 0.4]]),
+			_wave([[&"bibber", 4, 1.1], [&"troepfli", 4, 1.1, 0.4], [&"flocki", 4, 1.1, 0.4], [&"fluegel", 4, 1.1, 0.4]]),
+		],
+		[&"musikbox", &"keksstand", &"fluegelladen", &"kakao", &"schneemann"] as Array[StringName], [] as Array[StringName],
+		[], true, 10.0)
+	_level(15, "Das große Schneefest", 600,
+		[Vector2(-60, 760), Vector2(350, 760), Vector2(350, 240), Vector2(750, 240), Vector2(750, 560), Vector2(1050, 560),
+			Vector2(1050, 240), Vector2(1400, 240), Vector2(1400, 740), Vector2(1760, 740)], [],
+		[
+			_wave([[&"bibber", 4, 1.8], [&"flocki", 4, 1.8, 0.6]]),
+			_wave([[&"elektro", 4, 1.6], [&"fluegel", 4, 1.6, 0.6]]),
+			_wave([[&"schlummi", 3, 2.0], [&"bibber", 4, 1.4, 0.5], [&"flocki", 3, 1.4, 0.5]]),
+			_wave([[&"fluegel", 4, 1.3], [&"elektro", 4, 1.3, 0.4], [&"schlummi", 3, 1.8, 0.4]]),
+			_wave([[&"bibber", 4, 1.2], [&"flocki", 4, 1.2, 0.4], [&"elektro", 4, 1.2, 0.4], [&"fluegel", 3, 1.2, 0.4]]),
+			_wave([[&"schlummi", 3, 1.5], [&"bibber", 4, 1.1, 0.4], [&"fluegel", 4, 1.1, 0.4], [&"flocki", 4, 1.1, 0.4],
+				[&"elektro", 3, 1.1, 0.4]]),
+		],
+		[&"ruhe", &"batterie", &"fluegelladen", &"kakao", &"schneemann"] as Array[StringName], [] as Array[StringName],
+		[], true, 10.0)

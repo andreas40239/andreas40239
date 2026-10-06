@@ -34,6 +34,7 @@ static func make(icon_id: StringName, title: String, bg: Color, btn_size: Vector
 	b._title.text = title
 	b._title.label_settings = UiTheme.label_settings(32, fg, 6 if fg == Color.WHITE else 0, bg.darkened(0.45), true)
 	col.add_child(b._title)
+	b._fit_title()
 	b._cost_row = HBoxContainer.new()
 	b._cost_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b._cost_row.add_theme_constant_override("separation", 4)
@@ -50,6 +51,16 @@ static func make(icon_id: StringName, title: String, bg: Color, btn_size: Vector
 
 func set_title(t: String) -> void:
 	_title.text = t
+	_fit_title()
+
+
+## Verkleinert die Schrift, bis der Titel in den Knopf passt (lange Wörter, z. B. Griechisch).
+func _fit_title() -> void:
+	var ls := _title.label_settings
+	var avail := custom_minimum_size.x - 56.0 - 50.0
+	ls.font_size = 32
+	while ls.font_size > 20 and ls.font.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, ls.font_size).x > avail:
+		ls.font_size -= 2
 
 
 ## cost < 0 blendet die Kostenzeile aus. prefix z. B. "+" beim Verkaufen.

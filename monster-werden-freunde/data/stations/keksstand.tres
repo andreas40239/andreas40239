@@ -23,4 +23,5 @@ slow_duration = 0.0
 target_strategy = 2
 color = Color(0.909804, 0.635294, 0.290196, 1)
 projectile = &"cookie"
+dance_duration = 0.0
 description = "Füttert hungrige Monster."

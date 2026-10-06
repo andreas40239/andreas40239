@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_s62jo"]
+
+[resource]
+script = ExtResource("1_s62jo")
+id = &"batterie"
+display_name = "Batterieladen"
+short_name = "Batterie"
+supported_needs = Array[int]([5])
+need_strengths = {
+5: 20.0
+}
+mismatch_factor = 0.2
+cost = 150
+upgrade_cost = 120
+help_range = 130.0
+cooldown = 0.6
+is_aura = false
+effect_tag = &"charge"
+slow_amount = 0.0
+slow_duration = 0.0
+target_strategy = 2
+color = Color(0.235294, 0.776471, 0.627451, 1)
+projectile = &"battery"
+dance_duration = 0.0
+description = "Lädt leere Monster wieder auf."

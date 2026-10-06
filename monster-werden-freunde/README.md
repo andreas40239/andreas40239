@@ -21,14 +21,35 @@ keine HP, keinen Schaden, keinen Tod. Bei 10 Chaos endet das Level mit freundlic
 | Tröpfli | traurig (Note) | Musikbox |
 | Schlummi | müde (Mond) | Ruhe-Station |
 | Flitzi | überdreht (Windrad) | Ventilator (bremst), Musikbox |
+| Elektro | leer (Batterie) | Batterieladen |
+| Flügel | möchte fliegen (Flügel) | Flügelladen |
+| Bibber | friert (Schneeflocke) | Kakaostand |
+| Flocki | einsam (zwei Freunde) | Schneemann-Werkstatt |
 
 Bedienung: **+** auf der Wiese antippen → Stationskarte antippen. Station antippen → *Weiter*
 (+20 % Reichweite) / *Stärker* (+25 % Wirkung) / *Verkaufen* (75 % zurück, bei teuren Stationen mit
 „Sicher?“). Pause (Bauen bleibt möglich), 1x/2x (ab Level 3), Menü mit Musik- und Geräusche-Regler.
 
-Enthalten (MVP laut GDD Kap. 17): 5 Level mit Tutorial (Welt 1 „Sonnental“), 5 Monster, 5 Stationen,
-2 Upgrade-Stufen, lokale Speicherung (`user://save.json`, atomisch), Levelauswahl mit Sternen,
-Deutsch, Querformat, kein Netzwerk, keine Werbung/Käufe.
+Enthalten: **3 Welten mit je 5 Leveln** (15 Level), 9 Monster, 10 Stationen, 2 Upgrade-Stufen,
+Welt- und Levelauswahl mit Sternen (eine Welt öffnet sich erst, wenn die vorherige geschafft ist),
+lokale Speicherung (`user://save.json`, atomisch), **Sprachauswahl per Flagge: Deutsch, Englisch,
+Griechisch**, Querformat, kein Netzwerk, keine Werbung/Käufe. Pro Level höchstens 5 Monstertypen
+und höchstens 5 Stationen (wird beim Erzeugen der Daten und in den Tests geprüft).
+
+### Welten (Version 1.1)
+
+| Welt | Level | Neu |
+|---|---|---|
+| 1 Sonnental | 1–5 | Knurri, Matschi, Tröpfli, Flitzi, Schlummi |
+| 2 Strand und Meer | 6–10 | **Elektro** (braucht Batterien – aufgeladen rennt es 3x so schnell ins Dorf), **Flügel** (bekommt im Flügelladen Flügel und fliegt dann direkt ins Dorf), **Disco** |
+| 3 Schnee und Berge | 11–15 | **Bibber** (friert → Kakaostand), **Flocki** (ist einsam → Schneemann-Werkstatt) |
+
+**Disco:** Die Monster in Reichweite bleiben stehen und tanzen eine Weile (2,5 s, mit „Stärker“
+länger). Ihr Zustand ändert sich nicht – die Disco verschafft nur Zeit. Danach laufen sie
+mindestens 3 s weiter, bevor sie wieder tanzen können (kein Dauer-Festhalten).
+
+Jede Welt hat eigene Grafik (Wiese / Sand mit Meer und Palmen / Schnee mit Bergen und Tannen),
+ein eigenes Dorf und eigene Musik.
 
 ## Projektstruktur
 
@@ -44,7 +65,12 @@ tools/         Generatoren für Daten (.tres), Sounds und Icons
 ```
 
 Alle Grafiken werden als Vektoren im Code gezeichnet (`scripts/art/`), alle Klänge mit
-`tools/gen_audio.py` erzeugt – es gibt keine fremden Assets außer der Schrift Fredoka (SIL OFL).
+`tools/gen_audio.py` erzeugt – es gibt keine fremden Assets außer den Schriften Fredoka und
+M PLUS Rounded 1c (für Griechisch; beide SIL OFL).
+
+**Übersetzungen:** Quelltexte sind Deutsch, Englisch und Griechisch stehen in
+`scripts/i18n/Strings.gd` (Autoload `I18n` registriert sie beim TranslationServer). Ein Test prüft,
+dass alle Monster-, Stations-, Level- und Tutorial-Texte übersetzt sind.
 
 ## Abweichungen vom GDD (bewusst)
 
@@ -52,7 +78,8 @@ Alle Grafiken werden als Vektoren im Code gezeichnet (`scripts/art/`), alle Klä
   ~18 Bedürfnispunkte/s, Welle 1 bringt ~55/s). Das GDD erlaubt Anpassungen nach Tests. Geändert:
   Takt Seifenblasen 0,45 s, Keksstand 0,6 s, Ventilator 0,55 s; Musikbox 14/7 pro s, Ruhe 16 pro s
   (Reichweite 140); Belohnungen 25–35; Schlummi 115/40 px/s; Flitzi 75/74 px/s; Startpunkte
-  L4 = 460, L5 = 600. Die Simulation (`tests/Simulation.tscn`) gewinnt damit alle Level.
+  L4 = 460, L5 = 600. Die Simulation (`tests/Simulation.tscn`) gewinnt damit alle 15 Level
+  (sowohl „alles ausgeben“ als auch „sparsam bauen“).
 * **Karten:** statt `map_scene` enthält `LevelData` Pfadpunkte und Bauplätze (Kurven werden
   automatisch abgerundet).
 * **Reichweite:** Stationen prüfen Abstände direkt statt über Area2D (einfacher, gleiches Verhalten).

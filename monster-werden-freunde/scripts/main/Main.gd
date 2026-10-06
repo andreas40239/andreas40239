@@ -3,6 +3,7 @@ extends Node
 
 const SCREENS := {
 	&"title": "res://scenes/meta/TitleScreen.tscn",
+	&"world_select": "res://scenes/meta/WorldSelect.tscn",
 	&"level_select": "res://scenes/meta/LevelSelect.tscn",
 	&"game": "res://scenes/game/Game.tscn",
 }
@@ -26,7 +27,6 @@ func _ready() -> void:
 	_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_fade_layer.add_child(_fade)
 	GameState.screen_requested.connect(_on_screen_requested)
-	AudioManager.play_music()
 	_show(&"title", {})
 
 
@@ -39,6 +39,11 @@ func _show(screen: StringName, params: Dictionary) -> void:
 	Engine.time_scale = 1.0
 	if params.has("level"):
 		GameState.current_level = clampi(int(params["level"]), 1, DataRegistry.level_count())
+		GameState.current_world = DataRegistry.world_of_level(GameState.current_level)
+	if params.has("world"):
+		GameState.current_world = clampi(int(params["world"]), 1, DataRegistry.world_count())
+	if screen != &"game":
+		AudioManager.play_music(GameState.current_world if screen == &"level_select" else 1)
 	if _current:
 		_current.queue_free()
 		remove_child(_current)

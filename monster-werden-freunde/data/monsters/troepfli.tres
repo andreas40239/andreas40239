@@ -16,4 +16,6 @@ size_scale = 1.0
 effect_resistances = {
 &"music": -0.3
 }
+friend_speed_mult = 1.6
+friend_flies = false
 description = "Ist traurig. Musik hilft besonders gut!"

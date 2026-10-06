@@ -18,4 +18,8 @@ extends Resource
 ## Effekt-Tag -> Resistenz (0.3 = 30 % weniger Wirkung, -0.3 = 30 % mehr Wirkung).
 ## Spezieller Tag &"slow" wirkt auf Verlangsamungen.
 @export var effect_resistances: Dictionary = {}
+## Tempo-Faktor als Freund auf dem Weg ins Dorf (Elektro: 3x).
+@export var friend_speed_mult: float = 1.6
+## Freund fliegt direkt (Luftlinie) ins Dorf (Flügel).
+@export var friend_flies: bool = false
 @export_multiline var description: String = ""

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="StationData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/StationData.gd" id="1_uumu8"]
+
+[resource]
+script = ExtResource("1_uumu8")
+id = &"schneemann"
+display_name = "Schneemann-Werkstatt"
+short_name = "Schneemann"
+supported_needs = Array[int]([8])
+need_strengths = {
+8: 15.0
+}
+mismatch_factor = 0.2
+cost = 160
+upgrade_cost = 130
+help_range = 140.0
+cooldown = 0.0
+is_aura = true
+effect_tag = &"friends"
+slow_amount = 0.0
+slow_duration = 0.0
+target_strategy = 2
+color = Color(0.721569, 0.847059, 0.941176, 1)
+projectile = &""
+dance_duration = 0.0
+description = "Baut Schneemänner als Freunde für einsame Monster."

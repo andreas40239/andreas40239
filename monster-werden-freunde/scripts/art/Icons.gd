@@ -16,7 +16,7 @@ static func draw(ci: CanvasItem, icon: StringName, c: Vector2, s: float, tint: C
 		&"heart": heart(ci, c, s, Color("ff5a87"))
 		&"sun": sun(ci, c, s)
 		&"swirl": swirl(ci, c, s, Color("9b59d0"))
-		&"flag": flag(ci, c, s)
+		&"flag": wave_flag(ci, c, s)
 		&"pause": pause(ci, c, s, tint)
 		&"play": play(ci, c, s, tint)
 		&"fast": fast(ci, c, s, tint)
@@ -36,6 +36,18 @@ static func draw(ci: CanvasItem, icon: StringName, c: Vector2, s: float, tint: C
 		&"cookie": cookie(ci, c, s)
 		&"zzz": zzz(ci, c, s, tint)
 		&"check": check(ci, c, s, tint)
+		&"battery": battery(ci, c, s, 0.2)
+		&"battery_full": battery(ci, c, s, 1.0)
+		&"wing": wing(ci, c, s)
+		&"snowflake": snowflake(ci, c, s, Color("4f9be0"))
+		&"friends": friends(ci, c, s)
+		&"feather": feather(ci, c, s, 0.0)
+		&"mug": mug(ci, c, s, 0.0)
+		&"disco": discoball(ci, c, s, 0.0)
+		&"flag_de": flag(ci, c, s, &"de")
+		&"flag_en": flag(ci, c, s, &"en")
+		&"flag_el": flag(ci, c, s, &"el")
+		&"world": globe(ci, c, s)
 		_:
 			ci.draw_circle(c, s * 0.3, tint)
 
@@ -198,7 +210,7 @@ static func swirl(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
 	ci.draw_circle(pts[pts.size() - 1], s * 0.045, col)
 
 
-static func flag(ci: CanvasItem, c: Vector2, s: float) -> void:
+static func wave_flag(ci: CanvasItem, c: Vector2, s: float) -> void:
 	thick_line(ci, c + Vector2(-s * 0.24, s * 0.42), c + Vector2(-s * 0.24, -s * 0.42), Color("6b5a4a"), s * 0.07)
 	ci.draw_colored_polygon(PackedVector2Array([
 		c + Vector2(-s * 0.22, -s * 0.4), c + Vector2(s * 0.36, -s * 0.25), c + Vector2(-s * 0.22, -s * 0.06)]),
@@ -332,3 +344,133 @@ static func zzz(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
 static func check(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
 	ci.draw_polyline(PackedVector2Array([
 		c + Vector2(-s * 0.3, 0), c + Vector2(-s * 0.08, s * 0.24), c + Vector2(s * 0.32, -s * 0.24)]), col, s * 0.14, true)
+
+
+
+# --- Icons der neuen Welten -------------------------------------------------------
+
+static func battery(ci: CanvasItem, c: Vector2, s: float, level: float) -> void:
+	var body := Rect2(c + Vector2(-s * 0.38, -s * 0.2), Vector2(s * 0.68, s * 0.42))
+	Icons.rounded_rect(ci, body.grow(s * 0.05), s * 0.08, Color("2f3b5c"))
+	Icons.rounded_rect(ci, body, s * 0.05, Color("e9eef5"))
+	ci.draw_rect(Rect2(body.end.x + s * 0.03, c.y - s * 0.09, s * 0.08, s * 0.18), Color("2f3b5c"))
+	var col := Color("ff6b6b").lerp(Color("5fd068"), level)
+	ci.draw_rect(Rect2(body.position + Vector2(s * 0.04, s * 0.04), Vector2((body.size.x - s * 0.08) * level, body.size.y - s * 0.08)), col)
+	var bolt := PackedVector2Array([c + Vector2(-s * 0.02, -s * 0.16), c + Vector2(-s * 0.12, s * 0.03), c + Vector2(-s * 0.01, s * 0.03),
+		c + Vector2(-s * 0.06, s * 0.18), c + Vector2(s * 0.1, -s * 0.04), c + Vector2(-s * 0.01, -s * 0.04)])
+	ci.draw_colored_polygon(bolt, Color("ffc93c"))
+
+
+static func wing(ci: CanvasItem, c: Vector2, s: float) -> void:
+	for k in 3:
+		var p := c + Vector2(-s * 0.1 + k * s * 0.08, -s * 0.12 + k * s * 0.12)
+		var len := s * (0.42 - k * 0.08)
+		ellipse(ci, p + Vector2(len * 0.5, 0), len * 0.55, s * 0.12, Color.WHITE, -0.35)
+		ellipse_outline(ci, p + Vector2(len * 0.5, 0), len * 0.55, s * 0.12, Color("e07aa0"), s * 0.04, -0.35)
+	ci.draw_circle(c + Vector2(-s * 0.16, -s * 0.06), s * 0.1, Color("ff8fb1"))
+
+
+static func snowflake(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
+	var w := maxf(1.5, s * 0.07)
+	for i in 3:
+		var a := i * PI / 3.0 + PI * 0.5
+		var d := Vector2(cos(a), sin(a)) * s * 0.42
+		ci.draw_line(c - d, c + d, col, w, true)
+		for sgn in [-1.0, 1.0]:
+			var tip: Vector2 = c + d * sgn * 0.62
+			var n: Vector2 = d.normalized() * sgn
+			ci.draw_line(tip, tip + n.rotated(0.7) * s * 0.14, col, w * 0.8, true)
+			ci.draw_line(tip, tip + n.rotated(-0.7) * s * 0.14, col, w * 0.8, true)
+
+
+static func friends(ci: CanvasItem, c: Vector2, s: float) -> void:
+	for i in 2:
+		var p := c + Vector2((i * 2 - 1) * s * 0.2, s * 0.06)
+		var col := Color("b8a6e8") if i == 0 else Color("7fc4f5")
+		ci.draw_circle(p, s * 0.2, col)
+		ci.draw_circle(p + Vector2(-s * 0.06, -s * 0.03), s * 0.03, INK)
+		ci.draw_circle(p + Vector2(s * 0.06, -s * 0.03), s * 0.03, INK)
+		ci.draw_arc(p + Vector2(0, s * 0.04), s * 0.07, 0.3, PI - 0.3, 8, INK, s * 0.03, true)
+	heart(ci, c + Vector2(0, -s * 0.28), s * 0.32, Color("ff5a87"))
+
+
+static func feather(ci: CanvasItem, c: Vector2, s: float, rot: float) -> void:
+	var d := Vector2(cos(rot - 0.8), sin(rot - 0.8))
+	ellipse(ci, c, s * 0.42, s * 0.15, Color.WHITE, d.angle())
+	ellipse_outline(ci, c, s * 0.42, s * 0.15, Color("e07aa0"), s * 0.04, d.angle())
+	ci.draw_line(c - d * s * 0.5, c + d * s * 0.38, Color("e07aa0"), s * 0.05, true)
+
+
+static func mug(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
+	var body := Rect2(c + Vector2(-s * 0.26, -s * 0.12), Vector2(s * 0.46, s * 0.42))
+	ci.draw_arc(c + Vector2(s * 0.22, s * 0.08), s * 0.12, -PI * 0.5, PI * 0.5, 10, Color("c0392b"), s * 0.07, true)
+	rounded_rect(ci, body, s * 0.08, Color("e84a5f"))
+	ellipse(ci, c + Vector2(-s * 0.03, -s * 0.12), s * 0.23, s * 0.06, Color("7a4a26"))
+	for i in 2:
+		var x := c.x - s * 0.1 + i * s * 0.14
+		var pts := PackedVector2Array()
+		for k in 6:
+			pts.append(Vector2(x + sin(k * 1.3 + t * 4.0 + i) * s * 0.05, c.y - s * 0.2 - k * s * 0.06))
+		ci.draw_polyline(pts, Color(1, 1, 1, 0.8), s * 0.04, true)
+
+
+static func discoball(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
+	var r := s * 0.4
+	ci.draw_circle(c, r, Color("c9d2e3"))
+	for i in 5:
+		var y := -r + (i + 0.5) * r * 0.4
+		var half := sqrt(maxf(0.0, r * r - y * y))
+		ci.draw_line(c + Vector2(-half, y), c + Vector2(half, y), Color("8a93a8"), maxf(1.0, s * 0.02))
+	for i in 5:
+		var x := -r + (i + 0.5) * r * 0.4
+		ci.draw_line(c + Vector2(x, -sqrt(maxf(0.0, r * r - x * x))), c + Vector2(x, sqrt(maxf(0.0, r * r - x * x))), Color("8a93a8"), maxf(1.0, s * 0.02))
+	for i in 3:
+		var a := t * 2.0 + i * TAU / 3.0
+		ci.draw_circle(c + Vector2(cos(a), sin(a)) * r * 0.5, s * 0.06, Color.from_hsv(fmod(i / 3.0 + t * 0.2, 1.0), 0.6, 1.0))
+	ci.draw_arc(c, r, 0, TAU, 28, Color("6c7a89"), s * 0.04, true)
+
+
+static func flag(ci: CanvasItem, c: Vector2, s: float, lang: StringName) -> void:
+	var w := s * 0.9
+	var h := s * 0.6
+	var r := Rect2(c - Vector2(w, h) * 0.5, Vector2(w, h))
+	match lang:
+		&"de":
+			ci.draw_rect(Rect2(r.position, Vector2(w, h / 3.0)), Color("1a1a1a"))
+			ci.draw_rect(Rect2(r.position + Vector2(0, h / 3.0), Vector2(w, h / 3.0)), Color("dd0000"))
+			ci.draw_rect(Rect2(r.position + Vector2(0, h * 2.0 / 3.0), Vector2(w, h / 3.0)), Color("ffce00"))
+		&"el":
+			var sh := h / 9.0
+			for i in 9:
+				ci.draw_rect(Rect2(r.position + Vector2(0, i * sh), Vector2(w, sh)), Color("0d5eaf") if i % 2 == 0 else Color.WHITE)
+			var cs := sh * 5.0
+			ci.draw_rect(Rect2(r.position, Vector2(cs, cs)), Color("0d5eaf"))
+			ci.draw_rect(Rect2(r.position + Vector2(cs * 0.4, 0), Vector2(cs * 0.2, cs)), Color.WHITE)
+			ci.draw_rect(Rect2(r.position + Vector2(0, cs * 0.4), Vector2(cs, cs * 0.2)), Color.WHITE)
+		_:
+			var blue := Color("012169")
+			var red := Color("c8102e")
+			ci.draw_rect(r, blue)
+			_diag_band(ci, r, h * 0.2, Color.WHITE)
+			_diag_band(ci, r, h * 0.08, red)
+			ci.draw_rect(Rect2(r.position + Vector2(w * 0.5 - h * 0.17, 0), Vector2(h * 0.34, h)), Color.WHITE)
+			ci.draw_rect(Rect2(r.position + Vector2(0, h * 0.33), Vector2(w, h * 0.34)), Color.WHITE)
+			ci.draw_rect(Rect2(r.position + Vector2(w * 0.5 - h * 0.1, 0), Vector2(h * 0.2, h)), red)
+			ci.draw_rect(Rect2(r.position + Vector2(0, h * 0.4), Vector2(w, h * 0.2)), red)
+	ci.draw_rect(r, Color(0, 0, 0, 0.35), false, maxf(1.0, s * 0.03))
+
+
+static func _diag_band(ci: CanvasItem, r: Rect2, bw: float, col: Color) -> void:
+	var p := r.position
+	var e := r.end
+	ci.draw_colored_polygon(PackedVector2Array([p, p + Vector2(bw, 0), e - Vector2(0, bw), e, e - Vector2(bw, 0), p + Vector2(0, bw)]), col)
+	var q := Vector2(e.x, p.y)
+	var z := Vector2(p.x, e.y)
+	ci.draw_colored_polygon(PackedVector2Array([q, q + Vector2(0, bw), z + Vector2(bw, 0), z, z - Vector2(0, bw), q - Vector2(bw, 0)]), col)
+
+
+static func globe(ci: CanvasItem, c: Vector2, s: float) -> void:
+	ci.draw_circle(c, s * 0.42, Color("6cc3ef"))
+	ellipse(ci, c + Vector2(-s * 0.12, -s * 0.1), s * 0.16, s * 0.12, Color("5fc356"))
+	ellipse(ci, c + Vector2(s * 0.14, s * 0.12), s * 0.14, s * 0.1, Color("5fc356"))
+	ci.draw_arc(c, s * 0.42, 0, TAU, 28, Color("2f6f9f"), s * 0.05, true)

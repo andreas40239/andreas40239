@@ -4,7 +4,8 @@ extends Node2D
 ## sucht Monster in Reichweite, wählt per TargetStrategy ein Ziel und ruft apply_help() auf.
 
 const AURA_TICK := 0.25
-const SOUNDS := {&"bubble": &"bubble", &"cookie": &"cookie", &"wind": &"wind"}
+const SOUNDS := {&"bubble": &"bubble", &"cookie": &"cookie", &"wind": &"wind", &"battery": &"zap",
+	&"feather": &"flap", &"mug": &"cocoa"}
 
 var data: StationData
 var spot: BuildSpot
@@ -67,6 +68,8 @@ func make_effect(scale: float = 1.0) -> HelpEffect:
 	e.tag = data.effect_tag
 	e.slow_amount = data.slow_amount
 	e.slow_duration = data.slow_duration
+	if data.is_disco():
+		e.dance_duration = data.dance_duration * get_power()
 	return e
 
 
@@ -85,7 +88,9 @@ func _process(delta: float) -> void:
 	_t += delta
 	_activity = maxf(0.0, _activity - delta * 1.2)
 	_pop = maxf(0.0, _pop - delta * 2.5)
-	if data.is_aura:
+	if data.is_disco():
+		_process_disco(delta)
+	elif data.is_aura:
 		_process_aura(delta)
 	else:
 		_process_shooter(delta)
@@ -108,8 +113,32 @@ func _process_aura(delta: float) -> void:
 		_activity = 1.0
 		if _fx_timer <= 0.0 and _fx_root:
 			_fx_timer = 0.8
-			var kind: Fx.Kind = Fx.Kind.NOTES if data.effect_tag == &"music" else Fx.Kind.ZZZ
+			var kind: Fx.Kind = Fx.Kind.ZZZ
+			if data.effect_tag == &"music":
+				kind = Fx.Kind.NOTES
+			elif data.effect_tag == &"friends":
+				kind = Fx.Kind.HEARTS
 			Fx.spawn(_fx_root, kind, _fx_root.to_local(global_position + Vector2(0, -110)))
+
+
+## Disco: alle paar Sekunden ein Tanz-Impuls - Monster in Reichweite bleiben stehen und tanzen.
+func _process_disco(delta: float) -> void:
+	_cooldown -= delta
+	if _cooldown > 0.0:
+		return
+	var effect := make_effect()
+	var any := false
+	for m in monsters_in_range():
+		if m.start_dance(effect.dance_duration):
+			any = true
+	if any:
+		_cooldown = data.cooldown
+		_activity = 1.0
+		AudioManager.play(&"disco", 0.05, -4.0)
+		if _fx_root:
+			Fx.spawn(_fx_root, Fx.Kind.NOTES, _fx_root.to_local(global_position + Vector2(0, -150)))
+	else:
+		_cooldown = 0.0
 
 
 func _process_shooter(delta: float) -> void:
@@ -165,6 +194,8 @@ func _fire(target: Monster) -> void:
 		muzzle = Vector2(38, -100)
 	elif data.projectile == &"wind":
 		muzzle = Vector2(0, -92)
+	elif data.projectile in [&"battery", &"feather", &"mug"]:
+		muzzle = Vector2(0, -134)
 	p.position = _projectiles_root.to_local(global_position + muzzle)
 	p.setup(data.projectile, target, effect, _fx_root)
 	_projectiles_root.add_child(p)

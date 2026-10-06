@@ -20,22 +20,22 @@ func _ready() -> void:
 	center.add_theme_constant_override("separation", 0)
 	HUD._anchor(center, 0.5, 0.38, 0, 0)
 	add_child(center)
-	center.add_child(_title("Monster", 168, Color("ffa62b")))
-	center.add_child(_title("werden", 84, Color("a463f2")))
-	center.add_child(_title("Freunde", 168, Color("57c84d")))
+	center.add_child(_title(tr("Monster"), 168, Color("ffa62b")))
+	center.add_child(_title(tr("werden"), 84, Color("a463f2")))
+	center.add_child(_title(tr("Freunde"), 168, Color("57c84d")))
 	var ribbon := PanelContainer.new()
 	ribbon.add_theme_stylebox_override("panel", UiTheme.box(Color("b5764b"), Color("7a4a26"), 22, 4, 6, 26))
 	ribbon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var sub := Label.new()
-	sub.text = "Ein fröhliches Tower-Defense-Abenteuer"
+	sub.text = tr("Ein fröhliches Tower-Defense-Abenteuer")
 	sub.label_settings = UiTheme.label_settings(36, Color.WHITE, 8, Color("7a4a26"), true)
 	ribbon.add_child(sub)
 	center.add_child(ribbon)
 
-	var play := IconButton.make(&"play", UiTheme.GREEN, Vector2(460, 150), "Spielen", Color.WHITE, 60)
+	var play := IconButton.make(&"play", UiTheme.GREEN, Vector2(460, 150), tr("Spielen"), Color.WHITE, 60)
 	play.icon_size = 70
 	HUD._anchor(play, 0.5, 0.755, 0, 0)
-	play.pressed.connect(func() -> void: GameState.goto_screen(&"level_select"))
+	play.pressed.connect(func() -> void: GameState.goto_screen(&"world_select"))
 	add_child(play)
 
 	var gear := IconButton.make(&"gear", Color("7d8bb0"))
@@ -43,8 +43,25 @@ func _ready() -> void:
 	gear.pressed.connect(_open_settings)
 	add_child(gear)
 
+	# Sprachauswahl per Flagge (Deutsch, Englisch, Griechisch)
+	var langs := HBoxContainer.new()
+	langs.add_theme_constant_override("separation", 14)
+	HUD._anchor(langs, 0.0, 0.0, 28, 28)
+	add_child(langs)
+	for code in I18n.LANGUAGES:
+		var selected := I18n.current() == code
+		var b := IconButton.make(StringName("flag_" + code), Color("fff3b0") if selected else Color.WHITE, Vector2(124, 100))
+		b.icon_size = 86
+		if selected:
+			b.add_theme_stylebox_override("normal", UiTheme.box(Color("fff3b0"), UiTheme.ORANGE, 30, 6, 6, 20))
+		b.pressed.connect(func() -> void:
+			if I18n.current() != code:
+				I18n.set_language(code)
+				GameState.goto_screen(&"title"))
+		langs.add_child(b)
+
 	var info := Label.new()
-	info.text = "Keine Werbung · Keine Käufe · Ganz ohne Internet"
+	info.text = tr("Keine Werbung · Keine Käufe · Ganz ohne Internet")
 	info.label_settings = UiTheme.label_settings(24, Color(1, 1, 1, 0.95), 6, Color(0.2, 0.4, 0.6, 0.6))
 	HUD._anchor(info, 0.5, 1.0, 0, -18)
 	add_child(info)
@@ -80,21 +97,21 @@ func _open_settings() -> void:
 	v.add_theme_constant_override("separation", 22)
 	panel.add_child(v)
 	var t := Label.new()
-	t.text = "Einstellungen"
+	t.text = tr("Einstellungen")
 	t.label_settings = UiTheme.label_settings(58, UiTheme.BLUE, 12, Color.WHITE, true)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
 	v.add_child(SettingsWidgets.volume_sliders())
-	var reset := IconButton.make(&"retry", Color("e8e2d4"), Vector2(520, 104), "Fortschritt löschen", UiTheme.INK, 34)
+	var reset := IconButton.make(&"retry", Color("e8e2d4"), Vector2(520, 104), tr("Fortschritt löschen"), UiTheme.INK, 34)
 	reset.pressed.connect(func() -> void:
-		if reset.text == "Wirklich löschen?":
+		if reset.text == tr("Wirklich löschen?"):
 			SaveManager.reset_progress()
-			reset.text = "Gelöscht!"
+			reset.text = tr("Gelöscht!")
 		else:
-			reset.text = "Wirklich löschen?")
+			reset.text = tr("Wirklich löschen?"))
 	reset.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(reset)
-	var ok := IconButton.make(&"check", UiTheme.GREEN, Vector2(300, 110), "Fertig", Color.WHITE, 42)
+	var ok := IconButton.make(&"check", UiTheme.GREEN, Vector2(300, 110), tr("Fertig"), Color.WHITE, 42)
 	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	ok.pressed.connect(_close_settings)
 	v.add_child(ok)

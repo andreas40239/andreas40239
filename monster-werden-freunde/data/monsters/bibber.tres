@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MonsterData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/MonsterData.gd" id="1_j31cs"]
+
+[resource]
+script = ExtResource("1_j31cs")
+id = &"bibber"
+display_name = "Bibber"
+need_type = 7
+max_need = 110.0
+base_speed = 46.0
+chaos_value = 1
+reward = 30
+body_color = Color(0.623529, 0.847059, 0.960784, 1)
+size_scale = 1.02
+effect_resistances = {}
+friend_speed_mult = 1.6
+friend_flies = false
+description = "Friert ganz doll. Warmer Kakao hilft!"

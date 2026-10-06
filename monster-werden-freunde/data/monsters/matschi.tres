@@ -16,4 +16,6 @@ size_scale = 1.08
 effect_resistances = {
 &"slow": 0.5
 }
+friend_speed_mult = 1.6
+friend_flies = false
 description = "Ist ganz schmutzig. Seifenblasen helfen!"

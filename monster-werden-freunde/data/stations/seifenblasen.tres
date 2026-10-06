@@ -23,4 +23,5 @@ slow_duration = 0.0
 target_strategy = 2
 color = Color(0.486275, 0.784314, 0.941176, 1)
 projectile = &"bubble"
+dance_duration = 0.0
 description = "Macht schmutzige Monster sauber."

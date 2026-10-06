@@ -49,7 +49,11 @@ func _draw() -> void:
 	StationArt.draw_station(self, station_id, _t, 0.4 if active else 0.0, 1, &"", false)
 	draw_set_transform(Vector2.ZERO)
 	var f := UiTheme.get_bold()
-	draw_string(f, Vector2(0, 132 + down) + off, data.short_name, HORIZONTAL_ALIGNMENT_CENTER, size.x, 28, UiTheme.INK)
+	var title := tr("station|" + data.short_name)
+	var fs := 28
+	while fs > 18 and f.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > size.x - 20:
+		fs -= 2
+	draw_string(f, Vector2(0, 132 + down) + off, title, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, UiTheme.INK)
 	var cost_txt := str(data.cost)
 	var w := f.get_string_size(cost_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 30).x
 	var cx := size.x * 0.5 + 16.0

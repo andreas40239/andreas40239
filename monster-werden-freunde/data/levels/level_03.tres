@@ -28,7 +28,7 @@ highlight = ""
 
 [sub_resource type="Resource" id="Resource_n7jmt"]
 script = ExtResource("2_hij7b")
-text = "Neu: Mit  ▶▶  geht es schneller."
+text = "Neu: Der Knopf  >>  macht schneller."
 trigger = "time:8"
 highlight = "speed"
 
@@ -154,6 +154,8 @@ id = &"level_03"
 number = 3
 display_name = "Tröpflis Regentag"
 world_name = "Sonnental"
+world = 1
+theme = &"meadow"
 starting_currency = 340
 chaos_limit = 10
 path_points = PackedVector2Array(-60, 250, 620, 250, 620, 520, 220, 520, 220, 790, 1080, 790, 1080, 430, 1480, 430, 1480, 690, 1760, 690)

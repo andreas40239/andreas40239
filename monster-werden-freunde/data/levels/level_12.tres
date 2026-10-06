@@ -1,0 +1,156 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=24 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_lnfmo"]
+[ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_jknkd"]
+[ext_resource type="Script" path="res://scripts/data/WaveData.gd" id="3_iv01l"]
+[ext_resource type="Script" path="res://scripts/data/SpawnEntry.gd" id="4_642wf"]
+
+[sub_resource type="Resource" id="Resource_e1gd7"]
+script = ExtResource("2_jknkd")
+text = "Flocki ist einsam.
+Ein Schneemann wird sein Freund!"
+trigger = "station_built:schneemann"
+highlight = "card:schneemann"
+
+[sub_resource type="Resource" id="Resource_utf61"]
+script = ExtResource("2_jknkd")
+text = "Tippe auf  Los!"
+trigger = "wave_started"
+highlight = "start"
+
+[sub_resource type="Resource" id="Resource_snmft"]
+script = ExtResource("4_642wf")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 2.0
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_1chg2"]
+script = ExtResource("3_iv01l")
+entries = Array[ExtResource("4_642wf")]([SubResource("Resource_snmft")])
+
+[sub_resource type="Resource" id="Resource_4a6hi"]
+script = ExtResource("4_642wf")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_1iuy7"]
+script = ExtResource("4_642wf")
+monster_id = &"flocki"
+count = 3
+spawn_interval = 1.8
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_e10fq"]
+script = ExtResource("3_iv01l")
+entries = Array[ExtResource("4_642wf")]([SubResource("Resource_4a6hi"), SubResource("Resource_1iuy7")])
+
+[sub_resource type="Resource" id="Resource_6jrlw"]
+script = ExtResource("4_642wf")
+monster_id = &"schlummi"
+count = 3
+spawn_interval = 2.2
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_ieasl"]
+script = ExtResource("4_642wf")
+monster_id = &"matschi"
+count = 4
+spawn_interval = 1.6
+start_delay = 0.6
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_uw8ie"]
+script = ExtResource("3_iv01l")
+entries = Array[ExtResource("4_642wf")]([SubResource("Resource_6jrlw"), SubResource("Resource_ieasl")])
+
+[sub_resource type="Resource" id="Resource_8ugj0"]
+script = ExtResource("4_642wf")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.4
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_vjnwe"]
+script = ExtResource("4_642wf")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_gysdk"]
+script = ExtResource("4_642wf")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.5
+start_delay = 0.5
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_fh0f2"]
+script = ExtResource("3_iv01l")
+entries = Array[ExtResource("4_642wf")]([SubResource("Resource_8ugj0"), SubResource("Resource_vjnwe"), SubResource("Resource_gysdk")])
+
+[sub_resource type="Resource" id="Resource_vwkcx"]
+script = ExtResource("4_642wf")
+monster_id = &"schlummi"
+count = 3
+spawn_interval = 1.8
+start_delay = 0.0
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_tf6uo"]
+script = ExtResource("4_642wf")
+monster_id = &"flocki"
+count = 4
+spawn_interval = 1.2
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_o4yta"]
+script = ExtResource("4_642wf")
+monster_id = &"bibber"
+count = 4
+spawn_interval = 1.3
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_jkq6u"]
+script = ExtResource("4_642wf")
+monster_id = &"matschi"
+count = 3
+spawn_interval = 1.4
+start_delay = 0.4
+path_id = &"main"
+
+[sub_resource type="Resource" id="Resource_lg6wr"]
+script = ExtResource("3_iv01l")
+entries = Array[ExtResource("4_642wf")]([SubResource("Resource_vwkcx"), SubResource("Resource_tf6uo"), SubResource("Resource_o4yta"), SubResource("Resource_jkq6u")])
+
+[resource]
+script = ExtResource("1_lnfmo")
+id = &"level_12"
+number = 12
+display_name = "Flockis Schneemann"
+world_name = "Schnee und Berge"
+world = 3
+theme = &"snow"
+starting_currency = 600
+chaos_limit = 10
+path_points = PackedVector2Array(-60, 250, 350, 250, 350, 750, 700, 750, 700, 300, 1050, 300, 1050, 750, 1400, 750, 1400, 450, 1760, 450)
+build_spots = PackedVector2Array(250, 350, 450, 650, 600, 650, 800, 400, 950, 400, 1150, 650, 1300, 650, 1500, 550, 242, 500, 458, 500, 808, 525, 592, 525)
+waves = Array[ExtResource("3_iv01l")]([SubResource("Resource_1chg2"), SubResource("Resource_e10fq"), SubResource("Resource_uw8ie"), SubResource("Resource_fh0f2"), SubResource("Resource_lg6wr")])
+available_station_ids = Array[StringName]([&"seifenblasen", &"ruhe", &"kakao", &"schneemann"])
+new_monster_ids = Array[StringName]([&"flocki"])
+tutorial_steps = Array[ExtResource("2_jknkd")]([SubResource("Resource_e1gd7"), SubResource("Resource_utf61")])
+star_thresholds = Vector3i(0, 3, 9)
+wave_break = 9.0
+early_start = true
+decor_seed = 16044

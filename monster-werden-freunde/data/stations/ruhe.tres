@@ -23,4 +23,5 @@ slow_duration = 0.0
 target_strategy = 2
 color = Color(0.709804, 0.611765, 0.941176, 1)
 projectile = &""
+dance_duration = 0.0
 description = "Lässt müde Monster entspannen."
