@@ -42,7 +42,8 @@ Aufgabe gehen automatisch weiter, sobald sie erledigt ist.
 | 2 Finger (Pinch) | Zoomen |
 | Joystick (unten links) | Links/rechts: Ansicht drehen · hoch/runter: Blickwinkel kippen |
 | Leiste unten | Registerkarten mit Symbolen oben an der Leiste (Kurven · Berg und Tal · Spezial), darunter die Teile der Karte, dazu immer Gerade und Zurück |
-| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden, 🔊 Ton an/aus, 🏠 Startmenü |
+| Rechts | ▶ Fahren, ★ Demo-Strecke, 🗑 Neue Strecke, 💾 Speichern & Laden |
+| Oben rechts | Spieler-Tier, Sticker-Buch, 🔊 Ton an/aus, 🏠 Startmenü |
 
 Die Strecke startet an der Station. Führt man sie in Fahrtrichtung zurück in
 die Station, ist sie **geschlossen** und der Wagen fährt endlos Runden. Offene
@@ -57,21 +58,48 @@ Kreuzungen sind erlaubt, wenn mindestens eine Höhenstufe Abstand dazwischen ist
 | Steile Auffahrt | 2 Höhenstufen auf einer Zelle, mit Kettenlift |
 | Weite Kurve | 90°-Kurve mit 6 m Radius über 3 Zellen, 20° geneigt |
 | Korkenzieher | 2 Zellen lang, der Zug dreht sich einmal komplett um die Fahrtachse |
-| Booster | Abschuss mit ca. 3 g bis 80 km/h |
+| Booster | Abschuss mit ca. 3,5 g bis ca. 115 km/h |
 | Bremse | bremst auf ca. 22 km/h herunter |
 | Tunnel | nur auf Bodenhöhe, mehrere hintereinander ergeben einen langen Tunnel |
 | Wasser-Splash | nur auf Bodenhöhe, bremst kräftig, Wasserfontäne + Platschen |
 
-## Speichern & Laden
+## Spielerprofile, Speichern & Laden
 
-Das Disketten-Symbol öffnet das Menü mit **5 Speicherplätzen**. Jeder Platz zeigt
-ein Vorschaubild der Strecke, Datum und Uhrzeit der letzten Speicherung sowie
-Teile, Länge und ob die Strecke geschlossen ist. Überschreiben und Löschen
-müssen mit einem zweiten Tipp bestätigt werden. Gespeichert wird im
-App-Datenverzeichnis (`user://slots/slot_N.json` + `slot_N.png`); die Strecke
-wird dabei als Liste der Teiltypen abgelegt.
+Auf dem Startbildschirm wählt jedes Kind sein **Tier** (Fuchs, Bär, Hase, Katze,
+Frosch, Eule). Jedes Tier hat **eigene 5 Speicherplätze** und ein eigenes
+„Weiterbauen“ – so überschreibt niemand mehr versehentlich die Bahn eines anderen.
+Das gewählte Tier steht oben rechts im Spiel und im Speichermenü.
+
+Jeder Platz zeigt Vorschaubild, Datum/Uhrzeit, Teile, Länge, Status und die
+verdienten Sticker. Überschreiben und Löschen brauchen einen zweiten Tipp – und
+**die vorherige Version wird immer gesichert**: Der gebogene Pfeil holt sie zurück
+(nochmal tippen tauscht wieder). Gespeichert wird im App-Datenverzeichnis unter
+`user://profiles/<tier>/`. Spielstände aus älteren Versionen landen beim ersten
+Start automatisch beim Fuchs.
 
 ![Speichern & Laden](docs/speichern.png)
+
+## Sticker
+
+Jede Bahn sammelt eigene Sticker – sie werden mit der Bahn gespeichert und beim
+Verdienen groß eingeblendet. Das Sticker-Buch (Symbol oben rechts) zeigt
+verdiente Sticker farbig und fehlende als graue Silhouette.
+
+| Sticker | Bedingung |
+|---|---|
+| Ticket | erste Fahrt |
+| Pfeil im Kreis | eine ganze Runde / 5 Runden am Stück |
+| Tacho mit 1 / 2 / 3 Sternen | 50 / 80 / 100 km/h |
+| Looping, Korkenzieher, Rakete, Wasser, Tunnel | das Teil vorwärts komplett durchfahren |
+| Berg mit Fahne | höher als 15 m |
+| Hüpfende Figur | Schwerelos (Airtime: spürbare Beschleunigung < 0,3 g) |
+| Schnecke | rückwärts gerollt |
+
+**100 km/h** sind erreichbar: Lifte gehen jetzt bis 24 m (12 Höhenstufen), Booster
+schießen bis ca. 115 km/h. Ein hoher Drop plus zwei Booster schafft es sicher.
+Die Tempoanzeige zeigt während der Fahrt zusätzlich die G-Kraft.
+
+![Sticker-Buch](docs/sticker.png)
 
 ## Sounds
 
@@ -108,7 +136,7 @@ Ehrlich – ohne versteckte Hilfen:
   - **Station:** Antriebsreifen bremsen/schieben auf 4 m/s (fangen auch einen
     zurückrollenden Zug auf)
   - **Kettenlift** (Hoch, Steil hoch): 3 m/s mit Rücklaufsperre, solange ein Wagen daran hängt
-  - **Booster:** Abschuss mit ca. 3 g bis 80 km/h
+  - **Booster:** Abschuss mit ca. 3,5 g bis ca. 115 km/h
 - Bremse und Splash bremsen in beide Fahrtrichtungen
 - Offene Strecken enden an einem Prellbock
 - Kommt der Zug ohne Antrieb 6 Sekunden lang nicht mehr voran (steht oder pendelt
@@ -128,7 +156,10 @@ tests/screenshots.gd   Rendert Kontroll-Screenshots
 icons/*.svg            Button-Icons (Platzhalter, leicht austauschbar)
 sounds/*.wav           Soundeffekte (Platzhalter, *_loop.wav laufen als Schleife)
 scripts/sfx.gd         Sound-Wiedergabe (Einzel-Sounds + tempoabhängige Fahrgeräusche)
-scripts/save_slots.gd  Speicherplätze (JSON + Vorschaubild)
+scripts/save_slots.gd  Profile, Speicherplätze, Sicherung, Autosave
+scripts/stickers.gd    Sticker: Bedingungen, Sticker-Buch, Belohnung
+stickers/*.svg         Sticker-Abzeichen
+tools/make_badges.py   Erzeugt Sticker und Tier-Symbole
 scripts/save_menu.gd   Speichern/Laden-Menü
 scripts/title_screen.gd Startbildschirm
 scripts/tutorial.gd    Interaktives Tutorial

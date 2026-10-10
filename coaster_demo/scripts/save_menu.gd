@@ -13,6 +13,7 @@ const CARD_W := 210.0
 var _cards: Array[Dictionary] = []
 var _pending := {}          # {"slot": int, "action": String}
 var _hint: Label
+var _profile_icon: TextureRect
 var _make_button: Callable  # (icon, tooltip, callback, size) -> Button
 
 
@@ -45,7 +46,11 @@ func setup(make_button: Callable) -> void:
 
 	var header := HBoxContainer.new()
 	col.add_child(header)
-	var title := _label("Speichern & Laden", 28)
+	_profile_icon = TextureRect.new()
+	_profile_icon.custom_minimum_size = Vector2(56, 56)
+	_profile_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	header.add_child(_profile_icon)
+	var title := _label("  Speichern & Laden", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	header.add_child(_make_button.call("close", "Schließen", close, 56.0))
@@ -109,15 +114,23 @@ func _build_card(i: int) -> Control:
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	var b_save: Button = _make_button.call("save", "Speichern", _on_save.bind(i), 62.0)
-	var b_load: Button = _make_button.call("load", "Laden", _on_load.bind(i), 62.0)
-	var b_del: Button = _make_button.call("new", "Löschen", _on_delete.bind(i), 62.0)
-	for b in [b_save, b_load, b_del]:
+	var b_save: Button = _make_button.call("save", "Speichern", _on_save.bind(i), 48.0)
+	var b_load: Button = _make_button.call("load", "Laden", _on_load.bind(i), 48.0)
+	var b_back: Button = _make_button.call("undo", "Vorherige Version zurückholen", _on_restore.bind(i), 48.0)
+	var b_del: Button = _make_button.call("new", "Löschen", _on_delete.bind(i), 48.0)
+	for b in [b_save, b_load, b_back, b_del]:
+		b.add_theme_constant_override("icon_max_width", 30)
 		buttons.add_child(b)
 	v.add_child(buttons)
+	var badges := HFlowContainer.new()
+	badges.custom_minimum_size = Vector2(CARD_W, 22)
+	badges.add_theme_constant_override("h_separation", 2)
+	badges.add_theme_constant_override("v_separation", 2)
+	v.add_child(badges)
+	v.move_child(badges, v.get_child_count() - 2)   # Sticker über den Knöpfen
 	_cards.append({
-		"thumb": thumb, "empty": empty, "date": date, "info": info,
-		"save": b_save, "load": b_load, "del": b_del,
+		"thumb": thumb, "empty": empty, "date": date, "info": info, "badges": badges,
+		"save": b_save, "load": b_load, "back": b_back, "del": b_del,
 	})
 	return card
 
@@ -153,6 +166,15 @@ func refresh() -> void:
 			c.info.text = ""
 		c.load.disabled = not used
 		c.del.disabled = not used
+		c.back.disabled = not SaveSlots.has_backup(i)
+		for b in c.badges.get_children():
+			b.queue_free()
+		for id in (data.get("stickers", []) if used else []):
+			var t := TextureRect.new()
+			t.texture = Stickers.texture(id)
+			t.custom_minimum_size = Vector2(20, 20)
+			t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			c.badges.add_child(t)
 		_mark(c.save, false)
 		_mark(c.del, false)
 
@@ -195,10 +217,22 @@ func _on_load(slot: int) -> void:
 	load_requested.emit(slot)
 
 
+func set_profile_icon(tex: Texture2D) -> void:
+	_profile_icon.texture = tex
+
+
+func _on_restore(slot: int) -> void:
+	_pending = {}
+	if SaveSlots.restore_backup(slot):
+		refresh()
+		_hint.text = "Vorherige Version von Platz %d zurückgeholt (nochmal tippen tauscht zurück)" % (slot + 1)
+		clicked.emit()
+
+
 func _on_delete(slot: int) -> void:
 	if not _confirm(slot, "delete", "Nochmal tippen, um Platz %d zu löschen" % (slot + 1), _cards[slot].del):
 		return
 	SaveSlots.erase(slot)
 	refresh()
-	_hint.text = "Platz %d gelöscht" % (slot + 1)
+	_hint.text = "Platz %d gelöscht – mit dem Pfeil holst du ihn zurück" % (slot + 1)
 	clicked.emit()

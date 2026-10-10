@@ -4,6 +4,9 @@ extends Node3D
 const P := CoasterTrack.Piece
 const G := 9.81
 const ROLL_FRICTION := 0.08     # Rollreibung in m/s²
+const AIR_DRAG := 0.0025        # Luftwiderstand: a = k · v²
+const BOOST_SPEED := 32.0       # Booster beschleunigen bis ~115 km/h
+const BOOST_ACCEL := 35.0       # ~3,5 g
 const TAP_MAX_MOVE := 24.0
 const TAP_MAX_MS := 450
 const SKY_COLOR := Color(0.62, 0.8, 0.96)
@@ -36,6 +39,20 @@ var tutorial: Tutorial
 var ride_btn: Button
 var undo_btn: Button
 var save_btn: Button
+var stickers: Stickers
+var top_bar: HBoxContainer
+var profile_icon: TextureRect
+var track_stickers: Array = []   # Sticker der aktuellen Bahn (werden mit ihr gespeichert)
+# Fahrtdaten für Sticker
+var _ride_types := {}
+var _max_height := 0.0
+var _had_airtime := false
+var _air_time := 0.0
+var _g_smooth := 1.0
+var ride_g := 1.0
+var _prev_pos := Vector3.INF
+var _prev_vel := Vector3.ZERO
+var _sticker_timer := 0.0
 signal category_changed(ci: int)
 signal piece_built(type: int)
 signal ride_started
@@ -101,6 +118,7 @@ var loop_entry_v := 0.0         # Tempo bei der letzten Looping-Einfahrt
 
 
 func _ready() -> void:
+	_load_profile()
 	sfx = Sfx.new()
 	add_child(sfx)
 	_setup_world()
@@ -404,8 +422,8 @@ func _setup_ui() -> void:
 	action_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	action_bar.grow_vertical = Control.GROW_DIRECTION_BOTH
 	action_bar.offset_right = -16
-	action_bar.offset_top = -30
-	action_bar.offset_bottom = -30
+	action_bar.offset_top = -10
+	action_bar.offset_bottom = -10
 	ride_btn = _make_button("play", "Fahren", _start_ride, 96)
 	var ride_style := StyleBoxFlat.new()
 	ride_style.bg_color = Color(0.45, 0.9, 0.5, 0.95)
@@ -419,13 +437,30 @@ func _setup_ui() -> void:
 	ride_btn.add_theme_stylebox_override("hover", ride_hover)
 	ride_btn.add_theme_stylebox_override("pressed", ride_hover)
 	action_bar.add_child(ride_btn)
-	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound)
 	save_btn = _make_button("save", "Speichern & Laden", _open_save_menu)
 	for b in [_make_button("demo", "Demo-Strecke", _on_demo), _make_button("new", "Neue Strecke", _on_new),
-			save_btn, sound_btn, _make_button("home", "Startmenü", _on_home)]:
+			save_btn]:
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		action_bar.add_child(b)
 	ui_root.add_child(action_bar)
+
+	# Leiste oben rechts: Spieler-Tier, Sticker-Buch, Ton, Startmenü
+	top_bar = HBoxContainer.new()
+	top_bar.add_theme_constant_override("separation", 8)
+	top_bar.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	top_bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	top_bar.offset_right = -16
+	top_bar.offset_top = 40
+	profile_icon = TextureRect.new()
+	profile_icon.custom_minimum_size = Vector2(64, 64)
+	profile_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	profile_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	top_bar.add_child(profile_icon)
+	sound_btn = _make_button("sound_off" if sfx.muted else "sound_on", "Ton an/aus", _on_toggle_sound, 64.0)
+	for b in [_make_button("stickers", "Sticker dieser Bahn", _open_stickers, 64.0), sound_btn,
+			_make_button("home", "Startmenü", _on_home, 64.0)]:
+		top_bar.add_child(b)
+	ui_root.add_child(top_bar)
 
 	fps_label = Label.new()
 	fps_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -469,6 +504,12 @@ func _setup_ui() -> void:
 	title.load_pressed.connect(_leave_title.bind("load"))
 	title.demo_pressed.connect(_leave_title.bind("demo"))
 	title.tutorial_pressed.connect(_leave_title.bind("tutorial"))
+	title.profile_selected.connect(_on_profile_selected)
+
+	stickers = Stickers.new()
+	ui_root.add_child(stickers)
+	stickers.setup(_make_button)
+	stickers.closed.connect(_on_stickers_closed)
 
 	tutorial = Tutorial.new()
 	ui_root.add_child(tutorial)
@@ -544,9 +585,9 @@ func _show_toast(msg: String, secs := 2.5) -> void:
 
 
 func _is_over_ui(pos: Vector2) -> bool:
-	if save_menu.visible or in_title or tutorial.is_over_card(pos):
+	if save_menu.visible or in_title or tutorial.is_over_card(pos) or stickers.is_book_open():
 		return true
-	for c in [build_bar, action_bar, ride_bar, joystick]:
+	for c in [build_bar, action_bar, ride_bar, joystick, top_bar]:
 		if c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
 	return false
@@ -588,12 +629,14 @@ func _on_undo() -> void:
 
 func _on_demo() -> void:
 	track.build_demo()
+	track_stickers = []
 	_show_toast("Demo-Strecke gebaut – FAHREN drücken")
 	sfx.play("closed", -2.0, 1.0, 0.0)
 
 
 func _on_new() -> void:
 	track.reset()
+	track_stickers = []
 	_show_toast("Neue Strecke")
 	sfx.play("undo", 0.0, 0.8)
 
@@ -618,8 +661,9 @@ func _enter_title() -> void:
 	_write_autosave()
 	tutorial.stop()
 	in_title = true
-	for c in [build_bar, action_bar, ride_bar, joystick, status_label, help_label, speed_label, toast_label]:
+	for c in [build_bar, action_bar, ride_bar, joystick, status_label, help_label, speed_label, toast_label, top_bar]:
 		c.visible = false
+	stickers.close_book()
 	_touches.clear()
 	_tap_valid = false
 	track.build_demo()
@@ -632,7 +676,7 @@ func _enter_title() -> void:
 	rig.zoom_by(1.0)
 	rig.cam.h_offset = -rig.zoom * 0.3   # Strecke rechts neben dem Menü zeigen
 	rig.make_current()
-	title.continue_button.disabled = SaveSlots.read_autosave().is_empty()
+	_refresh_profile()
 	title.show_animated()
 
 
@@ -643,12 +687,15 @@ func _leave_title(action: String) -> void:
 	in_title = false
 	title.hide_animated()
 	rig.cam.h_offset = 0.0
-	for c in [build_bar, action_bar, joystick, status_label, help_label]:
+	for c in [build_bar, action_bar, joystick, status_label, help_label, top_bar]:
 		c.visible = true
 	ride_v = 0.0
+	track_stickers = []
 	match action:
 		"continue":
-			track.load_types(SaveSlots.read_autosave())
+			var auto := SaveSlots.read_autosave()
+			track.load_types(auto.get("pieces", []))
+			track_stickers = auto.get("stickers", []).duplicate()
 			_show_toast("Weiter geht's!")
 		"new":
 			track.reset()
@@ -746,7 +793,105 @@ func _on_home() -> void:
 func _write_autosave() -> void:
 	_autosave_timer = -1.0
 	if not in_title and track != null:
-		SaveSlots.write_autosave(track.get_types())
+		SaveSlots.write_autosave(track.get_types(), track_stickers)
+
+
+# ------------------------------------------------------- Profile & Sticker ---
+
+func _load_profile() -> void:
+	SaveSlots.migrate_legacy()
+	var cfg := ConfigFile.new()
+	if cfg.load(Sfx.SETTINGS_PATH) == OK:
+		SaveSlots.profile = cfg.get_value("player", "profile", SaveSlots.PROFILES[0][0])
+
+
+func _on_profile_selected(id: String) -> void:
+	SaveSlots.profile = id
+	var cfg := ConfigFile.new()
+	cfg.load(Sfx.SETTINGS_PATH)
+	cfg.set_value("player", "profile", id)
+	cfg.save(Sfx.SETTINGS_PATH)
+	sfx.play("click", 0.0, 1.2)
+	_refresh_profile()
+
+
+func _refresh_profile() -> void:
+	var icon: Texture2D = load("res://icons/%s.svg" % SaveSlots.profile_icon(SaveSlots.profile))
+	profile_icon.texture = icon
+	title.set_profile(SaveSlots.profile)
+	title.continue_button.disabled = SaveSlots.read_autosave().get("pieces", []).is_empty()
+	save_menu.set_profile_icon(icon)
+
+
+func _on_stickers_closed() -> void:
+	joystick.visible = true
+	sfx.play("click")
+
+
+func _open_stickers() -> void:
+	sfx.play("click")
+	joystick.visible = false
+	_touches.clear()
+	_tap_valid = false
+	stickers.open_book(track_stickers)
+
+
+## Pro Frame während der Fahrt: Physik, Zug, G-Kraft, Sticker.
+func _ride_step(delta: float) -> void:
+	_physics_ride(delta)
+	_place_cart(ride_s)
+	_update_g(delta)
+	_sticker_timer -= delta
+	if _sticker_timer <= 0.0:
+		_sticker_timer = 0.3
+		_award_stickers()
+
+
+## Spürbare vertikale Beschleunigung (in g) im ersten Wagen, aus der Bewegung geschätzt.
+func _update_g(delta: float) -> void:
+	if delta <= 0.0:
+		return
+	var pos := cart.global_position
+	if _prev_pos == Vector3.INF:
+		_prev_pos = pos
+		return
+	var vel := (pos - _prev_pos) / delta
+	var acc := (vel - _prev_vel) / delta
+	_prev_pos = pos
+	var first := _prev_vel == Vector3.ZERO
+	_prev_vel = vel
+	if first:
+		return
+	var g_up := (acc + Vector3(0, G, 0)).dot(cart.global_basis.y) / G
+	_g_smooth = lerpf(_g_smooth, clampf(g_up, -3.0, 7.0), 1.0 - exp(-6.0 * delta))
+	ride_g = _g_smooth
+	if _g_smooth < 0.3 and absf(ride_v) > 4.0:
+		_air_time += delta
+		if _air_time > 0.2:
+			_had_airtime = true
+	else:
+		_air_time = 0.0
+
+
+func _ride_stats() -> Dictionary:
+	return {
+		"max_kmh": ride_max_v * 3.6, "laps": ride_laps, "types": _ride_types.keys(),
+		"max_height": _max_height, "airtime": _had_airtime, "backwards": _rollback_warned,
+	}
+
+
+func _award_stickers() -> void:
+	if in_title:
+		return
+	var fresh: Array = []
+	for id in Stickers.earned(_ride_stats()):
+		if not id in track_stickers:
+			track_stickers.append(id)
+			fresh.append(id)
+	if not fresh.is_empty():
+		stickers.celebrate(fresh)
+		sfx.play("closed", -3.0, 1.2, 0.0)
+		_autosave_timer = 1.0
 
 
 func _notification(what: int) -> void:
@@ -755,7 +900,9 @@ func _notification(what: int) -> void:
 			_write_autosave()
 		NOTIFICATION_WM_GO_BACK_REQUEST:
 			# Android-Zurück: Menü schließen → Fahrt beenden → Startbildschirm → App beenden
-			if save_menu.visible:
+			if stickers.is_book_open():
+				stickers.close_book()
+			elif save_menu.visible:
 				save_menu.close()
 			elif riding:
 				_stop_ride()
@@ -784,7 +931,7 @@ func _on_save_menu_closed() -> void:
 
 func _on_save_slot(slot: int) -> void:
 	var thumb := await _capture_thumbnail()
-	SaveSlots.write(slot, track.get_types(), track.length, track.closed, thumb)
+	SaveSlots.write(slot, track.get_types(), track.length, track.closed, thumb, track_stickers)
 	save_menu.refresh()
 	sfx.play("save", 0.0, 1.0, 0.0)
 
@@ -794,6 +941,7 @@ func _on_load_slot(slot: int) -> void:
 	if data.is_empty():
 		return
 	var ok := track.load_types(data.pieces)
+	track_stickers = data.get("stickers", []).duplicate()
 	save_menu.close()
 	sfx.play("load", 0.0, 1.0, 0.0)
 	_show_toast("Platz %d geladen" % (slot + 1) if ok else "Platz %d nur teilweise geladen" % (slot + 1))
@@ -1015,6 +1163,14 @@ func _start_ride() -> void:
 	_ride_piece = -1
 	_stuck_time = 0.0
 	_best_s = ride_s
+	_ride_types = {}
+	_max_height = 0.0
+	_had_airtime = false
+	_air_time = 0.0
+	_g_smooth = 1.0
+	_prev_pos = Vector3.INF
+	_prev_vel = Vector3.ZERO
+	_sticker_timer = 0.5
 	_rollback_warned = false
 	build_bar.visible = false
 	action_bar.visible = false
@@ -1105,7 +1261,7 @@ func _physics_ride(dt: float) -> void:
 		var probe := train.probe(track, ride_s)
 		var a: float = -G * probe.slope                     # Hangabtrieb, gemittelt über den Zug
 		var dir := signf(ride_v)
-		a -= dir * (0.004 * ride_v * ride_v + ROLL_FRICTION)  # Luftwiderstand + Rollreibung
+		a -= dir * (AIR_DRAG * ride_v * ride_v + ROLL_FRICTION)  # Luftwiderstand + Rollreibung
 		var nv := ride_v + a * h
 		if dir != 0.0 and signf(nv) != dir and absf(G * probe.slope) < ROLL_FRICTION:
 			nv = 0.0   # Reibung hält den Zug auf fast ebener Strecke an, statt ihn umzudrehen
@@ -1117,7 +1273,7 @@ func _physics_ride(dt: float) -> void:
 			P.BOOSTER:
 				if entered and ride_v > -1.0:
 					sfx.play("boost", 0.0, 1.0, 0.03)
-				ride_v = move_toward(ride_v, maxf(ride_v, 22.0), 30.0 * h)  # Abschuss (~3 g) bis 80 km/h
+				ride_v = move_toward(ride_v, maxf(ride_v, BOOST_SPEED), BOOST_ACCEL * h)  # Abschuss
 			P.BRAKE:
 				if entered and absf(ride_v) > 8.0:
 					sfx.play("brake", -2.0)
@@ -1142,6 +1298,9 @@ func _physics_ride(dt: float) -> void:
 		if piece.type == P.STATION and _ride_piece >= 0 and not in_title \
 				and track.pieces[_ride_piece].type != P.STATION and ride_v > 5.0:
 			sfx.play("brake", -2.0)
+		if smp.piece != _ride_piece and _ride_piece >= 0 and ride_v > 0.0:
+			_ride_types[track.pieces[_ride_piece].type] = true   # Teil vorwärts komplett durchfahren
+		_max_height = maxf(_max_height, smp.pos.y)
 		_ride_piece = smp.piece
 		var prev_s := ride_s
 		ride_s += ride_v * h
@@ -1252,8 +1411,7 @@ func _process(delta: float) -> void:
 
 	var j := joystick.output
 	if riding:
-		_physics_ride(delta)
-		_place_cart(ride_s)
+		_ride_step(delta)
 		if j != Vector2.ZERO:
 			_look.x = clampf(_look.x - j.x * 120.0 * delta, -150, 150)
 			_look.y = clampf(_look.y - j.y * 80.0 * delta, -70, 60)
@@ -1263,8 +1421,8 @@ func _process(delta: float) -> void:
 		_update_ride_cam(delta)
 		var on_chain: bool = ride_v < 3.3 and train.probe(track, ride_s).on_lift
 		sfx.update_ride(absf(ride_v), on_chain, delta)
-		speed_label.text = "%d km/h%s\nRunden: %d" % [int(absf(ride_v) * 3.6),
-			"  (rückwärts)" if ride_v < -0.3 else "", ride_laps]
+		speed_label.text = "%d km/h%s   %.1f g\nRunden: %d" % [int(absf(ride_v) * 3.6),
+			"  (rückwärts)" if ride_v < -0.3 else "", ride_g, ride_laps]
 		if _ride_end_timer >= 0.0:
 			_ride_end_timer -= delta
 			if _ride_end_timer < 0.0:

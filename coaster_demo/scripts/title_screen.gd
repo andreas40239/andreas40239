@@ -8,8 +8,10 @@ signal load_pressed
 signal demo_pressed
 signal tutorial_pressed
 signal sound_pressed
+signal profile_selected(id: String)
 
 var continue_button: Button
+var _profile_buttons := {}
 var sound_button: Button
 var _panel: PanelContainer
 
@@ -40,6 +42,8 @@ func setup(can_continue: bool, muted: bool) -> void:
 	style.set_corner_radius_all(22)
 	style.set_content_margin_all(28)
 	_panel.add_theme_stylebox_override("panel", style)
+	style.content_margin_top = 20
+	style.content_margin_bottom = 20
 	_panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_panel.offset_left = 48
@@ -65,9 +69,21 @@ func setup(can_continue: bool, muted: bool) -> void:
 	titles.add_child(_label("COASTER DEMO", 50, Color(1, 1, 1)))
 	titles.add_child(_label("Achterbahn bauen – und selbst fahren", 19, Color(0.75, 0.85, 0.95)))
 
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 10)
-	col.add_child(spacer)
+	# Wer spielt? – Tier wählen (eigene Speicherplätze pro Tier)
+	var who := HBoxContainer.new()
+	who.add_theme_constant_override("separation", 6)
+	who.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(who)
+	for p in SaveSlots.PROFILES:
+		var b := Button.new()
+		b.icon = load("res://icons/%s.svg" % p[1])
+		b.expand_icon = true
+		b.tooltip_text = p[2]
+		b.custom_minimum_size = Vector2(62, 62)
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(profile_selected.emit.bind(p[0]))
+		who.add_child(b)
+		_profile_buttons[p[0]] = b
 
 	continue_button = _menu_button("continue", "Weiterbauen", continue_pressed, true)
 	continue_button.disabled = not can_continue
@@ -95,6 +111,24 @@ func setup(can_continue: bool, muted: bool) -> void:
 	set_muted(muted)
 
 
+## Markiert das gewählte Tier mit einem dicken Ring.
+func set_profile(id: String) -> void:
+	for pid in _profile_buttons:
+		var b: Button = _profile_buttons[pid]
+		var st := StyleBoxFlat.new()
+		st.set_corner_radius_all(31)
+		st.set_content_margin_all(6)
+		if pid == id:
+			st.bg_color = Color(1, 1, 1, 0.95)
+			st.border_color = Color(0.3, 0.72, 0.38)
+			st.set_border_width_all(5)
+		else:
+			st.bg_color = Color(0.3, 0.32, 0.36, 0.7)
+		for state in ["normal", "hover", "pressed"]:
+			b.add_theme_stylebox_override(state, st)
+		b.modulate = Color(1, 1, 1) if pid == id else Color(1, 1, 1, 0.6)
+
+
 func set_muted(muted: bool) -> void:
 	sound_button.icon = load("res://icons/%s.svg" % ("sound_off" if muted else "sound_on"))
 
@@ -112,7 +146,7 @@ func _menu_button(icon_name: String, text: String, sig: Signal, primary := false
 	b.text = "  " + text
 	b.icon = load("res://icons/%s.svg" % icon_name)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.custom_minimum_size = Vector2(400, 60)
+	b.custom_minimum_size = Vector2(400, 54)
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_size_override("font_size", 26)
 	b.add_theme_constant_override("icon_max_width", 34)

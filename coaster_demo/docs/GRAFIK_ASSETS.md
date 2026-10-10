@@ -248,6 +248,31 @@ Prompt als Vorlage für KI-Generatoren.
 | `close.svg` | Schließen |
 | `continue.svg`, `plus.svg`, `help.svg` | Startbildschirm: Weiterbauen / Neue Strecke / Tutorial |
 
+#### 4.5.1a Tier-Symbole (Spielerprofile) – `icons/animal_*.svg`
+- Fuchs, Bär, Hase, Katze, Frosch, Eule (`animal_fox`, `animal_bear`, `animal_rabbit`,
+  `animal_cat`, `animal_frog`, `animal_owl`).
+- Freundliche Tiergesichter frontal, 96 × 96, kräftige Farben, auch klein (≈ 50 px) eindeutig.
+- **Prompt:** *“Set of 6 cute flat animal face icons (fox, bear, rabbit, cat, frog, owl) for a kids game profile picker, front view, bold simple shapes, no text, transparent background.”*
+
+#### 4.5.1b Sticker – `stickers/*.svg`
+- Runde Abzeichen, 128 × 128, farbiger Kreis mit weißem Rand und weißem Symbol, **ohne Text**
+  (für Kinder, die noch nicht lesen). Fehlende Sticker werden im Spiel grau eingefärbt.
+
+| Datei | Motiv |
+|---|---|
+| `ride` | Eintrittskarte |
+| `lap`, `laps5` | Kreispfeil; mit 5 Punkten |
+| `speed50`, `speed80`, `speed100` | Tacho mit 1/2/3 Sternen (Bronze/Silber/Gold) |
+| `loop`, `corkscrew` | Looping, Korkenzieher |
+| `booster` | Rakete |
+| `splash` | Wasserspritzer |
+| `tunnel` | Tunnelportal |
+| `high` | Berg mit Fahne |
+| `airtime` | schwebende Figur über dem Boden |
+| `backwards` | Schnecke mit Rückwärtspfeil |
+
+- **Prompt:** *“Set of 14 round cartoon achievement stickers for a kids roller coaster game, each a colored circle with white border and a simple white symbol (ticket, circular arrow, speedometer with 1-3 stars in bronze/silver/gold, loop, corkscrew, rocket, water splash, tunnel, mountain with flag, floating figure, snail), no text.”*
+
 #### 4.5.2 App-Icon – `icon.svg` bzw. PNGs
 - `icon.svg` 128 × 128 (wird im Spiel als Logo verwendet).
 - Android: `icon_512.png` (512 × 512), adaptives Icon `icon_foreground.png` und

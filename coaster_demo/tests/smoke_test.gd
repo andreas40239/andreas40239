@@ -13,6 +13,13 @@ func check(cond: bool, msg: String) -> void:
 		fails += 1
 
 
+func ints(a: Array) -> Array:
+	var out := []
+	for x in a:
+		out.append(int(x))
+	return out
+
+
 func check_silent(cond: bool, msg: String) -> void:
 	if not cond:
 		check(false, msg)
@@ -102,13 +109,22 @@ func _initialize() -> void:
 	track.build_demo()
 	check(track.closed, "Demo-Strecke geschlossen (%d Teile, %.1f m)" % [track.pieces.size(), track.length])
 
+	main.track_stickers = []
 	main._start_ride()
 	var t := 0.0
+	var g_min := 9.0
+	var g_max := -9.0
 	while t < 40.0:
-		main._physics_ride(1.0 / 60.0)
-		main._place_cart(main.ride_s)
+		main._ride_step(1.0 / 60.0)
+		if t > 1.0:
+			g_min = minf(g_min, main.ride_g)
+			g_max = maxf(g_max, main.ride_g)
 		t += 1.0 / 60.0
-	print("  info max %.1f km/h, Runden %d, Looping-Einfahrt %.1f km/h" % [main.ride_max_v * 3.6, main.ride_laps, main.loop_entry_v * 3.6])
+	print("  info max %.1f km/h, Runden %d, Looping-Einfahrt %.1f km/h, g %.1f..%.1f, Sticker %s" % [
+		main.ride_max_v * 3.6, main.ride_laps, main.loop_entry_v * 3.6, g_min, g_max, main.track_stickers])
+	for id in ["ride", "lap", "loop", "corkscrew", "booster", "splash", "tunnel", "speed50"]:
+		check(id in main.track_stickers, "Demo-Fahrt gibt Sticker '%s'" % id)
+	check(g_max > 2.0 and g_max < 7.0, "G-Kraft plausibel (max %.1f g)" % g_max)
 	check(main.ride_laps >= 1, "Wagen fährt Runden")
 	check(not main._loop_warned, "Demo: genug Tempo für den Looping")
 	check(main.ride_max_v * 3.6 > 30.0, "Wagen wird schnell genug")
@@ -169,8 +185,50 @@ func _initialize() -> void:
 	check(track.closed and track.get_types() == types, "Platz 5 geladen, Strecke identisch")
 	check(not main.save_menu.visible, "Menü nach dem Laden zu")
 	check(not track.load_types([99]), "ungültige Daten werden abgelehnt")
+	check(data.get("stickers", []).size() == main.track_stickers.size(), "Sticker werden mitgespeichert")
 	SaveSlots.erase(4)
 	check(SaveSlots.read(4).is_empty(), "Platz gelöscht")
+	check(SaveSlots.restore_backup(4) and ints(SaveSlots.read(4).get("pieces", [])) == ints(types), "Gelöschter Platz zurückgeholt")
+
+	# Sicherung beim Überschreiben
+	track.reset()
+	track.place(CoasterTrack.Piece.UP)
+	await main._on_save_slot(4)                      # überschreibt die Demo-Strecke
+	check(SaveSlots.read(4).pieces.size() == 1, "Platz überschrieben")
+	check(SaveSlots.has_backup(4), "alte Version liegt in der Sicherung")
+	SaveSlots.restore_backup(4)
+	check(ints(SaveSlots.read(4).pieces) == ints(types), "Rückgängig holt die alte Strecke zurück")
+	SaveSlots.restore_backup(4)
+	check(SaveSlots.read(4).pieces.size() == 1, "nochmal tippen tauscht zurück")
+
+	# Profile: jedes Tier hat eigene Plätze
+	main._on_profile_selected("frog")
+	check(SaveSlots.read(4).is_empty(), "Frosch sieht die Plätze des Fuchses nicht")
+	await main._on_save_slot(4)
+	main._on_profile_selected("fox")
+	check(SaveSlots.read(4).pieces.size() == 1, "Fuchs-Platz unverändert")
+	main._on_profile_selected("frog")
+	SaveSlots.purge(4)
+	main._on_profile_selected("fox")
+	SaveSlots.purge(4)
+
+	# 100 km/h: hoher Lift + steile Abfahrten + Booster
+	track.reset()
+	for t2 in [CoasterTrack.Piece.STEEP_UP, CoasterTrack.Piece.STEEP_UP, CoasterTrack.Piece.STEEP_UP,
+			CoasterTrack.Piece.STEEP_UP, CoasterTrack.Piece.STEEP_UP, CoasterTrack.Piece.STEEP_UP,
+			CoasterTrack.Piece.STEEP_DOWN, CoasterTrack.Piece.STEEP_DOWN, CoasterTrack.Piece.STEEP_DOWN,
+			CoasterTrack.Piece.STEEP_DOWN, CoasterTrack.Piece.STEEP_DOWN, CoasterTrack.Piece.STEEP_DOWN,
+			CoasterTrack.Piece.BOOSTER, CoasterTrack.Piece.BOOSTER]:
+		check_silent(track.place(t2) == "", "Teil für 100-km/h-Strecke")
+	main.track_stickers = []
+	main._start_ride()
+	for i in 60 * 30:
+		main._ride_step(1.0 / 60.0)
+		if main._ride_end_timer >= 0.0:
+			break
+	print("  info 100-km/h-Strecke: max %.1f km/h, Höhe %.1f m" % [main.ride_max_v * 3.6, main._max_height])
+	check("speed100" in main.track_stickers and "high" in main.track_stickers, "100 km/h und Höhen-Sticker erreichbar")
+	main._stop_ride()
 
 	# Autosave / Weiterbauen / Zurück-Taste
 	track.reset()

@@ -17,7 +17,7 @@ enum Piece {
 const TILE := 4.0          # Kantenlänge einer Rasterzelle in Metern
 const LEVEL := 2.0         # Höhe einer Höhenstufe in Metern
 const GRID := 24           # Rastergröße (GRID x GRID Zellen)
-const MAX_LEVEL := 8
+const MAX_LEVEL := 12        # 24 m – genug Höhe für 100 km/h
 const STATION_CELL := Vector2i(6, 12)
 const STATION_LEN := 3
 const BANK_ANGLE := 35.0   # Neigung der Schrägkurven in Grad

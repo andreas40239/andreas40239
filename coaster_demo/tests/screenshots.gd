@@ -41,6 +41,7 @@ func _initialize() -> void:
 	await shot("03_demo_rotated")
 
 	# Speichern/Laden-Menü mit zwei belegten Plätzen (danach wieder löschen)
+	main.track_stickers = ["ride", "lap", "loop", "speed50", "booster"]
 	await main._on_save_slot(0)
 	main.track.load_types([1, 1, 4, 4, 2, 5, 5, 6, 1])
 	main.rig.position = Vector3(40, 0, 50)
@@ -48,8 +49,17 @@ func _initialize() -> void:
 	main._open_save_menu()
 	await shot("07_save_menu")
 	main.save_menu.close()
+	main.track_stickers = ["ride", "lap", "loop", "speed50", "booster", "splash", "tunnel", "corkscrew"]
+	main._open_stickers()
+	await shot("09_sticker_book")
+	main.stickers.close_book()
+	main.stickers.celebrate(["speed100"])
+	for i in 12:
+		await process_frame
+	await shot("10_sticker_popup")
+	main.save_menu.close()
 	for i in 3:
-		SaveSlots.erase(i)
+		SaveSlots.purge(i)
 	main.track.build_demo()
 
 	main._start_ride()
