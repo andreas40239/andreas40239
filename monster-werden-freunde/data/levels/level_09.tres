@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelData" load_steps=28 format=3]
+[gd_resource type="Resource" script_class="LevelData" load_steps=23 format=3]
 
 [ext_resource type="Script" path="res://scripts/data/LevelData.gd" id="1_vgm1h"]
 [ext_resource type="Script" path="res://scripts/data/TutorialStep.gd" id="2_e5b6v"]
@@ -15,8 +15,8 @@ highlight = ""
 [sub_resource type="Resource" id="Resource_fj82r"]
 script = ExtResource("4_5rn86")
 monster_id = &"schlummi"
-count = 4
-spawn_interval = 2.4
+count = 3
+spawn_interval = 2.6
 start_delay = 0.0
 path_id = &"main"
 
@@ -27,17 +27,17 @@ entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_fj82r")])
 [sub_resource type="Resource" id="Resource_8gxvl"]
 script = ExtResource("4_5rn86")
 monster_id = &"troepfli"
-count = 5
-spawn_interval = 1.5
+count = 3
+spawn_interval = 2.0
 start_delay = 0.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_q3gi0"]
 script = ExtResource("4_5rn86")
 monster_id = &"elektro"
-count = 3
-spawn_interval = 1.8
-start_delay = 0.6
+count = 2
+spawn_interval = 2.0
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_nqm5i"]
@@ -47,17 +47,17 @@ entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_8gxvl"), SubResou
 [sub_resource type="Resource" id="Resource_tg07b"]
 script = ExtResource("4_5rn86")
 monster_id = &"fluegel"
-count = 4
-spawn_interval = 1.5
+count = 3
+spawn_interval = 2.0
 start_delay = 0.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_ye5gv"]
 script = ExtResource("4_5rn86")
 monster_id = &"schlummi"
-count = 3
-spawn_interval = 2.0
-start_delay = 0.6
+count = 2
+spawn_interval = 2.4
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_lrb24"]
@@ -67,25 +67,25 @@ entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_tg07b"), SubResou
 [sub_resource type="Resource" id="Resource_qrxi2"]
 script = ExtResource("4_5rn86")
 monster_id = &"elektro"
-count = 4
-spawn_interval = 1.4
+count = 3
+spawn_interval = 1.9
 start_delay = 0.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_r7y1l"]
 script = ExtResource("4_5rn86")
 monster_id = &"troepfli"
-count = 4
-spawn_interval = 1.3
-start_delay = 0.5
+count = 3
+spawn_interval = 1.9
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_788bi"]
 script = ExtResource("4_5rn86")
 monster_id = &"schlummi"
-count = 3
-spawn_interval = 1.8
-start_delay = 0.5
+count = 2
+spawn_interval = 2.2
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_c7848"]
@@ -95,74 +95,38 @@ entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_qrxi2"), SubResou
 [sub_resource type="Resource" id="Resource_ugrji"]
 script = ExtResource("4_5rn86")
 monster_id = &"fluegel"
-count = 4
-spawn_interval = 1.2
+count = 3
+spawn_interval = 1.8
 start_delay = 0.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_fnmlf"]
 script = ExtResource("4_5rn86")
 monster_id = &"schlummi"
-count = 3
-spawn_interval = 1.6
-start_delay = 0.4
+count = 2
+spawn_interval = 2.0
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_63usb"]
 script = ExtResource("4_5rn86")
 monster_id = &"elektro"
-count = 4
-spawn_interval = 1.3
-start_delay = 0.4
+count = 3
+spawn_interval = 1.8
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_hbes8"]
 script = ExtResource("4_5rn86")
 monster_id = &"troepfli"
-count = 4
-spawn_interval = 1.2
-start_delay = 0.4
+count = 2
+spawn_interval = 1.8
+start_delay = 1.0
 path_id = &"main"
 
 [sub_resource type="Resource" id="Resource_vamrt"]
 script = ExtResource("3_j1ovd")
 entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_ugrji"), SubResource("Resource_fnmlf"), SubResource("Resource_63usb"), SubResource("Resource_hbes8")])
-
-[sub_resource type="Resource" id="Resource_q82r2"]
-script = ExtResource("4_5rn86")
-monster_id = &"schlummi"
-count = 3
-spawn_interval = 1.6
-start_delay = 0.0
-path_id = &"main"
-
-[sub_resource type="Resource" id="Resource_4vt6t"]
-script = ExtResource("4_5rn86")
-monster_id = &"fluegel"
-count = 4
-spawn_interval = 1.2
-start_delay = 0.4
-path_id = &"main"
-
-[sub_resource type="Resource" id="Resource_2poj6"]
-script = ExtResource("4_5rn86")
-monster_id = &"troepfli"
-count = 3
-spawn_interval = 1.2
-start_delay = 0.4
-path_id = &"main"
-
-[sub_resource type="Resource" id="Resource_vj5t2"]
-script = ExtResource("4_5rn86")
-monster_id = &"elektro"
-count = 3
-spawn_interval = 1.2
-start_delay = 0.4
-path_id = &"main"
-
-[sub_resource type="Resource" id="Resource_miybt"]
-script = ExtResource("3_j1ovd")
-entries = Array[ExtResource("4_5rn86")]([SubResource("Resource_q82r2"), SubResource("Resource_4vt6t"), SubResource("Resource_2poj6"), SubResource("Resource_vj5t2")])
 
 [resource]
 script = ExtResource("1_vgm1h")
@@ -172,15 +136,15 @@ display_name = "Muschelsuche"
 world_name = "Strand und Meer"
 world = 2
 theme = &"beach"
-starting_currency = 500
+starting_currency = 640
 chaos_limit = 10
 path_points = PackedVector2Array(-60, 250, 500, 250, 500, 520, 150, 520, 150, 780, 900, 780, 900, 450, 1250, 450, 1250, 220, 1600, 220, 1600, 600, 1760, 600)
 build_spots = PackedVector2Array(400, 350, 250, 620, 800, 680, 1000, 550, 1150, 350, 1350, 320, 1500, 320, 124.8, 358, 608, 385, 397.5, 672, 652.5, 672)
-waves = Array[ExtResource("3_j1ovd")]([SubResource("Resource_5fj72"), SubResource("Resource_nqm5i"), SubResource("Resource_lrb24"), SubResource("Resource_c7848"), SubResource("Resource_vamrt"), SubResource("Resource_miybt")])
+waves = Array[ExtResource("3_j1ovd")]([SubResource("Resource_5fj72"), SubResource("Resource_nqm5i"), SubResource("Resource_lrb24"), SubResource("Resource_c7848"), SubResource("Resource_vamrt")])
 available_station_ids = Array[StringName]([&"musikbox", &"ruhe", &"batterie", &"fluegelladen", &"disco"])
 new_monster_ids = Array[StringName]([])
 tutorial_steps = Array[ExtResource("2_e5b6v")]([SubResource("Resource_da246")])
 star_thresholds = Vector3i(0, 3, 9)
-wave_break = 9.0
+wave_break = 11.0
 early_start = true
 decor_seed = 12033

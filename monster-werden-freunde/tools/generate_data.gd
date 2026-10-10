@@ -382,65 +382,63 @@ func _make_world2() -> void:
 			start_hint,
 			_step("Aufgeladen rennt Elektro\ndreimal so schnell ins Dorf!", "time:8"),
 		], true, 9.0)
-	_level(7, "Flügels großer Traum", 420,
+	_level(7, "Flügels großer Traum", 540,
 		[Vector2(-60, 700), Vector2(350, 700), Vector2(350, 330), Vector2(700, 330), Vector2(700, 620), Vector2(1050, 620),
 			Vector2(1050, 250), Vector2(1420, 250), Vector2(1420, 560), Vector2(1760, 560)], [],
 		[
-			_wave([[&"fluegel", 4, 2.0]]),
-			_wave([[&"fluegel", 3, 1.8], [&"troepfli", 4, 1.6, 0.8]]),
-			_wave([[&"elektro", 4, 1.8], [&"fluegel", 4, 1.6, 0.6]]),
-			_wave([[&"knurri", 4, 1.4], [&"troepfli", 3, 1.5, 0.5], [&"fluegel", 3, 1.5, 0.5]]),
-			_wave([[&"fluegel", 4, 1.3], [&"elektro", 3, 1.5, 0.5], [&"knurri", 3, 1.3, 0.5], [&"troepfli", 3, 1.3, 0.5]]),
+			_wave([[&"fluegel", 3, 2.2]]),
+			_wave([[&"fluegel", 3, 2.0], [&"troepfli", 3, 2.0, 1.0]]),
+			_wave([[&"elektro", 3, 2.0], [&"fluegel", 3, 2.0, 1.0]]),
+			_wave([[&"knurri", 3, 1.8], [&"troepfli", 2, 1.8, 1.0], [&"fluegel", 3, 1.8, 1.0]]),
+			_wave([[&"fluegel", 3, 1.8], [&"elektro", 2, 1.8, 1.0], [&"knurri", 2, 1.8, 1.0], [&"troepfli", 2, 1.8, 1.0]]),
 		],
 		[&"musikbox", &"keksstand", &"batterie", &"fluegelladen"] as Array[StringName], [&"fluegel"] as Array[StringName],
 		[
 			_step("Flügel möchte fliegen.\nIm Flügelladen gibt es Flügel!", "station_built:fluegelladen", "card:fluegelladen"),
 			start_hint,
 			_step("Mit Flügeln fliegt es\ndirekt ins Dorf!", "time:8"),
-		], true, 9.0)
-	_level(8, "Disco am Strand", 540,
+		], true, 11.0)
+	_level(8, "Disco am Strand", 660,
 		[Vector2(-60, 450), Vector2(300, 450), Vector2(300, 220), Vector2(650, 220), Vector2(650, 760), Vector2(1000, 760),
 			Vector2(1000, 420), Vector2(1350, 420), Vector2(1350, 720), Vector2(1600, 720), Vector2(1600, 380), Vector2(1760, 380)], [],
 		[
-			_wave([[&"flitzi", 4, 2.0], [&"elektro", 3, 2.0, 0.8]]),
-			_wave([[&"matschi", 4, 1.6], [&"fluegel", 4, 1.6, 0.6]]),
-			_wave([[&"flitzi", 4, 1.4], [&"elektro", 4, 1.5, 0.5]]),
-			_wave([[&"fluegel", 4, 1.3], [&"matschi", 4, 1.4, 0.5], [&"flitzi", 3, 1.3, 0.5]]),
-			_wave([[&"elektro", 4, 1.2], [&"flitzi", 4, 1.2, 0.4], [&"fluegel", 4, 1.2, 0.4], [&"matschi", 3, 1.4, 0.4]]),
+			_wave([[&"flitzi", 3, 2.2], [&"elektro", 2, 2.2, 1.0]]),
+			_wave([[&"matschi", 3, 2.0], [&"fluegel", 3, 2.0, 1.0]]),
+			_wave([[&"flitzi", 3, 1.9], [&"elektro", 3, 1.9, 1.0]]),
+			_wave([[&"fluegel", 3, 1.8], [&"matschi", 3, 1.8, 1.0], [&"flitzi", 2, 1.8, 1.0]]),
+			_wave([[&"elektro", 3, 1.7], [&"flitzi", 2, 1.7, 1.0], [&"fluegel", 3, 1.7, 1.0], [&"matschi", 2, 1.8, 1.0]]),
 		],
 		[&"seifenblasen", &"ventilator", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
 		[
 			_step("Neu: die Disco!\nMonster bleiben stehen und tanzen.", "station_built:disco", "card:disco"),
 			_step("Tanzende Monster laufen nicht weiter.\nSo hast du mehr Zeit zum Helfen!", "time:9"),
-		], true, 9.0)
-	_level(9, "Muschelsuche", 500,
+		], true, 11.0)
+	_level(9, "Muschelsuche", 640,
 		[Vector2(-60, 250), Vector2(500, 250), Vector2(500, 520), Vector2(150, 520), Vector2(150, 780), Vector2(900, 780),
 			Vector2(900, 450), Vector2(1250, 450), Vector2(1250, 220), Vector2(1600, 220), Vector2(1600, 600), Vector2(1760, 600)], [],
 		[
-			_wave([[&"schlummi", 4, 2.4]]),
-			_wave([[&"troepfli", 5, 1.5], [&"elektro", 3, 1.8, 0.6]]),
-			_wave([[&"fluegel", 4, 1.5], [&"schlummi", 3, 2.0, 0.6]]),
-			_wave([[&"elektro", 4, 1.4], [&"troepfli", 4, 1.3, 0.5], [&"schlummi", 3, 1.8, 0.5]]),
-			_wave([[&"fluegel", 4, 1.2], [&"schlummi", 3, 1.6, 0.4], [&"elektro", 4, 1.3, 0.4], [&"troepfli", 4, 1.2, 0.4]]),
-			_wave([[&"schlummi", 3, 1.6], [&"fluegel", 4, 1.2, 0.4], [&"troepfli", 3, 1.2, 0.4], [&"elektro", 3, 1.2, 0.4]]),
+			_wave([[&"schlummi", 3, 2.6]]),
+			_wave([[&"troepfli", 3, 2.0], [&"elektro", 2, 2.0, 1.0]]),
+			_wave([[&"fluegel", 3, 2.0], [&"schlummi", 2, 2.4, 1.0]]),
+			_wave([[&"elektro", 3, 1.9], [&"troepfli", 3, 1.9, 1.0], [&"schlummi", 2, 2.2, 1.0]]),
+			_wave([[&"fluegel", 3, 1.8], [&"schlummi", 2, 2.0, 1.0], [&"elektro", 3, 1.8, 1.0], [&"troepfli", 2, 1.8, 1.0]]),
 		],
 		[&"musikbox", &"ruhe", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
 		[
 			_step("Tipp: Baue die Disco dort,\nwo viele Monster vorbeikommen.", "time:9"),
-		], true, 9.0)
-	_level(10, "Großes Strandfest", 560,
+		], true, 11.0)
+	_level(10, "Großes Strandfest", 700,
 		[Vector2(-60, 600), Vector2(250, 600), Vector2(250, 250), Vector2(600, 250), Vector2(600, 780), Vector2(950, 780),
 			Vector2(950, 330), Vector2(1300, 330), Vector2(1300, 700), Vector2(1560, 700), Vector2(1560, 300), Vector2(1760, 300)], [],
 		[
-			_wave([[&"elektro", 4, 1.8], [&"fluegel", 3, 1.8, 0.6]]),
-			_wave([[&"matschi", 4, 1.5], [&"knurri", 4, 1.4, 0.5]]),
-			_wave([[&"fluegel", 4, 1.3], [&"elektro", 4, 1.4, 0.5], [&"knurri", 3, 1.3, 0.5]]),
-			_wave([[&"matschi", 4, 1.4], [&"fluegel", 4, 1.2, 0.4], [&"elektro", 4, 1.3, 0.4]]),
-			_wave([[&"knurri", 4, 1.1], [&"elektro", 4, 1.2, 0.4], [&"matschi", 3, 1.3, 0.4], [&"fluegel", 4, 1.1, 0.4]]),
-			_wave([[&"elektro", 5, 1.1], [&"fluegel", 5, 1.1, 0.4], [&"knurri", 4, 1.0, 0.4], [&"matschi", 3, 1.3, 0.4]]),
+			_wave([[&"elektro", 3, 2.0], [&"fluegel", 2, 2.0, 1.0]]),
+			_wave([[&"matschi", 3, 2.0], [&"knurri", 3, 1.9, 1.0]]),
+			_wave([[&"fluegel", 3, 1.9], [&"elektro", 3, 1.9, 1.0], [&"knurri", 2, 1.9, 1.0]]),
+			_wave([[&"matschi", 3, 1.8], [&"fluegel", 3, 1.8, 1.0], [&"elektro", 3, 1.8, 1.0]]),
+			_wave([[&"knurri", 3, 1.7], [&"elektro", 3, 1.7, 1.0], [&"matschi", 2, 1.8, 1.0], [&"fluegel", 3, 1.7, 1.0]]),
 		],
 		[&"seifenblasen", &"keksstand", &"batterie", &"fluegelladen", &"disco"] as Array[StringName], [] as Array[StringName],
-		[], true, 10.0)
+		[], true, 11.0)
 
 
 # --- Welt 3: Schnee und Berge ------------------------------------------------------

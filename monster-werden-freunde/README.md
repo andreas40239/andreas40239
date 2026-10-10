@@ -80,6 +80,10 @@ dass alle Monster-, Stations-, Level- und Tutorial-Texte übersetzt sind.
   (Reichweite 140); Belohnungen 25–35; Schlummi 115/40 px/s; Flitzi 75/74 px/s; Startpunkte
   L4 = 460, L5 = 600. Die Simulation (`tests/Simulation.tscn`) gewinnt damit alle 15 Level
   (sowohl „alles ausgeben“ als auch „sparsam bauen“).
+* **Version 1.1.1:** Welt 2 ab Level 7 deutlich leichter: mehr Startpunkte (L7 540, L8 660,
+  L9 640, L10 700), kleinere spätere Wellen (höchstens 10 Monster pro Welle, insgesamt 31–39
+  statt 42–70 Monster pro Level), größere Abstände zwischen den Monstern und 11 s Pause
+  zwischen den Wellen.
 * **Karten:** statt `map_scene` enthält `LevelData` Pfadpunkte und Bauplätze (Kurven werden
   automatisch abgerundet).
 * **Reichweite:** Stationen prüfen Abstände direkt statt über Area2D (einfacher, gleiches Verhalten).
