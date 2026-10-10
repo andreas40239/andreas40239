@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spielekiste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Lexend:wght@400;500;700&display=swap">
+<style>
+/* Layout: eine Spalte wie ein Regal voller App-Icons (Handy), ab Tablet 2, ab Desktop 3 Spalten; jedes Spiel hat seine eigene Farbe. */
+:root {
+  --bg: #f2efff;
+  --bg-dots: #ddd6ff;
+  --card: #ffffff;
+  --ink: #1d1745;
+  --muted: #5d5785;
+  --line: #e2dcff;
+  --accent: #ff5b3a;
+  --sun: #ffc83d;
+  --chip: #ece8ff;
+  --shadow: 0 3px 0 #d6cefc;
+  --font-display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --font-body: "Lexend", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141029; --bg-dots: #241d47; --card: #1f1940; --ink: #f4f1ff; --muted: #aea6d6;
+    --line: #2f2760; --accent: #ff7a5c; --sun: #ffd25e; --chip: #2a2254; --shadow: 0 3px 0 #0b0820;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141029; --bg-dots: #241d47; --card: #1f1940; --ink: #f4f1ff; --muted: #aea6d6;
+  --line: #2f2760; --accent: #ff7a5c; --sun: #ffd25e; --chip: #2a2254; --shadow: 0 3px 0 #0b0820;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--bg-dots) 1.5px, transparent 1.6px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; }
+
+/* ---------- Kopf ---------- */
+header { position: relative; padding-block: 12px 8px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--ink); color: var(--bg);
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: 999px; transform: rotate(-2deg);
+}
+.eyebrow b { color: var(--sun); }
+h1 {
+  font-family: var(--font-display); font-weight: 400;
+  font-size: clamp(3.2rem, 16vw, 6.5rem); line-height: .9; letter-spacing: .01em;
+  margin: 18px 0 12px; text-wrap: balance;
+}
+h1 .l { display: inline-block; animation: hop 2.8s ease-in-out infinite; }
+h1 .l:nth-child(odd) { color: var(--accent); }
+h1 .l:nth-child(3n) { color: #7b5cff; }
+h1 .l:nth-child(4n) { color: #12b886; }
+h1 .l:nth-child(5n) { color: #f59f00; }
+@keyframes hop { 0%, 80%, 100% { transform: translateY(0) } 88% { transform: translateY(-10px) rotate(-4deg) } }
+.lede { font-size: 1.05rem; color: var(--muted); max-width: 34ch; margin: 0; text-wrap: pretty; }
+.lede strong { color: var(--ink); }
+
+.blob { position: absolute; pointer-events: none; z-index: -1; }
+.blob.s1 { right: 4%; top: 0; width: 64px; height: 64px; background: var(--sun); border-radius: 46% 54% 40% 60%; animation: float 6s ease-in-out infinite; }
+.blob.s2 { right: 22%; top: 84px; width: 26px; height: 26px; background: #7b5cff; border-radius: 50%; animation: float 5s ease-in-out infinite reverse; }
+.blob.s3 { right: 2%; top: 130px; width: 40px; height: 40px; background: var(--accent); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); animation: spin 14s linear infinite; }
+@keyframes float { 50% { transform: translateY(-12px) rotate(8deg) } }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* ---------- Filter ---------- */
+.filters {
+  display: flex; gap: 8px; overflow-x: auto; padding-block: 4px 10px;
+  margin-top: 26px; scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
+.filter {
+  flex: none; font: 500 .9rem var(--font-body); color: var(--ink);
+  background: var(--card); border: 2px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer; box-shadow: var(--shadow);
+  transition: transform .15s, background .15s;
+}
+.filter:active { transform: translateY(2px); box-shadow: none; }
+.filter[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.filter .n { font-variant-numeric: tabular-nums; opacity: .6; margin-left: 4px; }
+.filter:focus-visible, .store:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Karten ---------- */
+.grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 14px; }
+@media (min-width: 700px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1050px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.card {
+  --hue: #7b5cff;
+  position: relative; display: flex; flex-direction: column; gap: 14px;
+  background: var(--card); border: 2px solid var(--line); border-radius: 26px;
+  padding: 18px; min-width: 0;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--hue) 35%, var(--line));
+  animation: pop .45s cubic-bezier(.3, 1.6, .5, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes pop { from { transform: scale(.94) translateY(8px) } to { transform: none } }
+.card[hidden] { display: none; }
+
+.top { display: flex; gap: 14px; align-items: center; }
+.icon {
+  flex: none; width: 76px; height: 76px; border-radius: 24px;
+  display: grid; place-items: center; font-size: 42px; line-height: 1;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255,255,255,.55) 0 18%, transparent 19%),
+    linear-gradient(150deg, var(--hue), var(--hue2, var(--hue)));
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.18), 0 4px 10px color-mix(in srgb, var(--hue) 40%, transparent);
+  transform: rotate(var(--tilt, -4deg));
+  transition: transform .25s cubic-bezier(.3, 1.8, .5, 1);
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.card:hover .icon { transform: rotate(0) scale(1.06); }
+.icon.boing { animation: boing .5s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes boing { 30% { transform: scale(.82) rotate(8deg) } 70% { transform: scale(1.12) rotate(-6deg) } }
+.icon span { filter: drop-shadow(0 2px 0 rgba(0,0,0,.18)); }
+
+.head { min-width: 0; }
+.genre { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--hue) 75%, var(--ink)); }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; line-height: 1.05; margin: 2px 0 0; text-wrap: balance; overflow-wrap: anywhere; }
+
+.desc { margin: 0; color: var(--muted); font-size: .95rem; text-wrap: pretty; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chips li { font-size: .78rem; font-weight: 500; background: var(--chip); border-radius: 8px; padding: 3px 9px; }
+
+.store {
+  margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 10px;
+  text-decoration: none; color: var(--ink); font-weight: 700; font-size: .95rem;
+  border: 2px dashed color-mix(in srgb, var(--hue) 60%, var(--line));
+  background: color-mix(in srgb, var(--hue) 9%, var(--card));
+  border-radius: 16px; padding: 11px 14px; cursor: pointer;
+  transition: transform .15s;
+}
+.store:active { transform: scale(.97); }
+.store svg { width: 20px; height: 20px; flex: none; }
+.store small { font-weight: 500; color: var(--muted); }
+.store.live { border-style: solid; background: var(--ink); color: var(--bg); }
+.store.live small { color: inherit; opacity: .7; }
+
+/* ---------- Fuß ---------- */
+footer { margin-top: 40px; text-align: center; color: var(--muted); font-size: .85rem; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 140%); transition: transform .3s cubic-bezier(.3, 1.5, .5, 1);
+  background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 14px;
+  font-weight: 500; font-size: .9rem; max-width: calc(100% - 32px); text-align: center; z-index: 10;
+}
+.toast.show { transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="blob s1"></div><div class="blob s2"></div><div class="blob s3"></div>
+    <span class="eyebrow">Handyspiele · <b id="count">11</b> Stück</span>
+    <h1 aria-label="Spielekiste"><span class="l">S</span><span class="l">p</span><span class="l">i</span><span class="l">e</span><span class="l">l</span><span class="l">e</span><br><span class="l">k</span><span class="l">i</span><span class="l">s</span><span class="l">t</span><span class="l">e</span></h1>
+    <p class="lede">Selbst gebaute Spiele für Android. <strong>Vom freundlichen Monsterdorf bis zum Kampf gegen Mechagodzilla.</strong></p>
+  </header>
+
+  <nav class="filters" id="filters" aria-label="Spiele filtern"></nav>
+  <main class="grid" id="grid"></main>
+
+  <footer>Tipp aufs Icon ✨ · Play-Store-Links folgen bald</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   SPIELE-LISTE
+   Play-Store-Link eintragen: bei "playStore" den Platzhalter
+   (z. B. "PLAYSTORE_LINK_MONSTER") durch die echte URL ersetzen,
+   z. B. "https://play.google.com/store/apps/details?id=com.example.spiel".
+   ============================================================ */
+const GAMES = [
+  {
+    id: "monster-werden-freunde", title: "Monster werden Freunde", icon: "👾",
+    hue: "#9b6bff", hue2: "#ff8fd8", tilt: "-5deg",
+    genre: "Tower-Defense ohne Gewalt",
+    desc: "Monster stürmen ins Dorf, weil sie hungrig, müde oder traurig sind. Bau Keksstände, Musikboxen und Seifenblasenmaschinen, bis aus jedem Monster ein Freund wird.",
+    chips: ["6–8 Jahre", "3 Welten · 15 Level", "DE · EN · GR"],
+    tags: ["kids", "kreativ"],
+    playStore: "PLAYSTORE_LINK_MONSTER_WERDEN_FREUNDE"
+  },
+  {
+    id: "godzilla", title: "Godzilla: Kaiju Lane Fighter", icon: "🦖",
+    hue: "#20c06a", hue2: "#0b7a63", tilt: "4deg",
+    genre: "Kaiju-Beat-'em-up",
+    desc: "Stampf als Godzilla über drei Spuren durch 8 Level. Schwanzpeitsche, Atomatem und Nuklearpuls steuerst du per Wischgeste, bis Mechagodzilla wartet.",
+    chips: ["8 Level", "3 Bosse", "Trainingslevel"],
+    tags: ["action"],
+    playStore: "PLAYSTORE_LINK_GODZILLA"
+  },
+  {
+    id: "bubble-buddy", title: "Bubble Buddy", icon: "🐠",
+    hue: "#2bb5ff", hue2: "#58e0d2", tilt: "-3deg",
+    genre: "Sanfter Endlos-Schwimmer",
+    desc: "Schwimm mit Clownfisch Finley durchs Meer nach oben, schubs grummelige Krabben mit Blasen beiseite und befrei Babytiere aus dem Seetang. Verlieren kann man hier nicht.",
+    chips: ["4–8 Jahre", "Sticker-Album", "Eltern-Bereich"],
+    tags: ["kids"],
+    playStore: "PLAYSTORE_LINK_BUBBLE_BUDDY"
+  },
+  {
+    id: "tiny-tank-wars", title: "Tiny Tank Wars", icon: "💥",
+    hue: "#ff7a2f", hue2: "#ffc83d", tilt: "5deg",
+    genre: "Runden-Artillerie",
+    desc: "Winkel einstellen, Kraft wählen, Wind beachten, Feuer! Bis zu vier Spieler teilen sich ein Handy oder treten gegen Roboter an, auf vier Schlachtfeldern mit Upgrade-Hangar.",
+    chips: ["6–12 Jahre", "1–4 Spieler", "4 Karten"],
+    tags: ["kids", "action"],
+    playStore: "PLAYSTORE_LINK_TINY_TANK_WARS"
+  },
+  {
+    id: "schattengruft", title: "Schattengruft", icon: "💀",
+    hue: "#6a3fc9", hue2: "#2a1858", tilt: "-4deg",
+    genre: "Dungeon-Crawler",
+    desc: "Ein Labyrinth, das mit jeder Ebene tiefer und verwinkelter wird. Schwert, Axt, Bogen und drei Zauber gegen Skelette, die sich wieder zusammensetzen, und Geister, die durch Wände schweben.",
+    chips: ["6 Monsterarten", "5 Speicherplätze", "Live-Musik"],
+    tags: ["action", "abenteuer"],
+    playStore: "PLAYSTORE_LINK_SCHATTENGRUFT"
+  },
+  {
+    id: "nachtkatze", title: "Nachtkatze", icon: "🐈‍⬛",
+    hue: "#3b4cc0", hue2: "#ffb347", tilt: "3deg",
+    genre: "2.5D-Plattformer",
+    desc: "Als schwarze Katze nachts über die Dächer der Stadt: springen, greifen, klettern. Das Tutorial erklärt alles ganz ohne Worte.",
+    chips: ["10 Level", "Joystick + Sprung", "Toon-Look"],
+    tags: ["abenteuer"],
+    playStore: "PLAYSTORE_LINK_NACHTKATZE"
+  },
+  {
+    id: "coaster-demo", title: "Coaster Demo", icon: "🎢",
+    hue: "#ff4d6d", hue2: "#ffb3c1", tilt: "-6deg",
+    genre: "Achterbahn bauen & fahren",
+    desc: "Bau in isometrischer Ansicht deine eigene Achterbahn mit Kurven, Kettenlift und Looping und fahr danach selbst mit. Ein Tutorial führt in 12 Schritten durchs Bauen.",
+    chips: ["Baukasten", "Mitfahr-Kamera", "Speicherplätze"],
+    tags: ["kreativ"],
+    playStore: "PLAYSTORE_LINK_COASTER_DEMO"
+  },
+  {
+    id: "eidechsen-evolution", title: "Eidechsen-Evolution", icon: "🦎",
+    hue: "#8fd14f", hue2: "#2f9e44", tilt: "4deg",
+    genre: "Fressen & Wachsen",
+    desc: "Starte als winzige Eidechse und friss dich durch 23 Wachstumsstufen. Erst wachsen Stacheln, dann wirst du zum kleinen T-Rex und am Ende zu Godzilla mit Feueratem und Blitz.",
+    chips: ["23 Stufen", "Bosse ab Stufe 20"],
+    tags: ["action"],
+    playStore: "PLAYSTORE_LINK_EIDECHSEN_EVOLUTION"
+  },
+  {
+    id: "huepf-abenteuer", title: "Hüpf-Abenteuer", icon: "🏃",
+    hue: "#ffb000", hue2: "#ff6b3d", tilt: "-3deg",
+    genre: "Endlos-Läufer",
+    desc: "Lauf, spring und hüpf über Hindernisse und Gruben, weich fliegenden Gegnern aus und sammle Herzen. Berge, Meer und Unterwelt warten, jeweils mit eigenem Boss.",
+    chips: ["3 Welten", "Bosskämpfe"],
+    tags: ["action"],
+    playStore: "PLAYSTORE_LINK_HUEPF_ABENTEUER"
+  },
+  {
+    id: "labyrinth-abenteuer", title: "Labyrinth-Abenteuer", icon: "🏰",
+    hue: "#c08a4a", hue2: "#7a4b25", tilt: "5deg",
+    genre: "Labyrinth-Rätsel",
+    desc: "Finde in jedem dunklen Labyrinth die Tür. Gänge werden erst sichtbar, wenn du in ihre Nähe kommst; Schwert, Magie und Herzen helfen gegen die Monster.",
+    chips: ["12+ Level", "Steuerkreuz"],
+    tags: ["abenteuer"],
+    playStore: "PLAYSTORE_LINK_LABYRINTH_ABENTEUER"
+  },
+  {
+    id: "firststep-adventures", title: "FirstStep Adventures", icon: "🦊",
+    hue: "#ff8a3d", hue2: "#ffd166", tilt: "-4deg",
+    genre: "Lernspiel für die 1. Klasse",
+    desc: "Laute erkennen, zählen und Plus und Minus bis 20 üben. Richtige Antworten bringen Konfetti, einen tanzenden Fuchs und Sticker fürs Belohnungsbuch.",
+    chips: ["6–7 Jahre", "Mit Sprachausgabe", "Eltern-Sperre"],
+    tags: ["kids", "kreativ"],
+    playStore: "PLAYSTORE_LINK_FIRSTSTEP_ADVENTURES"
+  }
+];
+
+const FILTERS = [
+  { id: "alle", label: "Alle" },
+  { id: "kids", label: "Für Kids" },
+  { id: "action", label: "Action" },
+  { id: "abenteuer", label: "Abenteuer" },
+  { id: "kreativ", label: "Bauen & Lernen" }
+];
+
+const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#00d47e" d="M4 2.6 13.6 12 4 21.4c-.3-.2-.5-.6-.5-1V3.6c0-.4.2-.8.5-1Z"/><path fill="#ffc83d" d="m17 8.6-3.4 3.4 3.4 3.4 3.7-2.1c.8-.5.8-1.6 0-2.1L17 8.6Z"/><path fill="#ff4d5a" d="M13.6 12 4 21.4c.3.2.8.2 1.2 0L17 15.4 13.6 12Z"/><path fill="#2bb5ff" d="M13.6 12 17 8.6 5.2 2.6c-.4-.2-.9-.2-1.2 0l9.6 9.4Z"/></svg>';
+
+const isRealLink = (url) => /^https:\/\/play\.google\.com\//.test(url || "");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const grid = document.getElementById("grid");
+grid.innerHTML = GAMES.map((g, i) => {
+  const live = isRealLink(g.playStore);
+  const store = live
+    ? `<a class="store live" href="${esc(g.playStore)}" target="_blank" rel="noopener">${PLAY_ICON}<span>Im Play Store holen</span></a>`
+    : `<a class="store" href="#${esc(g.id)}" data-placeholder="${esc(g.playStore)}">${PLAY_ICON}<span>Play Store <small>· Link folgt</small></span></a>`;
+  return `
+  <article class="card" id="${esc(g.id)}" data-tags="${g.tags.join(" ")}"
+    style="--hue:${g.hue};--hue2:${g.hue2};--tilt:${g.tilt};--i:${i}">
+    <div class="top">
+      <div class="icon" role="img" aria-label="Icon ${esc(g.title)}"><span>${g.icon}</span></div>
+      <div class="head">
+        <div class="genre">${esc(g.genre)}</div>
+        <h2>${esc(g.title)}</h2>
+      </div>
+    </div>
+    <p class="desc">${esc(g.desc)}</p>
+    <ul class="chips">${g.chips.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+    ${store}
+  </article>`;
+}).join("");
+
+document.getElementById("count").textContent = GAMES.length;
+
+const nav = document.getElementById("filters");
+nav.innerHTML = FILTERS.map((f) => {
+  const n = f.id === "alle" ? GAMES.length : GAMES.filter((g) => g.tags.includes(f.id)).length;
+  return `<button type="button" class="filter" id="filter-${f.id}" data-f="${f.id}" aria-pressed="${f.id === "alle"}">${f.label}<span class="n">${n}</span></button>`;
+}).join("");
+
+nav.addEventListener("click", (e) => {
+  const btn = e.target.closest(".filter");
+  if (!btn) return;
+  const f = btn.dataset.f;
+  nav.querySelectorAll(".filter").forEach((b) => b.setAttribute("aria-pressed", b === btn));
+  grid.querySelectorAll(".card").forEach((card, i) => {
+    const show = f === "alle" || card.dataset.tags.split(" ").includes(f);
+    card.hidden = !show;
+    if (show) { card.style.animation = "none"; void card.offsetWidth; card.style.animation = ""; }
+  });
+});
+
+const toast = document.getElementById("toast");
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+grid.addEventListener("click", (e) => {
+  const icon = e.target.closest(".icon");
+  if (icon) {
+    icon.classList.remove("boing"); void icon.offsetWidth; icon.classList.add("boing");
+    return;
+  }
+  const store = e.target.closest(".store:not(.live)");
+  if (store) {
+    e.preventDefault();
+    const title = store.closest(".card").querySelector("h2").textContent;
+    showToast(`„${title}“ kommt bald in den Play Store 🚀`);
+  }
+});
+</script>
+</body>
+</html>
