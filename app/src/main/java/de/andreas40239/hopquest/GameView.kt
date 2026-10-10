@@ -47,6 +47,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         Scenery.UNDERGROUND to decode(R.drawable.obstacle_underground),
         Scenery.SEA to decode(R.drawable.obstacle_sea),
     )
+    private val srcGround = mapOf(
+        Scenery.MOUNTAINS to decode(R.drawable.ground_mountains),
+        Scenery.UNDERGROUND to decode(R.drawable.ground_underground),
+        Scenery.SEA to decode(R.drawable.ground_sea),
+    )
     private val srcFly = mapOf(
         Scenery.MOUNTAINS to listOf(decode(R.drawable.fly_mountains_0), decode(R.drawable.fly_mountains_1)),
         Scenery.UNDERGROUND to listOf(decode(R.drawable.fly_underground_0), decode(R.drawable.fly_underground_1)),
@@ -83,6 +88,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var canvasH = 0
     private var scaledBg: MutableMap<Scenery, Bitmap> = mutableMapOf()
     private var scaledBgWidth = 0f
+    private var scaledGround: MutableMap<Scenery, Bitmap> = mutableMapOf()
+    private var scaledGroundWidth = 0f
+    private var groundStripTopY = 0f
     private var scaledObstacle: MutableMap<Scenery, Bitmap> = mutableMapOf()
     private var scaledFly: MutableMap<Scenery, List<Bitmap>> = mutableMapOf()
     private var scaledBoss: MutableMap<Scenery, List<Bitmap>> = mutableMapOf()
@@ -107,6 +115,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val maxObstacleHFrac = 0.24f
     private val obstacleGrowTime = 100f
     private val jumpAirTime get() = 2f * jumpVelFrac / gravityFrac
+    private val groundRimFrac = 0.035f // how far above groundY the ground-strip art overlaps the hillside
 
     // flying obstacles sit well above standing head-height so a grounded player
     // always clears them — only jumping into their band causes a hit
@@ -170,6 +179,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val heartPickups = Array(2) { HeartPickup() }
     private var heartSpawnTimer = 0f
     private var bgOffset = 0f
+    private var groundOffset = 0f
 
     private var levelIndex = 0
     private var levelTime = 0f
@@ -239,9 +249,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         synchronized(holder2) {
             canvasW = width
             canvasH = height
+            groundY = canvasH * 0.83f
             rebuildScaledAssets()
             layoutMenuCards()
-            groundY = canvasH * 0.83f
         }
     }
 
@@ -272,6 +282,15 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             scaledBg[k] = Bitmap.createScaledBitmap(bmp, w, canvasH, true)
         }
         scaledBgWidth = scaledBg.values.first().width.toFloat()
+
+        groundStripTopY = groundY - groundRimFrac * canvasH
+        val groundStripH = (canvasH - groundStripTopY).toInt().coerceAtLeast(1)
+        scaledGround.clear()
+        for ((k, bmp) in srcGround) {
+            val w = (groundStripH.toFloat() * bmp.width / bmp.height).toInt().coerceAtLeast(1)
+            scaledGround[k] = Bitmap.createScaledBitmap(bmp, w, groundStripH, true)
+        }
+        scaledGroundWidth = scaledGround.values.first().width.toFloat()
 
         scaledObstacle.clear() // rebuilt lazily per-size in getObstacleBitmap via cache below
         obstacleBitmapCache.clear()
@@ -419,6 +438,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             levelTime += dt
             val speed = currentSpeed()
             bgOffset = (bgOffset + speed * 0.8f * dt) % scaledBgWidth
+            groundOffset = (groundOffset + speed * dt) % scaledGroundWidth
             updateObstacles(dt, speed)
             updateFlyingObstacles(dt, speed)
             updateHeartPickups(dt, speed)
@@ -838,6 +858,26 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
     }
 
+    private fun drawScrollingGround(canvas: Canvas) {
+        val bmp = scaledGround.getValue(scenery)
+        var x = -groundOffset
+        if (x > 0f) x -= scaledGroundWidth
+        while (x < canvasW) {
+            canvas.drawBitmap(bmp, x, groundStripTopY, null)
+            x += scaledGroundWidth
+        }
+    }
+
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#40000000") }
+
+    /** A soft contact-shadow ellipse right at groundY, so grounded sprites feel anchored
+     *  to the floor instead of pasted on top of it. */
+    private fun drawGroundShadow(canvas: Canvas, centerX: Float, width: Float) {
+        val rx = width * 0.5f
+        val ry = rx * 0.22f
+        canvas.drawOval(centerX - rx, groundY - ry, centerX + rx, groundY + ry, shadowPaint)
+    }
+
     private val obstacleBitmapCache = HashMap<Int, Bitmap>()
     private val obstacleSizeBucket = 6 // px — keeps the scaled-bitmap cache small over long sessions
 
@@ -852,6 +892,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private fun drawGame(canvas: Canvas) {
         drawScrollingBackground(canvas)
+        drawScrollingGround(canvas)
 
         if (bossActive) {
             drawBossFight(canvas)
@@ -861,6 +902,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 if (o.isPit) {
                     o.pitBitmap?.let { canvas.drawBitmap(it, o.x, groundY - pitVisualRimFrac * canvasH, null) }
                 } else {
+                    drawGroundShadow(canvas, o.x + o.width / 2f, o.width * 0.9f)
                     val bmp = getObstacleBitmap(scenery, o.width.toInt(), o.height.toInt())
                     canvas.drawBitmap(bmp, o.x, groundY - o.height, null)
                 }
@@ -885,6 +927,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val showHitFrame = invulnTimer > 0f
         val blinkHidden = showHitFrame && ((invulnTimer * 10).toInt() % 2 == 0)
         if (!blinkHidden) {
+            drawGroundShadow(canvas, playerX + playerW / 2f, playerW * 0.75f)
             val frameBmp = when {
                 showHitFrame -> playerFrames[4]
                 !grounded -> playerFrames[3]
@@ -926,6 +969,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val frameIdx = if ((bossBobTimer * 1.2f).toInt() % 2 == 0) 0 else 1
         val bmp = frames[frameIdx]
         val bossX = canvasW * bossXFrac
+        drawGroundShadow(canvas, bossX, bmp.width * 0.8f)
         canvas.drawBitmap(bmp, bossX - bmp.width / 2f, groundY - bmp.height, null)
 
         val ballBmp = scaledBall.getValue(scenery)
