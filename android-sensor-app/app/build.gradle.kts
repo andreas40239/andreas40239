@@ -13,6 +13,12 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        ndk {
+            // Es wird kein natives (C/C++) Nativecode mitgeliefert; dies beschränkt
+            // vorsorglich transitive .so-Dateien auf arm64-v8a (Snapdragon im S24 Ultra).
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
