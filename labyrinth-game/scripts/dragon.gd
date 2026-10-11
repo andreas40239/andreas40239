@@ -1,13 +1,13 @@
 extends Node2D
 ## 1: Der Endlos-Drache - fliegt ewig eine liegende Acht durch die Halle.
 
-const CENTER := Vector2(46.5 * 32, 7.0 * 32)
-const AMP := Vector2(440.0, 128.0)
 const SPEED := TAU / 9.0
 const SEGMENTS := 22
 const SPACING := 0.085
 
 var game: Node
+var center := Vector2.ZERO
+var amp := Vector2(440.0, 128.0)
 var s := 0.0
 var frozen := 0.0
 var fire_cd := 3.0
@@ -17,6 +17,7 @@ var seg_r: Array = []
 
 
 func _ready() -> void:
+	z_index = 2
 	for i in SEGMENTS:
 		var k := float(i) / (SEGMENTS - 1)
 		seg_r.append(lerpf(17.0, 6.0, k) if i > 0 else 18.0)
@@ -25,7 +26,7 @@ func _ready() -> void:
 
 
 func curve(p: float) -> Vector2:
-	return CENTER + Vector2(AMP.x * sin(p), AMP.y * sin(2.0 * p))
+	return center + Vector2(amp.x * sin(p), amp.y * sin(2.0 * p))
 
 
 func _layout() -> void:
@@ -46,7 +47,7 @@ func update(dt: float) -> void:
 
 func _maybe_breathe(dt: float) -> void:
 	var p: Vector2 = game.player.position
-	if game.state != "play" or p.y > 12 * 32 or p.x < 29 * 32:
+	if game.state != "play" or not game.dragon_hall_has(game.world_to_tile(p)):
 		return
 	fire_cd -= dt
 	if fire_cd <= 0.0:

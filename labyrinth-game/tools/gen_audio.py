@@ -357,6 +357,35 @@ def music_boss():
     write_ogg('music_boss.ogg', normalize(soft_clip(normalize(buf), 1.6), 0.85), sr)
 
 
+def music_title():
+    """Startbildschirm: abenteuerliches Thema, 96 BPM, d-Moll -> F-Dur."""
+    sr = 44100
+    beat = 60 / 96
+    bars = 8
+    L = int(bars * 4 * beat * sr)
+    buf = np.zeros(L)
+    prog = [([50, 53, 57], 38), ([46, 50, 53], 34), ([48, 52, 55], 36), ([53, 57, 60], 41),
+            ([50, 53, 57], 38), ([46, 50, 53], 34), ([43, 46, 50], 31), ([45, 49, 52], 33)]
+    for bar, (chord, root) in enumerate(prog):
+        st = int(bar * 4 * beat * sr)
+        mix_at(buf, inst_pad(chord, 4 * beat + 0.5, sr), st, 0.5)
+        for k in range(4):
+            mix_at(buf, inst_bass(root + (12 if k == 2 else 0), beat * 0.9, sr, 'saw', cutoff=500), st + int(k * beat * sr), 0.3)
+        mix_at(buf, inst_tom(sr, 38), st, 0.4)
+        mix_at(buf, inst_tom(sr, 38), st + int(2.5 * beat * sr), 0.25)
+        mix_at(buf, inst_snare(sr, 0.2), st + int(3 * beat * sr), 0.12)
+    mel = [(0, 0, 62, 1), (0, 1, 65, 1), (0, 2, 69, 2), (1, 0, 70, 1.5), (1, 1.5, 69, 0.5), (1, 2, 65, 2),
+           (2, 0, 67, 1), (2, 1, 69, 1), (2, 2, 72, 2), (3, 0, 69, 4),
+           (4, 0, 74, 1.5), (4, 1.5, 72, 0.5), (4, 2, 69, 2), (5, 0, 70, 1), (5, 1, 69, 1), (5, 2, 65, 2),
+           (6, 0, 67, 1), (6, 1, 70, 1), (6, 2, 74, 2), (7, 0, 73, 2), (7, 2, 69, 2)]
+    for bar, bt, m, d in mel:
+        st = int((bar * 4 + bt) * beat * sr)
+        mix_at(buf, inst_lead(m, d * beat * 0.92, sr), st, 0.12)
+        mix_at(buf, inst_bell(m + 12, d * beat + 1.0, sr), st, 0.1)
+    buf = reverb_circular(buf, sr, seconds=2.5, wet=0.35, hi=5000)
+    write_ogg('music_title.ogg', normalize(soft_clip(normalize(buf), 1.3), 0.8), sr)
+
+
 def music_victory():
     sr = 44100
     beat = 60 / 120
@@ -375,6 +404,31 @@ def music_victory():
 
 # -------------------------------------------------------------- Effekte
 SR = 22050
+
+
+def sfx_level2():
+    """Effekte fuer Level 2 (eigener Zufallsgenerator, damit Level-1-Dateien gleich bleiben)."""
+    r = np.random.default_rng(99)
+    out = {}
+    # Schluessel: helles Klimpern
+    x = np.concatenate([inst_bell(m, 0.08, SR) for m in (88, 93)] + [inst_bell(100, 0.6, SR)])
+    out['key'] = normalize(reverb_tail(x, SR, 0.5, 0.3), 0.7)
+    # Spinne: schnelles Klicken und Zischen
+    n = int(0.8 * SR); t = np.arange(n) / SR
+    x = np.zeros(n)
+    for k in range(18):
+        p = int(k * 0.04 * SR + r.uniform(0, 0.01) * SR)
+        m = int(0.01 * SR)
+        if p + m < n:
+            x[p:p + m] += np.sin(2 * np.pi * r.uniform(1800, 3200) * np.arange(m) / SR) * np.exp(-np.arange(m) / SR * 400)
+    hiss = fft_filter(r.uniform(-1, 1, n), SR, lo=3000, hi=9000) * np.sin(np.pi * t / 0.8) ** 2
+    out['spider'] = normalize(x + hiss * 0.8, 0.7)
+    # Netz: weiches "Fffft"
+    n = int(0.3 * SR); t = np.arange(n) / SR
+    x = bp_var(r.uniform(-1, 1, n), 4000 - 3000 * t / 0.3, 3, SR) * np.sin(np.pi * t / 0.3)
+    out['web'] = normalize(x, 0.5)
+    for k, v in out.items():
+        write_wav(k + '.wav', fade(np.asarray(v, dtype=float), SR, 0.002, 0.02), SR)
 
 
 def whoosh(dur=0.22, f0=600, f1=2800, q=2.0):
@@ -534,7 +588,9 @@ def sfx_all():
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     sfx_all()
+    sfx_level2()
     music_dungeon()
     music_boss()
     music_victory()
+    music_title()
     print('fertig:', sorted(os.listdir(OUT)))

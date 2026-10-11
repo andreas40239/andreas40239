@@ -27,6 +27,7 @@ func _draw() -> void:
 		"heart": glow_c = Color(1, 0.3, 0.4)
 		"crystal": glow_c = Color(0.7, 0.5, 1.0)
 		"potion": glow_c = Color(1, 0.4, 0.5)
+		"key": glow_c = Color(1, 0.85, 0.3)
 	var pulse := 0.25 + 0.12 * sin(anim * 5.0)
 	draw_circle(Vector2.ZERO, 18, Color(glow_c, pulse * 0.5))
 	draw_circle(Vector2.ZERO, 12, Color(glow_c, pulse))
@@ -52,6 +53,12 @@ func _draw() -> void:
 			draw_circle(Vector2(0, 3), 7, Color(0.9, 0.2, 0.35))
 			draw_rect(Rect2(-2.5, -8, 5, 6), Color(0.8, 0.85, 0.9))
 			draw_rect(Rect2(-3.5, -10, 7, 3), Color(0.5, 0.3, 0.15))
+		"key":
+			var gold := Color(1.0, 0.82, 0.25)
+			draw_arc(Vector2(-5, -5), 5.5, 0, TAU, 14, gold, 3.0)
+			draw_line(Vector2(-1, -1), Vector2(10, 10), gold, 3.0)
+			draw_line(Vector2(6, 6), Vector2(9, 3), gold, 3.0)
+			draw_line(Vector2(9, 9), Vector2(12, 6), gold, 3.0)
 		"crystal":
 			var pts := PackedVector2Array([Vector2(0, -14), Vector2(8, -2), Vector2(0, 14), Vector2(-8, -2)])
 			draw_colored_polygon(pts, Color(0.65, 0.45, 1.0))

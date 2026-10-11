@@ -32,7 +32,9 @@ func _draw() -> void:
 					_torch(tx, ty, t)
 				"E":
 					_portal(tx, ty, t)
-	if cam.distance_to(game.RING_CENTER) < 700.0:
+				"L":
+					_door(tx, ty)
+	if game.has_rings and cam.distance_to(game.ring_center) < 700.0:
 		_rings()
 
 
@@ -83,6 +85,20 @@ func _gate(tx: int, ty: int, ch: String) -> void:
 		draw_rect(Rect2(r.position.x, r.position.y, T, 4), Color(0.4, 0.38, 0.42))
 
 
+func _door(tx: int, ty: int) -> void:
+	var r := Rect2(tx * T, ty * T, T, T)
+	draw_rect(r, Color(0.45, 0.28, 0.12))
+	for i in 3:
+		draw_line(r.position + Vector2(4 + i * 10, 0), r.position + Vector2(4 + i * 10, T), Color(0.3, 0.18, 0.08), 2.0)
+	draw_rect(Rect2(r.position + Vector2(0, 5), Vector2(T, 4)), Color(0.35, 0.35, 0.4))
+	draw_rect(Rect2(r.position + Vector2(0, 23), Vector2(T, 4)), Color(0.35, 0.35, 0.4))
+	# Schloss
+	var c := r.get_center()
+	draw_rect(Rect2(c - Vector2(6, 3), Vector2(12, 10)), Color(0.95, 0.8, 0.25))
+	draw_arc(c - Vector2(0, 3), 4.5, PI, TAU, 8, Color(0.95, 0.8, 0.25), 2.0)
+	draw_circle(c + Vector2(0, 2), 1.8, Color(0.2, 0.1, 0.0))
+
+
 func _torch(tx: int, ty: int, t: float) -> void:
 	var c := Vector2(tx * T + 16, ty * T + 14)
 	var f := 1.0 + 0.15 * sin(t * 13.0 + tx) + 0.1 * sin(t * 23.0)
@@ -106,12 +122,12 @@ func _portal(tx: int, ty: int, t: float) -> void:
 
 
 func _rings() -> void:
-	var C: Vector2 = game.RING_CENTER
+	var C: Vector2 = game.ring_center
 	# Boden-Rune in der Mitte
 	draw_circle(C, 20, Color(0.3, 0.4, 0.7, 0.25 + 0.1 * sin(game.time * 2.0)))
 	draw_arc(C, 14, 0, TAU, 6, Color(0.5, 0.7, 1.0, 0.6), 2.0)
-	for i in game.RING_RADII.size():
-		var rad: float = game.RING_RADII[i]
+	for i in game.ring_radii.size():
+		var rad: float = game.ring_radii[i]
 		var gap_half: float = (game.RING_GAP * 0.5) / rad
 		var a: float = game.ring_angles[i]
 		var start := a + gap_half

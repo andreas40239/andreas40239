@@ -1,49 +1,48 @@
 extends Node2D
 ## Spielleiter: Karte, Kollision, Bosse, Checkpoints, Kamera, Ablauf.
+## Welches Level gespielt wird, steht in Engine-Metadaten "level" (vom Startbildschirm gesetzt).
 
-const LevelData := preload("res://scripts/level_data.gd")
+const Levels := preload("res://scripts/levels.gd")
 const WorldStatic := preload("res://scripts/world_static.gd")
 const WorldDynamic := preload("res://scripts/world_dynamic.gd")
 const Player := preload("res://scripts/player.gd")
 const Bat := preload("res://scripts/enemy_bat.gd")
 const Slime := preload("res://scripts/enemy_slime.gd")
+const BabySpider := preload("res://scripts/enemy_spider.gd")
 const Knight := preload("res://scripts/boss_knight.gd")
 const Octopus := preload("res://scripts/boss_octopus.gd")
 const Golem := preload("res://scripts/boss_golem.gd")
+const Spider := preload("res://scripts/boss_spider.gd")
 const Dragon := preload("res://scripts/dragon.gd")
 const Pickup := preload("res://scripts/pickup.gd")
 const Projectile := preload("res://scripts/projectile.gd")
 const Effects := preload("res://scripts/effects.gd")
 const Hud := preload("res://scripts/hud.gd")
 const AudioMgr := preload("res://scripts/audio.gd")
+const Progress := preload("res://scripts/progress.gd")
 
+const START_SCENE := "res://scenes/start.tscn"
 const TILE := 32
 const MAX_DT := 1.0 / 30.0
 
-# --- Startzone (9): drehende Labyrinth-Scheiben ---------------------------
-const RING_CENTER := Vector2(15 * TILE, 8.5 * TILE)
-const RING_RADII := [42.0, 80.0, 118.0, 156.0]
-const RING_SPEED := [0.9, -0.62, 0.44, -0.3]
+# --- Drehende Labyrinth-Scheiben (Level 1) --------------------------------
 const RING_HALF_THICK := 4.0
 const RING_GAP := 46.0  # Breite der Lücke in Pixeln
 
-# --- Feuerfeld (6) ------------------------------------------------------
-const FIRE_X0 := 6
-const FIRE_Y0 := 34
-const FIRE_STEP := 0.55  # Sekunden pro Takt
-const FIRE_RESPAWN := Vector2(4.5 * TILE, 36.5 * TILE)
-const FIRE_DONE := Vector2(19.5 * TILE, 36.5 * TILE)
+# --- Feuerfeld: alle Flammen gehen gemeinsam an und aus -------------------
+const FIRE_CYCLE := 5.0  # Sekunden pro Durchgang
+const FIRE_ON := 1.0     # so lange brennt es
+const FIRE_WARN := 0.8   # so lange flackert vorher die Warnung
 
-# --- Bosse ---------------------------------------------------------------
 enum { BOSS_IDLE, BOSS_FIGHT, BOSS_DONE }
-const BOSS_NAMES := ["", "Schattenritter", "Riesenkrake", "Steingolem"]
-const BOSS_TRIGGER := [Rect2i(), Rect2i(10, 22, 9, 7), Rect2i(23, 32, 13, 10), Rect2i(48, 33, 11, 9)]
 const BOSS_ENTRY := ["", "a", "b", "c"]
 const BOSS_EXIT := ["", "A", "B", "G"]
 
+var level: Dictionary
+var level_num := 1
 var map_w := 0
 var map_h := 0
-var tiles: Array = []  # Array von PackedStringArray? -> Array[Array[String]]
+var tiles: Array = []
 
 var world_static: Node2D
 var world_dynamic: Node2D
@@ -54,29 +53,40 @@ var hud: Node
 var audio: Node
 
 var player: Node2D
-var dragon: Node2D
+var dragon: Node2D = null
 var enemies: Array = []
 var projectiles: Array = []
 var pickups: Array = []
 
 var time := 0.0
-var ring_angles := [0.0, 1.7, 3.3, 0.6]
-var boss_state := [0, BOSS_IDLE, BOSS_IDLE, BOSS_IDLE]
-var boss_nodes := [null, null, null, null]
-var boss_spawn := [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
+var has_rings := false
+var ring_center := Vector2.ZERO
+var ring_radii: Array = []
+var ring_speed: Array = []
+var ring_angles: Array = []
+var fire: Dictionary = {}
+
+var boss_count := 0
+var boss_info: Array = [{}]
+var boss_state: Array = [0]
+var boss_nodes: Array = [null]
+var boss_spawn: Array = [Vector2.ZERO]
+
 var crystals := 0
+var keys := 0
+var portal_pos := Vector2.ZERO
 var checkpoint := Vector2.ZERO
 var deaths := 0
 var play_time := 0.0
-var state := "title"  # title, play, dead, won
+var state := "play"  # play, dead, won
 var dead_timer := 0.0
 var shake := 0.0
 var fire_last_step := -1
 var portal_msg_cd := 0.0
+var door_msg_cd := 0.0
 var dragon_roar_cd := 3.0
 var seen_dragon := false
-var seen_fire := false
-var seen_rings := false
+var seen_hints := {}
 
 # Steuerung (wird vom HUD bzw. der Tastatur gesetzt)
 var touch_dir := Vector2.ZERO
@@ -85,7 +95,10 @@ var action_queued := false
 
 func _ready() -> void:
 	randomize()
+	level_num = int(Engine.get_meta("level", 1))
+	level = Levels.get_level(level_num)
 	_load_map()
+	_setup_level()
 
 	world_static = WorldStatic.new()
 	world_static.game = self
@@ -114,16 +127,38 @@ func _ready() -> void:
 	add_child(hud)
 
 	_spawn_from_map()
-	checkpoint = RING_CENTER
-	player.position = RING_CENTER
+	player.weapon = level["start_weapon"]
+	player.position = checkpoint
 	camera.position = player.position
 	camera.make_current()
 	audio.play_music("dungeon")
+	hud.show_message("Level %d: %s" % [level_num, level["name"]], level["intro"])
+
+
+func _setup_level() -> void:
+	var r = level["rings"]
+	has_rings = r != null
+	if has_rings:
+		ring_center = r["center"]
+		ring_radii = r["radii"]
+		ring_speed = r["speed"]
+		ring_angles = []
+		for i in ring_radii.size():
+			ring_angles.append(1.7 * i)
+	if level["fire"] != null:
+		fire = level["fire"]
+	var bs: Array = level["bosses"]
+	boss_count = bs.size()
+	for b in bs:
+		boss_info.append(b)
+		boss_state.append(BOSS_IDLE)
+		boss_nodes.append(null)
+		boss_spawn.append(Vector2.ZERO)
 
 
 # ---------------------------------------------------------------- Karte
 func _load_map() -> void:
-	var rows: Array = LevelData.MAP
+	var rows: Array = level["map"]
 	map_h = rows.size()
 	map_w = String(rows[0]).length()
 	tiles.clear()
@@ -154,30 +189,32 @@ func world_to_tile(p: Vector2) -> Vector2i:
 	return Vector2i(floori(p.x / TILE), floori(p.y / TILE))
 
 
-## Ist die Kachel fuer Laeufer blockiert? (fliegend: Wasser ist frei)
+func _boss_for_gate(ch: String, gates: Array) -> int:
+	var i := gates.find(ch)
+	return i if i > 0 and i <= boss_count else -1
+
+
+## Ist die Kachel für Läufer blockiert? (fliegend: Wasser ist frei)
 func is_solid(tx: int, ty: int, flying := false) -> bool:
 	var ch := tile_at(tx, ty)
 	match ch:
-		"#", "C", "P", "t":
+		"#", "C", "P", "t", "L":
 			return true
 		"~":
 			return not flying
-		"a":
-			return boss_state[1] == BOSS_FIGHT
-		"b":
-			return boss_state[2] == BOSS_FIGHT
-		"c":
-			return boss_state[3] == BOSS_FIGHT
-		"A":
-			return boss_state[1] != BOSS_DONE
-		"B":
-			return boss_state[2] != BOSS_DONE
-		"G":
-			return boss_state[3] != BOSS_DONE
+		"a", "b", "c":
+			var i := _boss_for_gate(ch, BOSS_ENTRY)
+			return i > 0 and boss_state[i] == BOSS_FIGHT
+		"A", "B", "G":
+			var i := _boss_for_gate(ch, BOSS_EXIT)
+			return i > 0 and boss_state[i] != BOSS_DONE
 	return false
 
 
 func _spawn_from_map() -> void:
+	var boss_chars := {}
+	for i in range(1, boss_count + 1):
+		boss_chars[boss_info[i]["char"]] = i
 	for y in map_h:
 		for x in map_w:
 			var ch: String = tiles[y][x]
@@ -185,7 +222,7 @@ func _spawn_from_map() -> void:
 			var keep_floor := true
 			match ch:
 				"S":
-					pass
+					checkpoint = p
 				"f":
 					_add_pickup("fire", p)
 				"i":
@@ -194,31 +231,39 @@ func _spawn_from_map() -> void:
 					_add_pickup("heart", p)
 				"p":
 					_add_pickup("potion", p)
+				"k":
+					_add_pickup("key", p)
 				"v":
 					_add_enemy(Bat.new(), p)
 				"s":
 					_add_enemy(Slime.new(), p)
-				"K":
-					boss_spawn[1] = p
-				"O":
-					boss_spawn[2] = p
-					tiles[y][x] = "~"
-					keep_floor = false
-				"M":
-					boss_spawn[3] = p
 				"D":
 					pass
-				_:
+				"E":
+					portal_pos = p
 					keep_floor = false
+				_:
+					if boss_chars.has(ch):
+						boss_spawn[boss_chars[ch]] = p
+						if boss_info[boss_chars[ch]]["kind"] == "octopus":
+							tiles[y][x] = "~"
+							keep_floor = false
+					else:
+						keep_floor = false
 			if keep_floor:
 				tiles[y][x] = "."
+	if has_rings:
+		checkpoint = ring_center
 	player = Player.new()
 	player.game = self
 	entities.add_child(player)
-	dragon = Dragon.new()
-	dragon.game = self
-	entities.add_child(dragon)
-	for i in range(1, 4):
+	if level["dragon"] != null:
+		dragon = Dragon.new()
+		dragon.game = self
+		dragon.center = level["dragon"]["center"]
+		dragon.amp = level["dragon"]["amp"]
+		entities.add_child(dragon)
+	for i in range(1, boss_count + 1):
 		_spawn_boss(i)
 
 
@@ -239,15 +284,23 @@ func _add_enemy(e: Node2D, p: Vector2) -> void:
 	enemies.append(e)
 
 
+func spawn_baby_spider(p: Vector2) -> void:
+	_add_enemy(BabySpider.new(), p)
+
+
 func _spawn_boss(i: int) -> void:
 	if boss_nodes[i] != null and is_instance_valid(boss_nodes[i]):
 		enemies.erase(boss_nodes[i])
 		boss_nodes[i].queue_free()
 	var b: Node2D
-	match i:
-		1: b = Knight.new()
-		2: b = Octopus.new()
-		3: b = Golem.new()
+	match boss_info[i]["kind"]:
+		"knight": b = Knight.new()
+		"octopus": b = Octopus.new()
+		"golem": b = Golem.new()
+		"icegolem":
+			b = Golem.new()
+			b.ice_variant = true
+		"spider": b = Spider.new()
 	b.game = self
 	b.position = boss_spawn[i]
 	b.boss_id = i
@@ -268,7 +321,7 @@ func spawn_projectile(p: Vector2, vel: Vector2, kind: String, hostile := true) -
 
 
 # ---------------------------------------------------------- Kollision
-## Bewegt einen Kreis mit Kachel-Kollision; gibt die neue Position zurueck.
+## Bewegt einen Kreis mit Kachel-Kollision; gibt die neue Position zurück.
 func move_circle(pos: Vector2, delta: Vector2, r: float, flying := false) -> Vector2:
 	var steps := int(ceil(delta.length() / (r * 0.8))) + 1
 	var d := delta / steps
@@ -298,7 +351,7 @@ func resolve_tiles(pos: Vector2, r: float, flying := false) -> Vector2:
 				if dist > 0.001:
 					pos = closest + diff / dist * r
 				else:
-					# Mittelpunkt steckt in der Kachel: kuerzesten Weg hinaus
+					# Mittelpunkt steckt in der Kachel: kürzesten Weg hinaus
 					var c := Vector2(rx + TILE * 0.5, ry + TILE * 0.5)
 					var o := pos - c
 					if absf(o.x) > absf(o.y):
@@ -314,28 +367,30 @@ func touches_solid(pos: Vector2, r: float, flying := false) -> bool:
 
 ## Kollision mit den drehenden Ringen der Startzone.
 func resolve_rings(pos: Vector2, r: float) -> Vector2:
-	var to := pos - RING_CENTER
-	if to.length() > RING_RADII[-1] + 30.0:
+	if not has_rings:
 		return pos
-	for i in RING_RADII.size():
-		var rad: float = RING_RADII[i]
+	var to := pos - ring_center
+	if to.length() > ring_radii[-1] + 30.0:
+		return pos
+	for i in ring_radii.size():
+		var rad: float = ring_radii[i]
 		var gap_half := (RING_GAP * 0.5) / rad
-		var d := (pos - RING_CENTER).length()
+		var d := (pos - ring_center).length()
 		if absf(d - rad) >= RING_HALF_THICK + r + 2.0:
 			continue
-		var ang := (pos - RING_CENTER).angle()
+		var ang := (pos - ring_center).angle()
 		var diff := wrapf(ang - ring_angles[i], -PI, PI)
 		if absf(diff) > gap_half:
-			# Auf der Mauer: radial auf die naechste Seite schieben
-			var dir := (pos - RING_CENTER).normalized()
+			# Auf der Mauer: radial auf die nächste Seite schieben
+			var dir := (pos - ring_center).normalized()
 			if d < rad:
-				pos = RING_CENTER + dir * minf(d, rad - RING_HALF_THICK - r)
+				pos = ring_center + dir * minf(d, rad - RING_HALF_THICK - r)
 			else:
-				pos = RING_CENTER + dir * maxf(d, rad + RING_HALF_THICK + r)
+				pos = ring_center + dir * maxf(d, rad + RING_HALF_THICK + r)
 		else:
-			# In der Luecke: an den Mauerenden abprallen
+			# In der Lücke: an den Mauerenden abprallen
 			for sgn in [-1.0, 1.0]:
-				var e: Vector2 = RING_CENTER + Vector2.from_angle(ring_angles[i] + sgn * gap_half) * rad
+				var e: Vector2 = ring_center + Vector2.from_angle(ring_angles[i] + sgn * gap_half) * rad
 				var off := pos - e
 				var od := off.length()
 				if od < RING_HALF_THICK + r and od > 0.001:
@@ -343,19 +398,21 @@ func resolve_rings(pos: Vector2, r: float) -> Vector2:
 	return pos
 
 
+## 0 = aus, 1 = Warnung (glühend), 2 = brennt
 func fire_burning_at(tx: int, ty: int) -> int:
-	## 0 = aus, 1 = Warnung (gluehend), 2 = brennt
-	if tile_at(tx, ty) != "F":
+	if tile_at(tx, ty) != "F" or fire.is_empty():
 		return 0
-	var col := tx - FIRE_X0
-	var row := ty - FIRE_Y0
-	var off := 2.0 if row % 2 == 1 else 0.0
-	var f := fposmod(time / FIRE_STEP - col - off, 4.0)
-	if f < 2.0:
+	var ph := fposmod(time, FIRE_CYCLE)
+	if ph < FIRE_ON:
 		return 2
-	if f > 3.35:
+	if ph > FIRE_CYCLE - FIRE_WARN:
 		return 1
 	return 0
+
+
+func is_ice(p: Vector2) -> bool:
+	var t := world_to_tile(p)
+	return tile_at(t.x, t.y) == "I"
 
 
 # ------------------------------------------------------------ Ablauf
@@ -363,7 +420,7 @@ func _process(delta: float) -> void:
 	var dt := minf(delta, MAX_DT)
 	time += dt
 	for i in ring_angles.size():
-		ring_angles[i] = wrapf(ring_angles[i] + RING_SPEED[i] * dt, -PI, PI)
+		ring_angles[i] = wrapf(ring_angles[i] + ring_speed[i] * dt, -PI, PI)
 
 	if state == "play":
 		play_time += dt
@@ -386,7 +443,8 @@ func _process(delta: float) -> void:
 
 
 func _update_world_only(dt: float) -> void:
-	dragon.update(dt)
+	if dragon:
+		dragon.update(dt)
 	for pk in pickups:
 		pk.update(dt)
 
@@ -405,7 +463,8 @@ func _update_play(dt: float) -> void:
 		player.try_attack()
 
 	player.update(dt)
-	dragon.update(dt)
+	if dragon:
+		dragon.update(dt)
 	for e in enemies.duplicate():
 		if is_instance_valid(e):
 			e.update(dt)
@@ -419,6 +478,7 @@ func _update_play(dt: float) -> void:
 	_check_contacts()
 	_check_bosses()
 	_check_fire_field()
+	_check_doors(dt)
 	_check_zones(dt)
 
 
@@ -430,7 +490,7 @@ func _check_contacts() -> void:
 			continue
 		if e.touches(player.position, player.radius):
 			player.hurt(e.contact_damage(), (player.position - e.position).normalized())
-	if dragon.touches(player.position, player.radius):
+	if dragon and dragon.touches(player.position, player.radius):
 		player.hurt(1, dragon.push_dir(player.position))
 	for pk in pickups.duplicate():
 		if pk.position.distance_to(player.position) < player.radius + 14.0:
@@ -460,18 +520,23 @@ func _collect(pk: Node2D) -> void:
 			player.hp = mini(player.max_hp, player.hp + 2)
 			audio.sfx("pickup")
 			hud.show_message("Heiltrank", "+2 Herzen")
+		"key":
+			keys += 1
+			audio.sfx("key")
+			hud.show_message("SCHLÜSSEL!", "Damit öffnest du eine verschlossene Tür.")
+			checkpoint = pk.position
 		"crystal":
 			crystals += 1
 			audio.sfx("crystal")
-			hud.show_message("KRISTALL %d/3" % crystals, "Bringe alle drei Kristalle zum Portal hinter dem Drachen.")
+			hud.show_message("KRISTALL %d/%d" % [crystals, boss_count], "Bringe alle Kristalle zum Portal.")
 	effects.burst(pk.position, Color(1, 0.95, 0.6), 18, 120.0)
 	pk.queue_free()
 
 
 func _check_bosses() -> void:
 	var pt := world_to_tile(player.position)
-	for i in range(1, 4):
-		if boss_state[i] == BOSS_IDLE and BOSS_TRIGGER[i].has_point(pt):
+	for i in range(1, boss_count + 1):
+		if boss_state[i] == BOSS_IDLE and Rect2i(boss_info[i]["trigger"]).has_point(pt):
 			_start_boss(i)
 
 
@@ -481,8 +546,7 @@ func _start_boss(i: int) -> void:
 	audio.play_music("boss")
 	shake = 6.0
 	boss_nodes[i].start_fight()
-	hud.show_message(BOSS_NAMES[i], "")
-	world_dynamic.queue_redraw()
+	hud.show_message(boss_info[i]["name"], "")
 
 
 func boss_defeated(i: int) -> void:
@@ -494,61 +558,101 @@ func boss_defeated(i: int) -> void:
 	audio.sfx("boss_defeat")
 	audio.sfx("gate")
 	audio.play_music("dungeon")
-	var drop := b.position
-	if i == 2:
-		drop = tile_center(24, 36)  # neben dem Becken
+	var drop: Vector2 = boss_info[i].get("drop", b.position)
 	_add_pickup("crystal", drop)
 	checkpoint = drop
-	hud.show_message(BOSS_NAMES[i] + " besiegt!", "Ein Kristall ist erschienen. Das Tor ist offen.")
+	hud.show_message(boss_info[i]["name"] + " besiegt!", "Ein Kristall ist erschienen. Das Tor ist offen.")
 	b.queue_free()
 	boss_nodes[i] = null
-	# Feinde-Projektile weg
 	for pr in projectiles.duplicate():
 		pr.queue_free()
 	projectiles.clear()
+	# kleine Spinnen verschwinden mit ihrer Mutter
+	for e in enemies.duplicate():
+		if e.has_meta("brood"):
+			enemies.erase(e)
+			effects.burst(e.position, Color(0.6, 0.5, 0.7), 8, 80.0)
+			e.queue_free()
 
 
 func _check_fire_field() -> void:
-	var step := floori(time / FIRE_STEP)
+	if fire.is_empty():
+		return
+	var step := floori(time / FIRE_CYCLE)
 	var p := player.position
-	var in_area := p.x < 22 * TILE and p.y > 31 * TILE
+	var pt := world_to_tile(p)
 	if step != fire_last_step:
 		fire_last_step = step
-		if in_area:
-			audio.sfx("fire", -10.0)
+		if Rect2i(fire["area"]).has_point(pt):
+			audio.sfx("fire", -6.0)
+	if player.dead or player.invuln > 0.0:
+		return
+	if fire_burning_at(pt.x, pt.y) == 2:
+		# Kinderfreundlich: ein Herz Schaden, kleiner Schubs zurück, kein Neustart
+		player.hurt(1, Vector2.LEFT)
+		effects.burst(p, Color(1, 0.5, 0.1), 20, 150.0)
+
+
+func _check_doors(dt: float) -> void:
+	door_msg_cd -= dt
 	if player.dead:
 		return
+	var p := player.position
 	var pt := world_to_tile(p)
-	if fire_burning_at(pt.x, pt.y) == 2:
-		player.hurt(1, Vector2.LEFT, true)
-		effects.burst(p, Color(1, 0.5, 0.1), 20, 150.0)
-		if not player.dead:
-			player.position = FIRE_RESPAWN
-			player.knock = Vector2.ZERO
+	for oy in range(-1, 2):
+		for ox in range(-1, 2):
+			var tx := pt.x + ox
+			var ty := pt.y + oy
+			if tile_at(tx, ty) != "L":
+				continue
+			var rect := Rect2(tx * TILE, ty * TILE, TILE, TILE)
+			var closest := Vector2(clampf(p.x, rect.position.x, rect.end.x), clampf(p.y, rect.position.y, rect.end.y))
+			if closest.distance_to(p) > player.radius + 3.0:
+				continue
+			if keys > 0:
+				keys -= 1
+				_open_door(tx, ty)
+				audio.sfx("gate")
+				hud.show_message("Die Tür ist offen!", "")
+				return
+			elif door_msg_cd <= 0.0:
+				door_msg_cd = 3.0
+				audio.sfx("denied")
+				hud.show_message("Verschlossen!", "Du brauchst einen Schlüssel.")
+
+
+func _open_door(tx: int, ty: int) -> void:
+	# ganze zusammenhängende Tür öffnen
+	var todo := [Vector2i(tx, ty)]
+	while not todo.is_empty():
+		var t: Vector2i = todo.pop_back()
+		if tile_at(t.x, t.y) != "L":
+			continue
+		tiles[t.y][t.x] = "."
+		effects.burst(tile_center(t.x, t.y), Color(0.9, 0.8, 0.4), 14, 120.0)
+		for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			todo.append(t + d)
+	world_static.queue_redraw_all()
 
 
 func _check_zones(dt: float) -> void:
 	var p := player.position
 	var pt := world_to_tile(p)
 	portal_msg_cd -= dt
-	# Startzone-Hinweis
-	if not seen_rings and play_time > 0.5:
-		seen_rings = true
-		hud.show_message("Die drehenden Scheiben", "Warte, bis sich die Lücken vor dir öffnen!")
-	# Feuerfeld-Hinweis
-	if not seen_fire and pt.y >= 34 and pt.x <= 5 and pt.y <= 39:
-		seen_fire = true
-		hud.show_message("Feuer aus dem Boden!", "Erkenne den Rhythmus: Folge den Flammen, wenn sie erlöschen.")
-		checkpoint = FIRE_RESPAWN
-	if pt.x >= 18 and pt.x <= 20 and pt.y >= 34 and pt.y <= 39 and checkpoint != FIRE_DONE and boss_state[2] != BOSS_DONE:
-		checkpoint = FIRE_DONE
+	for i in level["hints"].size():
+		var h: Dictionary = level["hints"][i]
+		if not seen_hints.has(i) and Rect2i(h["rect"]).has_point(pt):
+			seen_hints[i] = true
+			if h["title"] != "":
+				hud.show_message(h["title"], h["sub"])
+			if h.has("checkpoint"):
+				checkpoint = h["checkpoint"]
 	# Drachenhalle
-	var in_hall := pt.y <= 11 and pt.x >= 29
-	if in_hall:
+	if dragon and Rect2i(level["dragon"]["hall"]).has_point(pt):
 		dragon_roar_cd -= dt
 		if not seen_dragon:
 			seen_dragon = true
-			checkpoint = tile_center(61, 12) + Vector2(16, 0)
+			checkpoint = level["dragon"]["entry"]
 			audio.sfx("dragon")
 			shake = 8.0
 			hud.show_message("Der Endlos-Drache!", "Er kreist ewig. Finde die Lücke - das Eisschwert lähmt ihn.")
@@ -557,20 +661,29 @@ func _check_zones(dt: float) -> void:
 			dragon_roar_cd = randf_range(6.0, 10.0)
 			audio.sfx("dragon", -4.0)
 	# Portal
-	if tile_at(pt.x, pt.y) == "E" or p.distance_to(tile_center(30, 6)) < 26.0:
-		if crystals >= 3:
+	if p.distance_to(portal_pos) < 26.0:
+		if crystals >= boss_count:
 			_win()
 		elif portal_msg_cd <= 0.0:
 			portal_msg_cd = 2.5
 			audio.sfx("denied")
-			hud.show_message("Das Portal ist versiegelt", "Es fehlen noch %d Kristalle." % (3 - crystals))
+			hud.show_message("Das Portal ist versiegelt", "Es fehlen noch %d Kristalle." % (boss_count - crystals))
+
+
+func dragon_hall_has(pt: Vector2i) -> bool:
+	return dragon != null and Rect2i(level["dragon"]["hall"]).has_point(pt)
 
 
 func _win() -> void:
 	state = "won"
+	Progress.mark_done(level_num)
 	audio.play_music("victory")
 	effects.burst(player.position, Color(0.6, 0.9, 1.0), 80, 300.0)
 	hud.show_victory()
+
+
+func has_next_level() -> bool:
+	return level_num < Levels.COUNT
 
 
 func player_died() -> void:
@@ -582,11 +695,15 @@ func player_died() -> void:
 
 
 func _respawn() -> void:
-	# laufende Bosskaempfe zuruecksetzen
-	for i in range(1, 4):
+	# laufende Bosskämpfe zurücksetzen
+	for i in range(1, boss_count + 1):
 		if boss_state[i] == BOSS_FIGHT:
 			boss_state[i] = BOSS_IDLE
 			_spawn_boss(i)
+	for e in enemies.duplicate():
+		if e.has_meta("brood"):
+			enemies.erase(e)
+			e.queue_free()
 	for pr in projectiles.duplicate():
 		pr.queue_free()
 	projectiles.clear()
@@ -598,15 +715,16 @@ func _respawn() -> void:
 	hud.show_message("Weiter geht's!", "")
 
 
-func start_game() -> void:
-	state = "play"
-
-
-func restart() -> void:
+func next_level() -> void:
+	Engine.set_meta("level", level_num + 1)
 	get_tree().reload_current_scene()
 
 
-## Schwerthieb des Spielers: trifft Gegner, Projektile und rissige Waende.
+func to_menu() -> void:
+	get_tree().change_scene_to_file(START_SCENE)
+
+
+## Schwerthieb des Spielers: trifft Gegner, Projektile und rissige Wände.
 func player_attack(origin: Vector2, facing: Vector2, weapon: int) -> void:
 	var reach := 40.0
 	var dmg := 1 if weapon == 0 else 2
@@ -623,7 +741,7 @@ func player_attack(origin: Vector2, facing: Vector2, weapon: int) -> void:
 		hit_any = true
 		e.take_hit(dmg, to.normalized() if d > 0.1 else facing, weapon)
 	# Drache (nur einfrieren mit Eis)
-	if dragon.hit_test(origin + facing * 24.0, 30.0):
+	if dragon and dragon.hit_test(origin + facing * 24.0, 30.0):
 		hit_any = true
 		if weapon >= 2:
 			dragon.freeze(2.8)
@@ -636,7 +754,7 @@ func player_attack(origin: Vector2, facing: Vector2, weapon: int) -> void:
 		if is_instance_valid(pr) and pr.hostile and pr.position.distance_to(origin + facing * 22.0) < 30.0 + pr.radius:
 			effects.burst(pr.position, pr.color(), 8, 90.0)
 			pr.kill()
-	# Rissige Waende
+	# Rissige Wände
 	if weapon >= 1:
 		var probes := [facing * 30.0, facing.rotated(0.5) * 28.0, facing.rotated(-0.5) * 28.0]
 		var broken := {}

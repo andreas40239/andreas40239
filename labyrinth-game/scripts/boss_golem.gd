@@ -1,11 +1,13 @@
 extends "res://scripts/enemy_base.gd"
 ## Zwischenboss 7: Steingolem - nur mit Eis verwundbar, stampft Felsen.
+## Als Eisgolem (Level 2) ist er umgekehrt nur mit Feuer verwundbar.
 
 var fighting := false
 var mode := "walk"
 var t := 2.0
 var phase2 := false
 var hint_cd := 0.0
+var ice_variant := false
 
 
 func _ready() -> void:
@@ -36,7 +38,8 @@ func knock_power() -> float:
 
 
 func take_hit(dmg: int, dir: Vector2, weapon: int) -> void:
-	if weapon < 2:
+	var immune := weapon < 1 if ice_variant else weapon < 2
+	if immune:
 		hit_cd = 0.2
 		flash = 0.05
 		game.audio.sfx("clank")
@@ -44,9 +47,25 @@ func take_hit(dmg: int, dir: Vector2, weapon: int) -> void:
 		hint_cd -= 1.0
 		if hint_cd <= 0.0:
 			hint_cd = 4.0
-			game.hud.show_message("Kling! Der Golem ist zu hart.", "Nur eisige Kälte kann seinen Stein sprengen.")
+			if ice_variant:
+				game.hud.show_message("Kling! Das Eis ist zu hart.", "Nur Feuer kann den Eisgolem schmelzen.")
+			else:
+				game.hud.show_message("Kling! Der Golem ist zu hart.", "Nur eisige Kälte kann seinen Stein sprengen.")
 		return
-	super.take_hit(dmg, dir, weapon)
+	if ice_variant:
+		# Feuer schmilzt: kein Einfrieren, dafür Dampf
+		hp -= dmg
+		flash = 0.15
+		hit_cd = 0.12
+		knock = dir * knock_power()
+		game.audio.sfx("hit")
+		game.audio.sfx("fire", -6.0)
+		game.effects.burst(position, Color(0.9, 0.95, 1.0), 14, 120.0)
+		if hp <= 0:
+			die()
+			return
+	else:
+		super.take_hit(dmg, dir, weapon)
 	if hp > 0 and hp <= 5 and not phase2:
 		phase2 = true
 		game.audio.sfx("golem")
@@ -85,9 +104,13 @@ func _slam() -> void:
 	var off := randf() * TAU
 	for i in n:
 		var d := Vector2.from_angle(off + TAU * i / n)
-		game.spawn_projectile(position + d * 24.0, d * 150.0, "rock")
+		game.spawn_projectile(position + d * 24.0, d * 150.0, rock_kind())
 	if phase2:
-		game.spawn_projectile(position, to_player().normalized() * 210.0, "rock")
+		game.spawn_projectile(position, to_player().normalized() * 210.0, rock_kind())
+
+
+func rock_kind() -> String:
+	return "icerock" if ice_variant else "rock"
 
 
 func _draw() -> void:
@@ -96,6 +119,10 @@ func _draw() -> void:
 	var stone := tint(Color(0.45, 0.4, 0.35))
 	var dark := tint(Color(0.3, 0.27, 0.24))
 	var glow := Color(1.0, 0.45, 0.1) if frozen <= 0.0 else Color(0.5, 0.85, 1.0)
+	if ice_variant:
+		stone = tint(Color(0.65, 0.82, 0.95))
+		dark = tint(Color(0.42, 0.6, 0.78))
+		glow = Color(0.2, 0.4, 1.0)
 	# Beine
 	draw_rect(Rect2(-15, 6, 11, 14), dark)
 	draw_rect(Rect2(4, 6, 11, 14), dark)

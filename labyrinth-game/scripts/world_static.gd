@@ -37,19 +37,10 @@ func queue_redraw_all() -> void:
 
 
 func region_floor(tx: int, ty: int) -> Color:
-	if ty <= 14 and tx <= 22:
-		return Color(0.2, 0.22, 0.3)       # Startzone: blauer Stein
-	if ty <= 11 and tx >= 29:
-		return Color(0.24, 0.13, 0.13)     # Drachenhalle: Obsidian-rot
-	if tx >= 9 and tx <= 19 and ty >= 21 and ty <= 29:
-		return Color(0.22, 0.2, 0.26)      # Ritterhalle
-	if tx >= 22 and tx <= 36 and ty >= 31:
-		return Color(0.15, 0.22, 0.2)      # Krakengrotte: moosig
-	if tx >= 47 and ty >= 32:
-		return Color(0.27, 0.22, 0.17)     # Golem: Fels
-	if tx >= 46 and tx <= 55 and ty >= 18 and ty <= 24:
-		return Color(0.18, 0.23, 0.3)      # Eisraum
-	return Color(0.2, 0.19, 0.2)
+	for r in game.level["regions"]:
+		if Rect2i(r[0]).has_point(Vector2i(tx, ty)):
+			return r[1]
+	return game.level["floor"]
 
 
 func _hash(x: int, y: int) -> float:
@@ -81,13 +72,13 @@ func _draw_tile(ci: CanvasItem, tx: int, ty: int) -> void:
 		if not open_near:
 			ci.draw_rect(r, Color(0.05, 0.045, 0.06))
 			return
-		var top := Color(0.36, 0.33, 0.38).darkened(h * 0.15)
+		var top: Color = Color(game.level["wall"]).darkened(h * 0.15)
 		ci.draw_rect(r, top)
 		ci.draw_rect(Rect2(r.position, Vector2(T, 2)), top.lightened(0.15))
 		if not is_wallish(below):
 			# Vorderseite mit Ziegeln
 			var face := Rect2(tx * T, ty * T + 14, T, 18)
-			ci.draw_rect(face, Color(0.24, 0.21, 0.25))
+			ci.draw_rect(face, top.darkened(0.4))
 			ci.draw_line(Vector2(tx * T, ty * T + 23), Vector2(tx * T + T, ty * T + 23), Color(0.15, 0.13, 0.16), 1.0)
 			var o := 8 if (tx % 2 == 0) else 20
 			ci.draw_line(Vector2(tx * T + o, ty * T + 14), Vector2(tx * T + o, ty * T + 23), Color(0.15, 0.13, 0.16), 1.0)
@@ -120,9 +111,10 @@ func _draw_tile(ci: CanvasItem, tx: int, ty: int) -> void:
 	match ch:
 		"P":
 			# Saeule
-			ci.draw_rect(Rect2(tx * T + 4, ty * T - 10, 24, 40), Color(0.3, 0.2, 0.2))
-			ci.draw_rect(Rect2(tx * T + 2, ty * T - 14, 28, 6), Color(0.42, 0.3, 0.28))
-			ci.draw_rect(Rect2(tx * T + 2, ty * T + 26, 28, 6), Color(0.2, 0.12, 0.12))
+			var pc: Color = game.level.get("pillar", Color(0.3, 0.2, 0.2))
+			ci.draw_rect(Rect2(tx * T + 4, ty * T - 10, 24, 40), pc)
+			ci.draw_rect(Rect2(tx * T + 2, ty * T - 14, 28, 6), pc.lightened(0.25))
+			ci.draw_rect(Rect2(tx * T + 2, ty * T + 26, 28, 6), pc.darkened(0.35))
 		"F":
 			# Feuerduese: Gitter
 			var c := r.get_center()
@@ -132,3 +124,11 @@ func _draw_tile(ci: CanvasItem, tx: int, ty: int) -> void:
 			ci.draw_arc(c, 11, 0, TAU, 16, Color(0.35, 0.18, 0.1), 1.5)
 		"E":
 			ci.draw_circle(r.get_center(), 15, Color(0.1, 0.05, 0.15))
+		"I":
+			# Rutscheis
+			ci.draw_rect(r, Color(0.62, 0.8, 0.92))
+			ci.draw_rect(Rect2(r.position, Vector2(T, 1)), Color(1, 1, 1, 0.35))
+			ci.draw_line(r.position + Vector2(5 + h * 8, 8), r.position + Vector2(14 + h * 8, 4), Color(1, 1, 1, 0.7), 1.5)
+			ci.draw_line(r.position + Vector2(18, 24 - h * 6), r.position + Vector2(26, 20 - h * 6), Color(1, 1, 1, 0.5), 1.0)
+			if is_wallish(game.tile_at(tx, ty - 1)):
+				ci.draw_rect(Rect2(r.position, Vector2(T, 6)), Color(0, 0, 0, 0.18))

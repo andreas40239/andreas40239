@@ -18,6 +18,8 @@ var invuln := 0.0
 var attack_t := 0.0
 var cooldown := 0.0
 var walk_anim := 0.0
+var slide := Vector2.ZERO  # Schwung auf dem Eis
+var slow := 0.0  # Spinnennetz
 var dead := false
 
 
@@ -34,10 +36,23 @@ func update(dt: float) -> void:
 	if dir.length() > 0.2:
 		facing = dir.normalized()
 		walk_anim += dt * 10.0 * dir.length()
-	var speed := SPEED * (0.55 if attack_t > 0.0 else 1.0)
-	var vel := dir * speed + knock
+	slow = maxf(0.0, slow - dt)
+	var speed := SPEED * (0.55 if attack_t > 0.0 else 1.0) * (0.45 if slow > 0.0 else 1.0)
+	var want := dir * speed
+	if game.is_ice(position):
+		# auf dem Eis nur langsam lenken und bremsen
+		slide = slide.lerp(want * 1.15, minf(1.0, 1.6 * dt))
+	else:
+		slide = want
+	var vel := slide + knock
 	knock = knock.move_toward(Vector2.ZERO, 900.0 * dt)
+	var before := position
 	position = game.move_circle(position, vel * dt, radius)
+	if dt > 0.0 and game.is_ice(position):
+		# an Wänden geht der Schwung verloren
+		var real := (position - before) / dt - knock
+		if real.length() < slide.length() * 0.7:
+			slide = slide.lerp(real, 0.5)
 	position = game.resolve_rings(position, radius)
 	position = game.resolve_tiles(position, radius)
 	queue_redraw()
@@ -75,6 +90,8 @@ func revive(at: Vector2) -> void:
 	hp = max_hp
 	position = at
 	knock = Vector2.ZERO
+	slide = Vector2.ZERO
+	slow = 0.0
 	invuln = 1.5
 
 
@@ -132,3 +149,10 @@ func _draw() -> void:
 		draw_line(hand - Vector2.from_angle(ang - 0.6).orthogonal() * 3.0, hand + Vector2.from_angle(ang - 0.6).orthogonal() * 3.0, Color(0.3, 0.3, 0.3), 2.0)
 		if weapon > 0:
 			draw_circle(tip2, 2.5, Color(col, 0.6))
+	if slow > 0.0:
+		# Spinnennetz klebt am Helden
+		for i in 4:
+			var a := TAU * i / 4.0 + 0.4
+			draw_line(Vector2.from_angle(a) * 4.0, Vector2.from_angle(a) * 15.0, Color(1, 1, 1, 0.7), 1.0)
+		draw_arc(Vector2.ZERO, 9.0, 0, TAU, 12, Color(1, 1, 1, 0.6), 1.0)
+		draw_arc(Vector2.ZERO, 14.0, 0, TAU, 12, Color(1, 1, 1, 0.5), 1.0)

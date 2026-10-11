@@ -5,8 +5,9 @@ const MUSIC := {
 	"dungeon": preload("res://audio/music_dungeon.ogg"),
 	"boss": preload("res://audio/music_boss.ogg"),
 	"victory": preload("res://audio/music_victory.ogg"),
+	"title": preload("res://audio/music_title.ogg"),
 }
-const MUSIC_DB := {"dungeon": -7.0, "boss": -6.0, "victory": -4.0}
+const MUSIC_DB := {"dungeon": -7.0, "boss": -6.0, "victory": -4.0, "title": -6.0}
 const SFX := {
 	"swing": preload("res://audio/swing.wav"),
 	"swing_fire": preload("res://audio/swing_fire.wav"),
@@ -33,6 +34,9 @@ const SFX := {
 	"boss_defeat": preload("res://audio/boss_defeat.wav"),
 	"crystal": preload("res://audio/crystal.wav"),
 	"denied": preload("res://audio/denied.wav"),
+	"key": preload("res://audio/key.wav"),
+	"spider": preload("res://audio/spider.wav"),
+	"web": preload("res://audio/web.wav"),
 }
 const POOL_SIZE := 12
 
@@ -45,6 +49,7 @@ var last_played := {}
 
 
 func _ready() -> void:
+	AudioServer.set_bus_mute(0, not preload("res://scripts/progress.gd").sound_on())
 	for k in MUSIC:
 		if k != "victory":
 			MUSIC[k].loop = true
