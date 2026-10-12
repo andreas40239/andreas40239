@@ -87,6 +87,11 @@ var _bottom_box: VBoxContainer
 
 func _ready() -> void:
 	_build()
+	# Fade in from black (this also hides the shader warm-up).
+	_overlay.color = Color(0, 0, 0, 1)
+	var fade := create_tween()
+	fade.tween_interval(0.25)
+	fade.tween_property(_overlay, "color", Color(0, 0, 0, 0), 0.6)
 	Game.toast.connect(show_toast)
 	Game.fact_unlocked.connect(_queue_fact)
 

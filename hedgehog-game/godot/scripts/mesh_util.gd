@@ -74,3 +74,83 @@ static func sphere_points(count: int) -> Array[Vector3]:
 		var theta := golden * i
 		points.append(Vector3(cos(theta) * r, y, sin(theta) * r))
 	return points
+
+
+## Merges every visible MeshInstance3D below `root` into a single mesh that
+## keeps each part's colour as a vertex colour, so the whole thing is one draw
+## call instead of dozens. The original MeshInstance3Ds are freed; other nodes
+## (bodies, collision shapes) are left alone. Nodes in `exclude` (and their
+## children) are skipped. Returns the new MeshInstance3D, a child of `root`.
+static func merge(root: Node3D, exclude: Array = [], alpha := 1.0) -> MeshInstance3D:
+	var data := {
+		"vertices": PackedVector3Array(), "normals": PackedVector3Array(),
+		"colors": PackedColorArray(), "indices": PackedInt32Array(), "merged": [],
+	}
+	_collect(root, Transform3D.IDENTITY, exclude, data)
+	for node in data["merged"]:
+		node.get_parent().remove_child(node)
+		node.queue_free()
+	var instance := MeshInstance3D.new()
+	instance.name = "Merged"
+	if data["vertices"].is_empty():
+		root.add_child(instance)
+		return instance
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = data["vertices"]
+	arrays[Mesh.ARRAY_NORMAL] = data["normals"]
+	arrays[Mesh.ARRAY_COLOR] = data["colors"]
+	arrays[Mesh.ARRAY_INDEX] = data["indices"]
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.85
+	if alpha < 1.0:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+		mat.albedo_color.a = alpha
+	mesh.surface_set_material(0, mat)
+	instance.mesh = mesh
+	root.add_child(instance)
+	return instance
+
+
+static func _collect(node: Node, xform: Transform3D, exclude: Array, data: Dictionary) -> void:
+	for child in node.get_children():
+		if exclude.has(child) or not child is Node3D or not child.visible:
+			continue
+		var child_xform: Transform3D = xform * child.transform
+		if child is MeshInstance3D and child.mesh and child.get_child_count() == 0:
+			if _append(child, child_xform, data):
+				data["merged"].append(child)
+				continue
+		_collect(child, child_xform, exclude, data)
+
+
+static func _append(instance: MeshInstance3D, xform: Transform3D, data: Dictionary) -> bool:
+	var mesh: Mesh = instance.mesh
+	# Transparent parts keep their own material.
+	for s in mesh.get_surface_count():
+		var check := instance.get_active_material(s) as BaseMaterial3D
+		if check and check.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			return false
+	var normal_basis := xform.basis.inverse().transposed()
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var mat := instance.get_active_material(s) as BaseMaterial3D
+		var color: Color = mat.albedo_color if mat else Color.WHITE
+		var offset: int = data["vertices"].size()
+		for i in vertices.size():
+			data["vertices"].append(xform * vertices[i])
+			data["normals"].append((normal_basis * normals[i]).normalized())
+			data["colors"].append(color)
+		if indices.is_empty():
+			for i in vertices.size():
+				data["indices"].append(offset + i)
+		else:
+			for index in indices:
+				data["indices"].append(offset + index)
+	return true

@@ -6,7 +6,7 @@ extends Area3D
 @export var announce := true
 
 var _activated := false
-var _leaves: Array[StandardMaterial3D] = []
+var _leaves: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -22,9 +22,10 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	for i in 10:
 		var angle := TAU * i / 10.0
-		var leaf := MeshUtil.add(self, MeshUtil.box(Vector3(0.22, 0.01, 0.12)), Color(0.55, 0.45, 0.3),
+		MeshUtil.add(self, MeshUtil.box(Vector3(0.22, 0.01, 0.12)), Color.WHITE,
 				Vector3(cos(angle) * 0.75, 0.01, sin(angle) * 0.75), Vector3.ONE, Vector3(0, -angle, 0))
-		_leaves.append(leaf.mesh.material)
+	_leaves = MeshUtil.merge(self).mesh.surface_get_material(0)
+	_leaves.albedo_color = Color(0.55, 0.45, 0.3)
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -33,8 +34,7 @@ func _on_body_entered(body: Node3D) -> void:
 	body.respawn_point = global_position + Vector3.UP * 0.1
 	if not _activated:
 		_activated = true
-		for mat in _leaves:
-			mat.albedo_color = Color(0.95, 0.6, 0.15)
+		_leaves.albedo_color = Color(0.95, 0.6, 0.15)
 		if announce:
 			Game.show_toast("Checkpoint! A cosy leaf circle.")
 			Sound.play("chime_checkpoint", -8.0)

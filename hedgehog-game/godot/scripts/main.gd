@@ -30,6 +30,9 @@ var _wind_warned := false
 
 
 func _ready() -> void:
+	# The garden's static scenery becomes one mesh: far fewer draw calls.
+	MeshUtil.merge($Scenery)
+	_warm_up_shaders()
 	hud.bind(player)
 	for spot in get_tree().get_nodes_in_group("hibernation_spots"):
 		spot.hibernate_requested.connect(_on_hibernate_requested)
@@ -69,6 +72,41 @@ func _process(delta: float) -> void:
 	_sniff_amount = move_toward(_sniff_amount, 1.0 if player.is_sniffing else 0.0, delta * 4.0)
 	environment.adjustment_saturation = lerpf(1.0, 0.3, _sniff_amount)
 	camera_rig.sniff_amount = _sniff_amount
+
+
+## Phones compile each kind of material the first time it is drawn, which
+## causes a hitch mid-game (first sniff, first time the cat notices you, the
+## first snow...). So we draw one of each, hidden behind the fade-in, at the
+## start of the level.
+func _warm_up_shaders() -> void:
+	var camera: Camera3D = camera_rig.get_node("SpringArm3D/Camera3D")
+	var warm := Node3D.new()
+	camera.add_child(warm)
+	warm.position = Vector3(0, 0, -1.5)
+	var scent := Scent.new()
+	warm.add_child(scent)
+	scent.set_revealed(true)
+	var label := Label3D.new()
+	label.text = "?!."
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.outline_size = 12
+	warm.add_child(label)
+	var see_through := MeshUtil.add(warm, MeshUtil.sphere(0.1), Color.GREEN)
+	(see_through.mesh.material as StandardMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
+	var merged_parts := Node3D.new()
+	warm.add_child(merged_parts)
+	MeshUtil.add(merged_parts, MeshUtil.sphere(0.1), Color.BROWN)
+	MeshUtil.merge(merged_parts)
+	var flakes: CPUParticles3D = snow.duplicate()
+	flakes.position = Vector3.ZERO
+	flakes.emission_box_extents = Vector3(0.2, 0.2, 0.2)
+	warm.add_child(flakes)
+	flakes.preprocess = 1.0
+	flakes.emitting = true
+	for i in 4:
+		await get_tree().process_frame
+	warm.queue_free()
 
 
 ## Rates the nest. Returns [description, achieved] pairs; one star each.

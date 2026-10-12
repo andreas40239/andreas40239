@@ -100,3 +100,4 @@ func _build_visual() -> void:
 			MeshUtil.add(visual, MeshUtil.sphere(0.5), Color(0.6, 0.4, 0.15), Vector3(0, 0.1, 0), Vector3(1.0, 0.4, 1.0))
 		"shed":
 			pass  # The shed itself is part of the level scenery.
+	MeshUtil.merge(visual, [_nest])

@@ -43,6 +43,7 @@ func _on_body_exited(body: Node3D) -> void:
 
 func _set_see_through(on: bool) -> void:
 	for mat in _materials:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS if on else BaseMaterial3D.TRANSPARENCY_DISABLED
 		mat.albedo_color.a = 0.45 if on else 1.0
 
 
@@ -63,7 +64,5 @@ func _build_bush() -> void:
 		Vector3(0.1, 0.35, -0.4), Vector3(-0.1, 0.65, -0.1),
 	]
 	for i in blobs.size():
-		var blob := MeshUtil.add(_bush, MeshUtil.sphere(0.5 * size), greens[i % greens.size()], blobs[i] * size)
-		var mat: StandardMaterial3D = blob.mesh.material
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
-		_materials.append(mat)
+		MeshUtil.add(_bush, MeshUtil.sphere(0.5 * size), greens[i % greens.size()], blobs[i] * size)
+	_materials.append(MeshUtil.merge(_bush).mesh.surface_get_material(0))

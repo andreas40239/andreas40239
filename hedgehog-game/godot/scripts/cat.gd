@@ -336,6 +336,8 @@ func _build_visual() -> void:
 	MeshUtil.add(_visual, MeshUtil.cylinder(0.1, 0.1, 0.03), Color(0.8, 0.15, 0.2), Vector3(0, 0.38, 0.25), Vector3.ONE, Vector3(1.2, 0, 0))
 	MeshUtil.add(_visual, MeshUtil.sphere(0.025), Color(1.0, 0.85, 0.2), Vector3(0, 0.33, 0.32))
 
+	MeshUtil.merge(_visual)
+
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.font_size = 96

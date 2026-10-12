@@ -29,6 +29,7 @@ func _ready() -> void:
 	_visual = Node3D.new()
 	add_child(_visual)
 	_build_visual()
+	MeshUtil.merge(_visual)
 	_scent = Scent.new()
 	_scent.color = Scent.FOOD
 	add_child(_scent)

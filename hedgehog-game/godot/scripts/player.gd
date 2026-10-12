@@ -402,4 +402,7 @@ func _build_visual() -> void:
 	for point in MeshUtil.sphere_points(90):
 		var tint := SPINE_COLOR.lightened(randf() * 0.35)
 		MeshUtil.add_spike(_ball_pose, point * 0.13, point, 0.09, tint)
+	# One draw call per pose instead of ~130 (matters a lot on phones).
+	MeshUtil.merge(_walk_pose)
+	MeshUtil.merge(_ball_pose)
 	_ball_pose.visible = false

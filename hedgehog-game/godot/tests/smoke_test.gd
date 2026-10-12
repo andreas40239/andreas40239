@@ -39,6 +39,24 @@ func _ready() -> void:
 func _run() -> void:
 	_check(player.is_on_floor(), "hedgehog stands on the ground")
 
+	# Camera next to a tree trunk and in a fence corner: no sudden jumps
+	# (this used to flicker back and forth).
+	var rig = main.get_node("CameraRig")
+	var camera: Camera3D = rig.get_node("SpringArm3D/Camera3D")
+	var biggest_jump := 0.0
+	for spot in [Vector3(11.6, 0.05, 8.9), Vector3(14.6, 0.05, 14.6)]:
+		await _teleport(spot)
+		await _frames(30)
+		var last := camera.global_position.distance_to(rig.global_position)
+		for i in 180:
+			rig.yaw += TAU / 180.0
+			await get_tree().process_frame
+			var now := camera.global_position.distance_to(rig.global_position)
+			biggest_jump = maxf(biggest_jump, now - last)
+			last = now
+	_check(biggest_jump < 0.3, "camera eases out smoothly near obstacles (largest step %.2f m)" % biggest_jump)
+	rig.yaw = 0.0
+
 	# Eating good food raises dexterity; the food disappears.
 	var beetle: Food = main.get_node("Food/Beetle0")
 	var dexterity := player.dexterity
