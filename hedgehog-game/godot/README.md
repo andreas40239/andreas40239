@@ -7,22 +7,38 @@ All visuals are built from simple shapes. The goal is to find out whether the lo
 
 ## Running it
 
+**On a PC:**
+
 1. Install **Godot 4.3** or newer (the standard version, not .NET) from <https://godotengine.org/download>.
 2. Start Godot, click **Import**, and select `hedgehog-game/godot/project.godot`.
 3. Press **F5** (or the ▶ Play button).
 
+**On an Android phone or tablet:** see [Building the Android APK](#building-the-android-apk).
+
 ## Controls
 
-| Action | Keyboard / Mouse | Gamepad |
-|---|---|---|
-| Move | WASD / arrow keys | Left stick / D-pad |
-| Look around | Drag with the mouse, or Z / X | Right stick |
-| Sniff (hold) | Space | A / ✕ |
-| Roll into a ball (hold) | Shift | B / ○ |
-| Interact (eat, pick up, build nest, sleep) | E / Enter | X / □ |
-| Restart | R | Start |
+| Action | Touch screen | Keyboard / Mouse | Gamepad |
+|---|---|---|---|
+| Move | **Left thumb**: put it anywhere on the left side and slide (floating joystick) | WASD / arrow keys | Left stick / D-pad |
+| Look around | Swipe on empty space on the right side | Drag with the mouse, or Z / X | Right stick |
+| Sniff (hold) | **Right thumb**: hold the *Sniff* button | Space | A / ✕ |
+| Roll into a ball (hold) | **Right thumb**: hold the *Roll* button | Shift | B / ○ |
+| Interact (eat, pick up, build nest, sleep) | **Tap the item** on the screen when it shows *Tap!* | E / Enter | X / □ |
+| Restart | Tap the results screen | R | Start |
+
+The touch controls show up automatically on touch screens and hide when a keyboard or gamepad is used.
+To try them on a PC, run the game with the `--touch` user argument (in Godot: *Project → Project Settings → Editor → Run → Main Run Args*: `-- --touch`) and use the mouse as a finger.
 
 Input actions are registered in code (`scripts/game.gd`), so they don't appear in *Project Settings → Input Map*.
+
+## Tutorial
+
+The garden starts with an 8-step tutorial (`scripts/tutorial.gd`). Each step explains one control and waits until the player has tried it:
+move → look around → sniff → eat (tap food) → roll up → hide in a bush → pick up nest material → "bring it to a safe spot and hibernate".
+
+The text matches the device: touch instructions on phones and tablets, keys on a PC. On touch screens, the control being taught pulses yellow ("Left thumb here!", "Hold me!", "Swipe here to look around", "Tap!").
+The cat sleeps (*zzz*) until the roll step, and the winter clock only starts once the tutorial is done.
+To turn the tutorial off, select the **Tutorial** node in `main.tscn` and untick **Enabled**.
 
 ## What's in the prototype
 
@@ -51,14 +67,34 @@ scenes/
   hibernation_spot.tscn, hide_spot.tscn, checkpoint.tscn
                       Drag these into main.tscn to place more items. Set "kind" etc. in the Inspector.
 scripts/              All gameplay code (GDScript)
+  touch_controls.gd   Joystick, Sniff/Roll buttons, tap-to-use, swipe-to-look
+  tutorial.gd         The first-garden tutorial
+export_presets.cfg    Android export settings
 tests/smoke_test.*    Automated play-through of the core loop
 ```
 
 The entity scenes build their visuals when the game runs, so in the editor they show only as position markers.
 
+## Building the Android APK
+
+`export_presets.cfg` has an **Android** preset (package `com.andreas40239.hedgehoghighways`, landscape, arm64 + armv7, Android 5.0+).
+Mobile builds use the *Compatibility* renderer so they run on cheaper tablets too.
+
+1. In Godot, install the export templates: *Editor → Manage Export Templates → Download and Install*.
+2. In *Editor → Editor Settings → Export → Android*, set the **Android SDK path** and a **debug keystore**. Godot can create the keystore, or you can use the one Android Studio makes.
+3. *Project → Export → Android → Export Project* (tick *Export With Debug*), or from the command line:
+
+   ```bash
+   godot --headless --export-debug "Android" build/hedgehog-highways.apk
+   ```
+
+**Installing a test APK on a device:** copy the `.apk` to the phone or tablet and open it. Android asks you to allow installing apps from that source (for example *Files* or your browser); allow it once.
+Or, with USB debugging on: `adb install -r hedgehog-highways.apk`.
+
 ## Automated test
 
 The smoke test plays through the whole loop headlessly in under a minute: eat, sniff, collect, hide, get caught, roll up, use the shed gap, hibernate.
+A second pass plays the whole tutorial with simulated touches: joystick, swipe, the Sniff and Roll buttons, and tapping food and leaves on screen.
 
 ```bash
 cd hedgehog-game/godot
@@ -83,6 +119,7 @@ Most numbers are `@export` variables, so you can tweak them in the Inspector:
 - Do kids discover rolling up and hiding on their own?
 - Is 6 minutes of autumn too short or too long?
 - Do kids read or notice the fact cards?
+- On a phone or tablet: are the buttons big enough and in comfortable thumb reach? Is tapping items easy, or do kids miss?
 
 ## Next steps (towards M2 / vertical slice)
 

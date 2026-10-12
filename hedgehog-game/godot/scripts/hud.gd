@@ -100,6 +100,10 @@ func bind(player: Hedgehog) -> void:
 	_on_hidden_changed(false)
 
 
+func is_showing_results() -> bool:
+	return _results.visible
+
+
 func set_season(progress: float) -> void:
 	_season_bar.value = progress * 100.0
 	if progress >= 1.0:
@@ -186,7 +190,8 @@ func _show_results(stars: int, criteria: Array, stats: Dictionary) -> void:
 		box.add_child(line)
 	box.add_child(_label("Food eaten: %d    Times hidden: %d    Times caught: %d" % [stats.food, stats.hidden, stats.caught], 18))
 	box.add_child(_label("Facts discovered: %d / %d" % [Game.unlocked_facts.size(), Game.FACTS.size()], 18))
-	box.add_child(_label("Press R to play again", 22, HORIZONTAL_ALIGNMENT_CENTER))
+	var again := "Tap the screen to play again" if Game.touch_mode else "Press R to play again"
+	box.add_child(_label(again, 22, HORIZONTAL_ALIGNMENT_CENTER))
 	_results.visible = true
 	_results.modulate.a = 0.0
 	create_tween().tween_property(_results, "modulate:a", 1.0, 0.8)
@@ -244,8 +249,8 @@ func _build() -> void:
 
 	# Bottom-left: fact card.
 	_fact_panel = PanelContainer.new()
-	_place(_fact_panel, Control.PRESET_BOTTOM_LEFT, Vector2(20, -200), Vector2(420, 0))
-	_fact_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# Top-right, under the season dial, clear of the thumb controls.
+	_place(_fact_panel, Control.PRESET_TOP_RIGHT, Vector2(-380, 80), Vector2(360, 0))
 	_fact_panel.visible = false
 	_fact_panel.add_theme_stylebox_override("panel", _panel_style())
 	add_child(_fact_panel)
@@ -256,13 +261,15 @@ func _build() -> void:
 	fact_box.add_child(_fact_title)
 	_fact_text = _label("", 17)
 	_fact_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_fact_text.custom_minimum_size = Vector2(400, 0)
+	_fact_text.custom_minimum_size = Vector2(324, 0)
 	fact_box.add_child(_fact_text)
 
 	# Bottom: controls help.
 	_help = _label(HELP_TEXT, 14, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(_help, Control.PRESET_CENTER_BOTTOM, Vector2(-600, -30), Vector2(1200, 24))
 	_help.modulate = Color(1, 1, 1, 0.8)
+	_help.visible = not Game.touch_mode
+	Game.input_mode_changed.connect(func(touch: bool) -> void: _help.visible = not touch and not _sleeping)
 	add_child(_help)
 
 	# Centre: results panel (shown after hibernation).

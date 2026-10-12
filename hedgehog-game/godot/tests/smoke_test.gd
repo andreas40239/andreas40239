@@ -1,6 +1,7 @@
 extends Node
 ## Headless smoke test that plays through the core loop: eat, sniff, collect
 ## nest material, hide, get caught by the cat, roll up, build a nest, hibernate.
+## A second pass plays the tutorial with simulated touch-screen input.
 ## Run from the project folder:
 ##   godot --headless --fixed-fps 60 res://tests/smoke_test.tscn
 
@@ -8,16 +9,22 @@ var main: Node3D
 var player: Hedgehog
 var cat: Cat
 var failures := 0
+var touch_controls: Control
 
 
 func _ready() -> void:
-	main = load("res://scenes/main.tscn").instantiate()
-	add_child(main)
-	player = main.get_node("Player")
-	cat = main.get_node("Cat")
+	print("Core loop (keyboard):")
+	_load_level(false)
 	cat.process_mode = Node.PROCESS_MODE_DISABLED
 	await _frames(30)
 	await _run()
+
+	print("Tutorial (touch screen):")
+	main.queue_free()
+	await _frames(2)
+	_load_level(true)
+	await _frames(30)
+	await _run_touch_tutorial()
 	print("\n%s: %d failure(s)" % ["FAILED" if failures else "ALL PASSED", failures])
 	get_tree().quit(1 if failures else 0)
 
@@ -115,6 +122,136 @@ func _run() -> void:
 	_check(main.stars >= 2, "safe spot + cosy nest earn at least 2 stars (got %d)" % main.stars)
 	await _frames(500)
 	_check(main.get_node("HUD")._results.visible, "results panel is shown")
+
+
+func _load_level(with_tutorial: bool) -> void:
+	main = load("res://scenes/main.tscn").instantiate()
+	main.get_node("Tutorial").enabled = with_tutorial
+	add_child(main)
+	player = main.get_node("Player")
+	cat = main.get_node("Cat")
+
+
+func _run_touch_tutorial() -> void:
+	var tutorial = main.get_node("Tutorial")
+	var touch = main.get_node("TouchLayer/TouchControls")
+	touch_controls = touch
+	var rig = main.get_node("CameraRig")
+	_check(tutorial.active and tutorial.current_id() == "move", "tutorial starts with the move step")
+	_check(cat.asleep, "cat sleeps during the first tutorial steps")
+	await _frames(60)
+	_check(main.elapsed == 0.0, "winter clock waits for the tutorial")
+
+	# Left thumb: floating joystick.
+	var home: Vector2 = touch.joystick_home()
+	_touch(0, home, true)
+	await _frames(2)
+	_check(Game.touch_mode and touch.visible, "a touch switches on the touch controls")
+	_check(touch.highlight == "joystick", "tutorial highlights the joystick")
+	_drag(0, home + Vector2(0, -80), Vector2(0, -80))
+	await _frames(100)
+	_check(touch.joystick_vector().y < -0.8, "dragging the thumb up pushes the joystick forward")
+	_touch(0, home + Vector2(0, -80), false)
+	await _wait_for(func() -> bool: return tutorial.current_id() == "look", 4.0)
+	_check(tutorial.current_id() == "look", "walking with the joystick completes the move step")
+
+	# Swipe on the right side to look around.
+	var swipe_start := Vector2(touch.size.x * 0.65, touch.size.y * 0.4)
+	_touch(1, swipe_start, true)
+	for i in 12:
+		_drag(1, swipe_start + Vector2(20 * (i + 1), 0), Vector2(20, 0))
+		await _frames(1)
+	_touch(1, swipe_start + Vector2(240, 0), false)
+	await _wait_for(func() -> bool: return tutorial.current_id() == "sniff", 4.0)
+	_check(tutorial.current_id() == "sniff", "swiping turns the camera and completes the look step")
+
+	# Right thumb: hold Sniff.
+	_touch(2, touch.sniff_center(), true)
+	await _frames(20)
+	_check(player.is_sniffing, "holding the Sniff button sniffs")
+	await _frames(60)
+	_touch(2, touch.sniff_center(), false)
+	await _frames(3)
+	_check(not player.is_sniffing, "letting go of Sniff stops sniffing")
+	await _wait_for(func() -> bool: return tutorial.current_id() == "eat", 4.0)
+	_check(tutorial.current_id() == "eat", "sniffing completes the sniff step")
+
+	# Tap food on the screen.
+	var beetle: Food = main.get_node("Food/Beetle1")
+	await _teleport(beetle.global_position + Vector3(0, 0.05, 0.3))
+	await _frames(40)  # Let the camera catch up.
+	_check(player.prompt_changed.get_connections().size() > 0 and player.nearest_interactable() == beetle, "beetle is in reach")
+	await _tap_world(beetle.global_position)
+	_check(not beetle.is_available(), "tapping the beetle on screen eats it")
+	await _wait_for(func() -> bool: return tutorial.current_id() == "roll", 4.0)
+	_check(tutorial.current_id() == "roll" and not cat.asleep, "eating completes the eat step and the cat wakes up")
+
+	# Right thumb: hold Roll.
+	_touch(3, touch.roll_center(), true)
+	await _frames(20)
+	_check(player.is_rolled, "holding the Roll button rolls up")
+	await _frames(60)
+	_touch(3, touch.roll_center(), false)
+	await _frames(3)
+	_check(not player.is_rolled, "letting go of Roll uncurls")
+	await _wait_for(func() -> bool: return tutorial.current_id() == "hide", 4.0)
+	_check(tutorial.current_id() == "hide", "rolling completes the roll step")
+
+	cat.process_mode = Node.PROCESS_MODE_DISABLED  # Keep the rest of the test predictable.
+	await _teleport(main.get_node("HideSpots/Bush1").global_position + Vector3(0, 0.05, 0))
+	await _wait_for(func() -> bool: return tutorial.current_id() == "nest", 4.0)
+	_check(tutorial.current_id() == "nest", "hiding completes the hide step")
+
+	# Tap nest material on the screen.
+	var leaves: NestMaterial = main.get_node("NestMaterials/Leaves3")
+	await _teleport(leaves.global_position + Vector3(0, 0.05, 0.3))
+	await _frames(40)
+	await _tap_world(leaves.global_position)
+	_check(leaves.is_taken() and player.nest_material == 1, "tapping leaves on screen picks them up")
+	await _wait_for(func() -> bool: return tutorial.current_id() == "goal", 4.0)
+	_check(tutorial.current_id() == "goal", "picking up material completes the nest step")
+	await _wait_for(func() -> bool: return not tutorial.active, 15.0)
+	_check(not tutorial.active, "tutorial finishes after the goal message")
+	await _frames(30)
+	_check(main.elapsed > 0.0, "winter clock starts after the tutorial")
+
+	# Tapping an item that is too far away does nothing.
+	var far_food: Food = main.get_node("Food/Apple12")
+	var before: int = player.stats.food
+	await _tap_world(far_food.global_position)
+	_check(player.stats.food == before, "tapping food that is out of reach does not eat it")
+
+
+func _tap_world(world: Vector3) -> void:
+	var camera := get_viewport().get_camera_3d()
+	var screen := camera.unproject_position(world + Vector3.UP * 0.15)
+	_touch(9, screen, true)
+	await _frames(3)
+	_touch(9, screen, false)
+	await _frames(3)
+
+
+func _touch(finger: int, position: Vector2, pressed: bool) -> void:
+	var event := InputEventScreenTouch.new()
+	event.index = finger
+	event.position = position
+	event.pressed = pressed
+	_send(event)
+
+
+func _drag(finger: int, position: Vector2, relative: Vector2) -> void:
+	var event := InputEventScreenDrag.new()
+	event.index = finger
+	event.position = position
+	event.relative = relative
+	_send(event)
+
+
+## Delivers a touch event straight to the touch controls. (Headless runs have a
+## zero-size window, so events sent through the viewport get rescaled.)
+func _send(event: InputEvent) -> void:
+	Game._input(event)
+	touch_controls._input(event)
 
 
 func _place_cat_facing_player() -> void:

@@ -19,6 +19,8 @@ enum State { PATROL, SUSPICIOUS, STALK, POUNCE, BORED, SEARCH }
 @export var pounce_distance := 1.6
 @export var catch_distance := 0.5
 @export var bored_time := 7.0
+## A sleeping cat ignores everything until wake_up() (used by the tutorial).
+@export var asleep := false
 
 const POUNCE_WINDUP := 0.4
 const POUNCE_DURATION := 0.8
@@ -72,6 +74,12 @@ func _physics_process(delta: float) -> void:
 			return
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
+	if asleep:
+		velocity.x = 0.0
+		velocity.z = 0.0
+		move_and_slide()
+		_update_visual(delta)
+		return
 
 	var senses := _can_sense(_player)
 	if senses:
@@ -179,6 +187,13 @@ func _has_line_of_sight(player: Hedgehog) -> bool:
 	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
+func wake_up() -> void:
+	if not asleep:
+		return
+	asleep = false
+	_set_state(State.PATROL)
+
+
 func _set_state(new_state: State) -> void:
 	state = new_state
 	_timer = 0.0
@@ -232,6 +247,14 @@ func _flat_distance(point: Vector3) -> float:
 func _update_visual(delta: float) -> void:
 	var crouch := 1.0
 	var hop := 0.0
+	if asleep:
+		crouch = 0.6
+		_label.text = "zzz"
+		_label.modulate = Color(0.8, 0.85, 1.0)
+		_label.scale = Vector3.ONE * 0.8
+		_visual.scale.y = lerpf(_visual.scale.y, crouch, 1.0 - exp(-10.0 * delta))
+		_label.position.y = 0.75 + sin(_time * 2.0) * 0.05
+		return
 	match state:
 		State.STALK:
 			crouch = 0.8

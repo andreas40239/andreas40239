@@ -5,6 +5,8 @@ extends Node
 
 signal fact_unlocked(title: String, text: String)
 signal toast(text: String)
+## Emitted when the player switches between touch and keyboard/gamepad.
+signal input_mode_changed(touch: bool)
 
 ## Fact id -> [title, text]. Facts unlock once per session the first time
 ## the player does or finds the matching thing.
@@ -26,10 +28,34 @@ const FACTS := {
 }
 
 var unlocked_facts: Dictionary = {}
+## True when on-screen touch controls should be shown and touch hints used.
+var touch_mode := false
+
+## Run with `-- --touch` to try the touch controls on a desktop with the mouse.
+var _force_touch := false
 
 
 func _ready() -> void:
 	_setup_input()
+	_force_touch = OS.get_cmdline_user_args().has("--touch")
+	if _force_touch:
+		Input.emulate_touch_from_mouse = true
+	touch_mode = _force_touch or DisplayServer.is_touchscreen_available()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		set_touch_mode(true)
+	elif not _force_touch and (event is InputEventKey or event is InputEventJoypadButton
+			or event is InputEventMouseButton):
+		set_touch_mode(false)
+
+
+func set_touch_mode(touch: bool) -> void:
+	if touch == touch_mode:
+		return
+	touch_mode = touch
+	input_mode_changed.emit(touch)
 
 
 func unlock_fact(id: String) -> void:

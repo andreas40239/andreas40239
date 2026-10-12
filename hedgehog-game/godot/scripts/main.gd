@@ -20,6 +20,7 @@ var _sniff_amount := 0.0
 @onready var sun: DirectionalLight3D = $Sun
 @onready var environment: Environment = $WorldEnvironment.environment
 @onready var snow: CPUParticles3D = $Snow
+@onready var tutorial = $Tutorial
 
 
 func _ready() -> void:
@@ -36,7 +37,7 @@ func _process(delta: float) -> void:
 		get_tree().reload_current_scene()
 		return
 
-	if not finished:
+	if not finished and not tutorial.active:  # Autumn waits for the tutorial.
 		elapsed += delta
 		var progress := clampf(elapsed / level_duration, 0.0, 1.0)
 		player.winter_progress = progress

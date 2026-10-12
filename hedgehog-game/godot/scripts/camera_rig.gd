@@ -30,6 +30,14 @@ func _ready() -> void:
 		global_position = _target.global_position + Vector3.UP * height
 
 
+## Turns the camera by a screen-space drag (used by touch swipes).
+func rotate_by(radians: Vector2) -> void:
+	if _orbiting:
+		return
+	yaw -= radians.x
+	pitch = clampf(pitch - radians.y, -1.2, -0.05)
+
+
 func start_orbit() -> void:
 	_orbiting = true
 	# Rise above the garden even if the hedgehog sleeps under the shed.

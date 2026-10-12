@@ -218,10 +218,10 @@ func _handle_actions() -> void:
 	if rolled != is_rolled:
 		_set_rolled(rolled)
 
-	if Input.is_action_just_pressed("interact") and not is_rolled:
-		var item := _nearest_interactable()
+	if Input.is_action_just_pressed("interact"):
+		var item := nearest_interactable()
 		if item:
-			item.interact(self)
+			try_interact(item)
 
 
 func _set_rolled(rolled: bool) -> void:
@@ -246,7 +246,17 @@ func _camera_relative(input: Vector2) -> Vector3:
 	return direction.limit_length(1.0)
 
 
-func _nearest_interactable() -> Interactable:
+## Uses `item` if the hedgehog is close enough and able to. Used by the
+## Interact button and by tapping items on a touch screen.
+func try_interact(item: Interactable) -> bool:
+	if is_rolled or is_sleeping or not _interactables.has(item) or item.get_prompt(self) == "":
+		return false
+	item.interact(self)
+	return true
+
+
+## The closest item in reach that can be used right now, or null.
+func nearest_interactable() -> Interactable:
 	var best: Interactable = null
 	var best_distance := INF
 	for item in _interactables:
@@ -306,11 +316,11 @@ func _update_scents() -> void:
 func _update_prompt() -> void:
 	var text := ""
 	if is_rolled and not is_sleeping:
-		text = "Let go of [Shift] to uncurl"
+		text = "Let go of Roll to uncurl" if Game.touch_mode else "Let go of [Shift] to uncurl"
 	elif not is_sleeping:
-		var item := _nearest_interactable()
+		var item := nearest_interactable()
 		if item:
-			text = "[E] " + item.get_prompt(self)
+			text = ("Tap it: " if Game.touch_mode else "[E] ") + item.get_prompt(self)
 	if text != _prompt:
 		_prompt = text
 		prompt_changed.emit(text)
