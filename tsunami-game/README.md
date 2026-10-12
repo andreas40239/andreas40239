@@ -9,31 +9,49 @@ baue eine Mauer, die den Tsunami aufhält. Mit jedem Level wird die Welle höher
 3. **F5** drücken (oder den Play-Knopf oben rechts im Editor).
 
 ## So wird gespielt
+Jedes Level beginnt mit einem **Erdbeben**. Dann läuft ein **Countdown** bis zum Tsunami.
+
+**Vor dem Tsunami (Countdown):**
 | Aktion | Wie |
 |---|---|
-| Rohstoffe sammeln | Auf **Felsen** (Steine), **Wald** (Holz) oder **Sandhaufen** (Sand) klicken |
-| Werkzeuge verbessern | Spitzhacke, Axt, Schaufel: mehr Ertrag pro Klick |
-| Baumaschinen | **Bagger** (Steine + Sand automatisch), **Holzernter** (Holz automatisch), **Betonmischer** (macht Beton aus Sand + Steinen), **Kran** (höhere Mauerschichten pro Bauschritt) |
-| Mauer bauen | Button „Mauer bauen“ oder Taste **B**. Ab 4 m Höhe wird zusätzlich Beton gebraucht. |
-| Tsunami testen | **PLAY** oder Taste **P**: Das Meer zieht sich zurück, dann rollt die Welle an. |
+| Rohstoffe sammeln | Auf **Felsen** (Steine), **Wald** (Holz) oder **Sandhaufen** (Sand) tippen |
+| Mauer bauen | Material wählen: **Holz** (billig, schwach), **Stein**, **Beton** (teuer, sehr stabil). Tasten 1/2/3 |
+| Werkzeuge | Spitzhacke, Axt, Schaufel: mehr Ertrag pro Tipp |
+| Baumaschinen | **Bagger** (Steine + Sand), **Holzernter** (Holz), **Betonmischer** (Beton aus Sand + Steinen), **Kran** (dickere Mauerschichten) |
+| Schutz & Dorf | **Wellenbrecher** (−6 % Wellenhöhe je Stufe), **Schutzwald** (−4 % je Stufe), **Warnboje** (genauere Höhenmessung), zerstörte **Häuser wieder aufbauen** |
+| Früher auslösen | **JETZT auslösen** (Taste P): Wer nicht abwartet, bekommt für die restlichen Sekunden einen Rohstoff-Bonus |
 
-Beim ersten Versuch eines Levels ist die Höhe des Tsunamis unbekannt („??? m“).
-Nach dem Aufprall wird sie als rote Linie angezeigt. Ist die Mauer zu niedrig, wird das Land
-überflutet und du baust weiter. Ist sie hoch genug, zerschellt die Welle an der Mauer.
-Dann gibt es einen Bonus und das nächste Level startet automatisch.
+Die genaue Höhe der Welle kennt man vorher nicht. Hinweise gibt es trotzdem:
+- Die Erdbebenstärke auf dem Seismographen.
+- Ein roter Bereich zeigt die erwartete Höhe. Je besser die Warnboje, desto schmaler wird er.
+- In den letzten 15 Sekunden zieht sich das Meer zurück, bei höheren Wellen weiter. In den letzten 10 Sekunden heult die Sirene.
+
+**Während des Tsunamis:**
+- Ab Level 2 kommen **mehrere Wellen** hintereinander.
+- Beim Aufprall bekommt die Mauer **Risse**. Tippe schnell darauf, bevor der Ring abläuft, sonst bricht der Riss auf.
+- **Treibgut** (Boote, Container, Baumstämme) reitet auf den Wellen. Tippst du darauf, wird es zerstört und du bekommst Rohstoffe. Erreicht es die Mauer, gibt es Schaden und einen neuen Riss.
+- Die Mauer hat **Stabilität** (Balken oben). Fällt sie auf 0, gibt es einen **Mauerbruch**: Die oberen Schichten stürzen ein.
+- Schwappt Wasser über die Mauer, werden **Häuser** weggespült, zuerst die direkt hinter der Mauer.
+
+**Wertung:**
+- 3 Sterne: Kein Haus verloren und die Mauer ist nicht gebrochen.
+- 2 Sterne: Kein Haus verloren, aber die Mauer ist gebrochen.
+- 1 Stern: Genau 1 Haus verloren.
+
+Danach startet automatisch das nächste, höhere Level. Sind alle Häuser zerstört, heißt es **Game Over**.
 
 ## Technik
 - Grafik: alles prozedural mit `_draw()` gezeichnet (Wellen, Wasserstand, Überflutung, Gischt-Partikel, animierte Maschinen)
 - Sound: Meeresrauschen, Tsunami-Grollen und Motorbrummen der Baumaschinen werden live mit einem `AudioStreamGenerator` erzeugt, Audiodateien gibt es keine
 - `scripts/main.gd`: Spiellogik, Kosten/Balancing, Benutzeroberfläche
-- `scripts/world.gd`: Spielwelt und Tsunami-Ablauf (Rückzug → Anrollen → Aufprall/Überflutung → Ablaufen)
+- `scripts/world.gd`: Spielwelt und Tsunami-Ablauf (Rückzug → Wellen mit Rissen/Treibgut → Überflutung → Ablaufen)
 - `scripts/ocean_audio.gd`: prozeduraler Sound
 
 ## Android (arm64)
 Fertige APK: [`apk/TsunamiMauerbau-arm64.apk`](apk/TsunamiMauerbau-arm64.apk) (Android 5.0+, nur arm64-v8a, Querformat).
 
 Installation: APK aufs Handy laden, öffnen und „Installation aus unbekannten Quellen“ für den Browser/Dateimanager erlauben.
-Auf dem Handy wird getippt statt geklickt; die Tastenkürzel B und P braucht man dort nicht.
+Auf dem Handy wird getippt statt geklickt, Tastenkürzel braucht man dort nicht. Bei Aufprall und Mauerbruch vibriert das Handy.
 
 Selbst exportieren: In Godot unter *Editor → Export-Vorlagen verwalten* die Vorlagen für 4.3 installieren, in den
 Editor-Einstellungen Android-SDK und Debug-Keystore eintragen, dann *Projekt → Exportieren → Android* (Preset ist in

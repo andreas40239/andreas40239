@@ -8,6 +8,8 @@ const RATE := 22050.0
 var intensity := 0.0
 ## 0..1 – Lautstärke der Baumaschinen-Motoren
 var machine_level := 0.0
+## 0..1 – Tsunami-Warnsirene
+var siren := 0.0
 
 var _burst := 0.0
 var _clock := 0.0
@@ -15,6 +17,7 @@ var _lp1 := 0.0
 var _lp2 := 0.0
 var _rumble := 0.0
 var _motor_phase := 0.0
+var _siren_phase := 0.0
 var _player: AudioStreamPlayer
 var _playback: AudioStreamGeneratorPlayback
 
@@ -64,5 +67,11 @@ func _process(delta: float) -> void:
 			var chug := 0.65 + 0.35 * sin(_clock * TAU * 11.0)
 			motor = (saw * 0.6 + white * 0.15) * 0.10 * machine_level * chug
 
-		var s := clampf(ocean * (1.0 + intensity + 2.0 * _burst) + roar + motor, -1.0, 1.0)
+		# Warnsirene: auf- und abschwellender Heulton
+		var wail := 0.0
+		if siren > 0.001:
+			_siren_phase += (560.0 + 260.0 * sin(_clock * TAU * 0.25)) * step
+			wail = sin(_siren_phase * TAU) * 0.09 * siren
+
+		var s := clampf(ocean * (1.0 + intensity + 2.0 * _burst) + roar + motor + wail, -1.0, 1.0)
 		_playback.push_frame(Vector2(s, s))
