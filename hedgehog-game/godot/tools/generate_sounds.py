@@ -380,6 +380,58 @@ def bark(variant):
     return reverb(out, 0.8, 0.1)
 
 
+def yelp():
+    """The dog's surprised "ouch!" after nudging a spiky hedgehog."""
+    length = 0.35
+    f0 = glide([(0, 900), (0.2, 1300), (1, 600)], length)
+    formants = [(0.0, [(800, 0.4, 1.0), (1600, 0.3, 0.7)]), (1.0, [(600, 0.4, 1.0), (1200, 0.3, 0.5)])]
+    v = formant_voice(f0, formants, length, breath=0.05)
+    return v * envelope(len(v), 0.01, 0.25, 2)
+
+
+def woof_close():
+    """A single, nearby, excited bark (the dog spotted you)."""
+    out = silence(0.9)
+    place(out, woof(1.1), 0.0)
+    place(out, woof(1.15), 0.3, 0.8)
+    return out
+
+
+# --- Owl ---
+
+def hoot():
+    """Tawny-owl style "hoo... hoo-hoo-hooo"."""
+    out = silence(2.6)
+    for start, length, pitch in ((0.0, 0.45, 1.0), (0.85, 0.18, 0.97), (1.12, 0.18, 1.0), (1.4, 0.9, 1.02)):
+        f0 = glide([(0, 380 * pitch), (0.25, 420 * pitch), (1, 360 * pitch)], length)
+        f0 *= 1 + 0.015 * np.sin(2 * np.pi * 7 * times(length))
+        t = tone(f0, ((1, 1.0), (2, 0.08))) + 0.05 * band(noise(length), 300, 1200)
+        place(out, t * envelope(len(t), 0.06, length * 0.5, 1.5), start)
+    return reverb(out, 1.6, 0.3, 2500)
+
+
+def swoop():
+    length = 1.2
+    centre = glide([(0, 400), (0.7, 2200), (1, 900)], length)
+    w = stft_filter(noise(length), centre, 0.45)
+    return w * envelope(len(w), 0.5, 0.4, 1.5)
+
+
+def night_loop():
+    """Night ambience: soft crickets and a faint, low breeze."""
+    loop = 10.0
+    out = silence(loop)
+    for pitch, period, offset in ((5200, 0.45, 0.0), (4700, 0.7, 0.2)):
+        t = offset
+        while t < loop:
+            for pulse in range(4):
+                n = int(0.015 * RATE)
+                chirp = np.sin(2 * np.pi * pitch * np.arange(n) / RATE) * np.hanning(n)
+                place(out, chirp, t + pulse * 0.025, 0.35, wrap=True)
+            t += period * rng.uniform(0.9, 1.1)
+    return out
+
+
 # --- Wind --------------------------------------------------------------------------------------
 
 def wind_loop():
@@ -511,6 +563,11 @@ def main():
     save("chime_step", chime(["E6", "A6"], 0.1, 0.5), 0.4)
     save("star", chime(["C6"], 0.1, 1.0), 0.5)
     save("poof", poof(), 0.6)
+    save("yelp", yelp(), 0.6)
+    save("woof", woof_close(), 0.8)
+    save("hoot", hoot(), 0.7)
+    save("swoop", swoop(), 0.7)
+    save("night", night_loop(), 0.35)
     save("music", music(), 0.8, quality=5)
 
 

@@ -1,7 +1,14 @@
 extends Node3D
-## Prototype level controller: the winter clock, the sniff-mode look, and
-## the hibernation ending with its star rating.
+## Level controller for each garden: the winter clock, the sniff-mode look,
+## night lighting, and the hibernation ending with its star rating.
 
+## Position in Game.LEVELS.
+@export var level_index := 0
+@export var level_title := "Garden 1: The Cottage Garden"
+## Shown at the start of the level (gardens without a tutorial).
+@export_multiline var intro_text := ""
+## Night gardens: dark sky, moonlight, a little lantern glow around the hedgehog.
+@export var night := false
 ## Length of the level's autumn, in seconds.
 @export var level_duration := 360.0
 @export var good_nest_material := 6
@@ -19,6 +26,8 @@ var _winter_announced := false
 var _sniff_amount := 0.0
 var _dog_timer := 10.0
 var _wind_warned := false
+var _sun_color := Color.WHITE
+var _sun_energy := 1.0
 
 @onready var player: Hedgehog = $Player
 @onready var hud = $HUD
@@ -33,13 +42,28 @@ func _ready() -> void:
 	# The garden's static scenery becomes one mesh: far fewer draw calls.
 	MeshUtil.merge($Scenery)
 	_warm_up_shaders()
+	_sun_color = sun.light_color
+	_sun_energy = sun.light_energy
 	hud.bind(player)
+	hud.play_again_pressed.connect(func() -> void: get_tree().reload_current_scene())
+	hud.next_garden_pressed.connect(func() -> void: Game.go_to_level(level_index + 1))
+	hud.all_gardens_pressed.connect(Game.go_to_title)
 	for spot in get_tree().get_nodes_in_group("hibernation_spots"):
 		spot.hibernate_requested.connect(_on_hibernate_requested)
 	environment.adjustment_enabled = true
-	get_tree().create_timer(1.5).timeout.connect(Game.unlock_fact.bind("start"))
-	Game.show_toast("Find food, stay safe and build a cosy nest before winter!")
-	Sound.start_level_audio()
+	# The tutorial is only needed the first time.
+	if tutorial.active and Game.best_stars[level_index] > 0:
+		tutorial.skip()
+	if night:
+		_add_lantern()
+		Game.unlock_fact("night")
+	else:
+		get_tree().create_timer(1.5).timeout.connect(Game.unlock_fact.bind("start"))
+	if tutorial.active:
+		Game.show_toast("Find food, stay safe and build a cosy nest before winter!")
+	else:
+		hud.show_title(level_title, intro_text if intro_text != "" else "Find food, stay safe and build a cosy nest before winter!")
+	Sound.start_level_audio(night)
 	_apply_audio(0.0)
 
 
@@ -87,10 +111,13 @@ func _warm_up_shaders() -> void:
 	warm.add_child(scent)
 	scent.set_revealed(true)
 	var label := Label3D.new()
-	label.text = "?!."
+	# Same font settings as the animals' labels, with every glyph they use.
+	label.text = "?!. meh zzz WOOF ouch yay"
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
+	label.font_size = 96
 	label.outline_size = 12
+	label.pixel_size = 0.0005
 	warm.add_child(label)
 	var see_through := MeshUtil.add(warm, MeshUtil.sphere(0.1), Color.GREEN)
 	(see_through.mesh.material as StandardMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_DEPTH_PRE_PASS
@@ -128,6 +155,7 @@ func _on_hibernate_requested(spot: HibernationSpot) -> void:
 	for entry in criteria:
 		if entry[1]:
 			stars += 1
+	Game.complete_level(level_index, stars)
 	player.start_sleep(spot.global_position)
 	camera_rig.start_orbit()
 	snow.emitting = true
@@ -136,7 +164,7 @@ func _on_hibernate_requested(spot: HibernationSpot) -> void:
 	# The wind settles down for a peaceful sleep.
 	create_tween().tween_method(Sound.set_wind, 0.6, 0.15, 5.0)
 	Sound.set_insects(0.0)
-	hud.play_hibernation(stars, criteria, player.stats)
+	hud.play_hibernation(stars, criteria, player.stats, Game.has_level(level_index + 1))
 
 
 func _start_winter() -> void:
@@ -158,5 +186,16 @@ func _apply_audio(progress: float) -> void:
 
 
 func _apply_season(progress: float) -> void:
-	sun.light_color = Color(1.0, 0.9, 0.75).lerp(Color(0.75, 0.82, 1.0), progress)
-	sun.light_energy = lerpf(1.2, 0.75, progress)
+	sun.light_color = _sun_color.lerp(Color(0.75, 0.82, 1.0), progress * 0.8)
+	sun.light_energy = _sun_energy * lerpf(1.0, 0.65, progress)
+
+
+## A soft warm glow around the hedgehog, so kids can see it at night.
+func _add_lantern() -> void:
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(1.0, 0.85, 0.6)
+	glow.light_energy = 1.4
+	glow.omni_range = 5.0
+	glow.position = Vector3(0, 1.2, 0)
+	glow.shadow_enabled = false
+	player.add_child(glow)

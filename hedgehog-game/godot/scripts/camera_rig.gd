@@ -50,11 +50,21 @@ func rotate_by(radians: Vector2) -> void:
 	pitch = clampf(pitch - radians.y, -1.2, -0.05)
 
 
+## Moves the camera to the hedgehog at once (after a respawn).
+func snap_to_target() -> void:
+	if _target:
+		global_position = _target.global_position + Vector3.UP * height
+		_arm_length = _safe_length(lerpf(distance, sniff_distance, sniff_amount))
+		_arm.spring_length = _arm_length
+
+
 func start_orbit() -> void:
 	_orbiting = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.device == InputEvent.DEVICE_ID_EMULATION:
+		return  # Touches are handled by the touch controls.
 	if event is InputEventMouseButton:
 		_dragging = event.pressed
 	elif event is InputEventMouseMotion and _dragging and not _orbiting:

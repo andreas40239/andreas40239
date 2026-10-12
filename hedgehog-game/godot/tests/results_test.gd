@@ -9,4 +9,5 @@ func _ready() -> void:
 	var driver := Node.new()
 	driver.set_script(load("res://tests/results_test_driver.gd"))
 	get_tree().root.add_child.call_deferred(driver)
-	get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
+	Game.best_stars = [0, 0, 0]
+	get_tree().change_scene_to_file.call_deferred("res://scenes/garden_1.tscn")

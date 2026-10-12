@@ -9,14 +9,15 @@ const KINDS := {
 	"slug": {"name": "slug", "health": 1, "dexterity": 5.0, "bad": false},
 	"apple": {"name": "fallen apple", "health": 1, "dexterity": 0.0, "bad": false},
 	"milk": {"name": "milk", "health": -1, "dexterity": -10.0, "bad": true},
+	"caterpillar": {"name": "caterpillar", "health": 1, "dexterity": 12.0, "bad": false},
 }
 
-@export_enum("beetle", "worm", "slug", "apple", "milk") var kind: String = "beetle"
+@export_enum("beetle", "worm", "slug", "apple", "milk", "caterpillar") var kind: String = "beetle"
 ## Seconds until the food comes back. 0 = never.
 @export var respawn_time := 45.0
 
 ## Sound played when eaten: crunchy beetles, munchy worms and slugs, slurpy milk.
-const EAT_SOUNDS := {"beetle": "crunch", "worm": "munch", "slug": "munch", "apple": "crunch", "milk": "slurp"}
+const EAT_SOUNDS := {"beetle": "crunch", "worm": "munch", "slug": "munch", "apple": "crunch", "milk": "slurp", "caterpillar": "munch"}
 
 var _available := true
 var _visual: Node3D
@@ -102,6 +103,11 @@ func _build_visual() -> void:
 		"apple":
 			MeshUtil.add(_visual, MeshUtil.sphere(0.1), Color(0.8, 0.15, 0.1), Vector3(0, 0.09, 0))
 			MeshUtil.add(_visual, MeshUtil.cylinder(0.008, 0.008, 0.06), Color(0.35, 0.2, 0.1), Vector3(0, 0.2, 0))
+		"caterpillar":
+			for i in 6:
+				var green := Color(0.45, 0.75, 0.2) if i % 2 else Color(0.35, 0.62, 0.15)
+				MeshUtil.add(_visual, MeshUtil.sphere(0.028), green, Vector3(0, 0.03 + sin(i * 0.9) * 0.008, -0.07 + i * 0.03))
+			MeshUtil.add(_visual, MeshUtil.sphere(0.008), Color(0.05, 0.05, 0.05), Vector3(0.015, 0.045, 0.1))
 		"milk":
 			MeshUtil.add(_visual, MeshUtil.cylinder(0.16, 0.12, 0.05), Color(0.55, 0.7, 0.85), Vector3(0, 0.025, 0))
 			MeshUtil.add(_visual, MeshUtil.cylinder(0.14, 0.14, 0.01), Color(0.98, 0.98, 0.95), Vector3(0, 0.05, 0))

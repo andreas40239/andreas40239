@@ -9,11 +9,12 @@ extends Node
 const DIR := "res://sounds/"
 ## Sounds with several takes (name_1, name_2, ...); one is picked at random.
 const VARIANTS := {"snuffle": 3, "step": 3, "rustle": 3, "bark": 2}
-const LOOPS := ["music", "wind", "crickets", "crawl", "purr", "snore"]
+const LOOPS := ["music", "wind", "crickets", "crawl", "purr", "snore", "night"]
 const ALL := [
 	"snuffle", "step", "rustle", "squeak", "huff", "crunch", "munch", "slurp", "snore",
 	"bush", "crawl", "crickets", "meow", "meow_sleepy", "meh", "hiss", "purr", "bell",
 	"bark", "wind", "gust", "chime_checkpoint", "chime_fact", "chime_step", "star", "poof", "music",
+	"yelp", "woof", "hoot", "swoop", "night",
 ]
 
 const MUSIC_DB := -13.0
@@ -44,7 +45,13 @@ func _ready() -> void:
 
 ## Starts music and ambience (called when a level starts; keeps playing
 ## across restarts so the music doesn't jump).
-func start_level_audio() -> void:
+func start_level_audio(night := false) -> void:
+	preload_all()
+	# Night gardens have their own insect chorus.
+	var insects := stream("night" if night else "crickets")
+	if _crickets.stream != insects:
+		_crickets.stream = insects
+		_crickets.stop()
 	for player in [_music, _wind, _crickets]:
 		if not player.playing:
 			player.play()
@@ -52,10 +59,34 @@ func start_level_audio() -> void:
 	set_insects(1.0)
 
 
+## Just the music (title screen).
+func start_music() -> void:
+	preload_all()
+	if not _music.playing:
+		_music.play()
+	_wind.stop()
+	_crickets.stop()
+
+
+## Loads every sound up front, so nothing is read from storage mid-game
+## (that can cause a hitch on phones, e.g. the first time the cat catches you).
+func preload_all() -> void:
+	for sound in ALL:
+		if VARIANTS.has(sound):
+			for i in range(1, VARIANTS[sound] + 1):
+				_load_file("%s_%d" % [sound, i], sound)
+		else:
+			_load_file(sound, sound)
+
+
 func stream(sound: String) -> AudioStream:
 	var file := sound
 	if VARIANTS.has(sound):
 		file = "%s_%d" % [sound, randi_range(1, VARIANTS[sound])]
+	return _load_file(file, sound)
+
+
+func _load_file(file: String, sound: String) -> AudioStream:
 	if not _cache.has(file):
 		var loaded: AudioStream = load(DIR + file + ".ogg")
 		if loaded is AudioStreamOggVorbis:

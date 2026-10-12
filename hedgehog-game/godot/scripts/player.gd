@@ -38,6 +38,7 @@ var respawn_point := Vector3.ZERO
 var stats := {"food": 0, "caught": 0, "hidden": 0}
 
 var _hide_count := 0
+var _scent_mask_count := 0
 var _interactables: Array[Interactable] = []
 var _prompt := ""
 var _invulnerable := 0.0
@@ -145,7 +146,14 @@ func remove_interactable(item: Interactable) -> void:
 	_interactables.erase(item)
 
 
-func enter_hide() -> void:
+## True inside a compost heap or hedgehog house: dogs can't smell you there.
+func is_scent_masked() -> bool:
+	return _scent_mask_count > 0
+
+
+func enter_hide(masks_scent := false) -> void:
+	if masks_scent:
+		_scent_mask_count += 1
 	_hide_count += 1
 	if _hide_count == 1:
 		stats.hidden += 1
@@ -153,7 +161,9 @@ func enter_hide() -> void:
 		Game.unlock_fact("hide")
 
 
-func exit_hide() -> void:
+func exit_hide(masks_scent := false) -> void:
+	if masks_scent:
+		_scent_mask_count = maxi(_scent_mask_count - 1, 0)
 	_hide_count = maxi(_hide_count - 1, 0)
 	if _hide_count == 0:
 		hidden_changed.emit(false)
@@ -365,6 +375,10 @@ func _update_prompt() -> void:
 func _respawn() -> void:
 	global_position = respawn_point
 	velocity = Vector3.ZERO
+	# Jump the camera straight there instead of sweeping across the garden
+	# (sweeping through trees and fences made it jump about).
+	if _camera and _camera.has_method("snap_to_target"):
+		_camera.snap_to_target()
 
 
 func _build_visual() -> void:

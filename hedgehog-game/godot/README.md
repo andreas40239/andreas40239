@@ -1,9 +1,21 @@
-# Hedgehog Highways: Prototype (M1)
+# Hedgehog Highways: Prototype
 
 A grey-box Godot 4 prototype of the core loop from the [Game Design Document](../GDD.md):
-**forage → avoid the cat → collect nest material → hibernate in a safe spot**.
+**forage → avoid the animals → collect nest material → hibernate in a safe spot**, across three gardens.
 
 All visuals are built from simple shapes. The goal is to find out whether the loop is fun before investing in art.
+
+## The gardens
+
+The game opens on a **title screen** with one card per garden, showing your best stars. Each garden unlocks when the one before it is finished. Progress is saved on the device (`user://progress.cfg`).
+
+| Garden | What's new | Safe places to hibernate |
+|---|---|---|
+| **1. The Cottage Garden** | The tutorial; a cat that hunts by sight and hearing | Under the shed, the log pile |
+| **2. The Allotments** | **Biscuit the dog** hunts by *smell*: a bush only helps while he is a few steps away. **Compost heaps** and the **hedgehog house** hide your smell completely. **Nudge a ball** and Biscuit runs off to play. If you roll up, he barks, gets a spiky nose ("ouch!") and gives up. New food: caterpillars. | The hedgehog house, under the shed |
+| **3. The Night Garden** | It's dark (the hedgehog has a soft glow), with fireflies and lit windows. **An owl** circles overhead: when it hoots, its shadow turns red and slides towards you, so hide in a hedge or roll up before it swoops. Running away works too. A dark cat with glowing eyes prowls about. | Under the decking, the log pile |
+
+After hibernating, the results screen has **Play again**, **Next garden** and **All gardens** buttons. The tutorial only runs until garden 1 has been finished once.
 
 ## Running it
 
@@ -24,7 +36,7 @@ All visuals are built from simple shapes. The goal is to find out whether the lo
 | Sniff (hold) | **Right thumb**: hold the *Sniff* button | Space | A / ✕ |
 | Roll into a ball (hold) | **Right thumb**: hold the *Roll* button | Shift | B / ○ |
 | Interact (eat, pick up, build nest, sleep) | **Tap the item** on the screen when it shows *Tap!* | E / Enter | X / □ |
-| Restart | Tap the results screen | R (or any key on the results screen) | Start |
+| Restart | *Play again* on the results screen | R | Start |
 
 The touch controls show up automatically on touch screens and hide when a keyboard or gamepad is used.
 To try them on a PC, run the game with the `--touch` user argument (in Godot: *Project → Project Settings → Editor → Run → Main Run Args*: `-- --touch`) and use the mouse as a finger.
@@ -38,7 +50,7 @@ move → look around → sniff → eat (tap food) → roll up → hide in a bush
 
 The text matches the device: touch instructions on phones and tablets, keys on a PC. On touch screens, the control being taught pulses yellow ("Left thumb here!", "Hold me!", "Swipe here to look around", "Tap!").
 The cat sleeps (*zzz*) until the roll step, and the winter clock only starts once the tutorial is done.
-To turn the tutorial off, select the **Tutorial** node in `main.tscn` and untick **Enabled**.
+To turn the tutorial off, select the **Tutorial** node in `garden_1.tscn` and untick **Enabled**.
 
 ## What's in the prototype
 
@@ -55,7 +67,10 @@ To turn the tutorial off, select the **Tutorial** node in `main.tscn` and untick
 | **Star rating** | `scripts/main.gd` | ⭐ safe spot, ⭐ 6+ nest material, ⭐ full hearts and dexterity 60+. |
 | **Winter clock** | `main.gd` | A 6-minute autumn: the light cools, dexterity drains faster, and at full winter it snows and any safe spot will do. |
 | **Hibernation cut-scene** | `main.gd`, `scripts/hud.gd` | Snow, the hedgehog curls up and breathes, the camera circles, the screen fades blue, then a results panel. |
-| **Hedgehog facts** | `game.gd`, `hud.gd` | 13 real-world fact cards unlock as you play. |
+| **Hedgehog facts** | `game.gd`, `hud.gd` | 20 real-world fact cards unlock as you play. |
+| **Dog AI** | `scripts/dog.gd` | Patrol → `?` sniffing (nose down) → `!` chase. Smell range 5 m (1.6 m into a bush, 0 in compost or the hedgehog house), plus sight. Rolled up: WOOF → ouch! → gives up. Plays with a nudged ball (`scripts/ball.gd`). |
+| **Owl** | `scripts/owl.gd` | Circles over the night garden; hoots, then its shadow turns red and follows the hedgehog for 3.5 s before the swoop. Hidden, rolled-up or far-away hedgehogs are missed. |
+| **Test-build frame counter** | `hud.gd` | Debug builds (like the test APK) show fps and the slowest recent frame at the top of the screen. It turns red if a frame took over 100 ms, which helps track down hitches. |
 
 ## Sound and music
 
@@ -69,8 +84,10 @@ Every sound is synthesised by `tools/generate_sounds.py` (numpy + ffmpeg), so th
 | Beetles scuttling in the leaves (only audible up close) | Near a beetle |
 | Rustling leaves | Picking up nest material, adding it to the nest, entering or leaving a bush |
 | Cat's collar bell (a handy warning!), a meow when it notices you, a hiss as it pounces, a bored *meh*, purring while it sleeps | Cat |
-| The neighbours' dog barking behind the fence | Every 20–40 s, from a random direction |
-| Crickets that fall silent as it gets colder | Ambience |
+| Biscuit sniffing, an excited *woof woof* when he gives chase, a yelp ("ouch!") after a spiky nose | Dog (garden 2) |
+| The owl's *hoo... hoo-hoo-hooo* before it swoops, and the whoosh of its wings | Owl (garden 3) |
+| A neighbour's dog barking behind the fence | Every 20–40 s, from a random direction |
+| Crickets that fall silent as it gets colder (a different night chorus in garden 3) | Ambience |
 | A gentle breeze that **picks up strongly in the last quarter of the winter clock**, with more and more gusts | Ambience |
 | Relaxing background music (soft pads, bass and a kalimba-like melody, 53 s loop) | Always |
 | Chimes for checkpoints, fact cards, tutorial steps and each star on the results screen | UI |
@@ -82,22 +99,30 @@ Audio uses three buses (*Music*, *Ambience*, *SFX*) so volumes can be balanced o
 ```
 project.godot
 scenes/
-  main.tscn           The garden level (grey-box layout, edit it in the editor)
-  player.tscn, cat.tscn, food.tscn, nest_material.tscn,
+  title.tscn          Title screen (the main scene)
+  garden_1..3.tscn    The three gardens (generated, see below)
+  player.tscn, cat.tscn, dog.tscn, owl.tscn, ball.tscn, food.tscn, nest_material.tscn,
   hibernation_spot.tscn, hide_spot.tscn, checkpoint.tscn
-                      Drag these into main.tscn to place more items. Set "kind" etc. in the Inspector.
+                      Building blocks. Set "kind", "look" etc. in the Inspector.
 scripts/              All gameplay code (GDScript)
+  main.gd             Level controller (winter clock, night, results)
+  game.gd             Autoload: input, facts, garden list, saved progress
   touch_controls.gd   Joystick, Sniff/Roll buttons, tap-to-use, swipe-to-look
   tutorial.gd         The first-garden tutorial
   sound.gd            Sound effects, ambience and music
 sounds/               Generated .ogg files
+tools/build_levels.py Builds the garden scenes from a description in Python
 tools/generate_sounds.py
                       Synthesises everything in sounds/
 export_presets.cfg    Android export settings
-tests/smoke_test.*    Automated play-through of the core loop
+tests/                Automated tests (see below)
 ```
 
 The entity scenes build their visuals when the game runs, so in the editor they show only as position markers.
+
+**Editing gardens:** the gardens are generated by `python3 tools/build_levels.py`, which **overwrites** `scenes/garden_*.tscn`. Either change the layouts in that script and re-run it, or stop using it and edit the scenes in Godot from then on.
+
+**Phone performance:** at load time, each object's many small shapes are merged into one mesh (`MeshUtil.merge`) and every kind of material is drawn once behind the fade-in (`main.gd`), so phones don't stall mid-game. Each garden draws in roughly 110–155 draw calls.
 
 ## Building the Android APK
 
@@ -115,23 +140,22 @@ Mobile builds use the *Compatibility* renderer so they run on cheaper tablets to
 **Installing a test APK on a device:** copy the `.apk` to the phone or tablet and open it. Android asks you to allow installing apps from that source (for example *Files* or your browser); allow it once.
 Or, with USB debugging on: `adb install -r hedgehog-highways.apk`.
 
-## Automated test
+## Automated tests
 
-The smoke test plays through the whole loop headlessly in under a minute: eat, sniff, collect, hide, get caught, roll up, use the shed gap, hibernate.
-A second pass plays the whole tutorial with simulated touches: joystick, swipe, the Sniff and Roll buttons, and tapping food, leaves and the nest on screen.
-
-`tests/results_test.tscn` plays the real level, hibernates and taps the results screen to check that the level restarts.
-
-```bash
-godot --headless --fixed-fps 60 res://tests/results_test.tscn
-```
+| Test | What it checks |
+|---|---|
+| `tests/smoke_test.tscn` | Garden 1's whole loop (eat, sniff, collect, hide, get caught, roll up, the shed gap, a smooth camera, hibernate), then the full tutorial with simulated touches |
+| `tests/creatures_test.tscn` | Biscuit's nose (bushes vs compost heaps), chase, the rolled-up "ouch!", the ball, the hedgehog house; the owl catching, missing a rolled-up/hidden/fleeing hedgehog; the decking |
+| `tests/results_test.tscn` | The real game flow: results buttons (Play again, Next garden, All gardens), unlocking gardens, the title screen |
 
 ```bash
 cd hedgehog-game/godot
 godot --headless --fixed-fps 60 res://tests/smoke_test.tscn
+godot --headless --fixed-fps 60 res://tests/creatures_test.tscn
+godot --headless --fixed-fps 60 res://tests/results_test.tscn
 ```
 
-It prints `PASS`/`FAIL` per check and exits with code 1 if anything fails.
+Each prints `PASS`/`FAIL` per check and exits with code 1 if anything fails. (They save test progress to the same `user://` file as the game.)
 
 ## Tuning knobs
 
@@ -139,6 +163,8 @@ Most numbers are `@export` variables, so you can tweak them in the Inspector:
 
 - **Player:** `base_speed`, `dexterity_speed_bonus`, `sniff_radius`, `max_health`
 - **Cat:** `vision_range`, `vision_angle_degrees`, `notice_time`, `pounce_distance`, `bored_time`
+- **Dog:** `smell_range`, `smell_range_in_bush`, `chase_speed`, `notice_time`, `play_time`
+- **Owl:** `circle_radius`, `height`, `first_swoop_delay`, `swoop_interval_min/max`, `warn_time`
 - **Main:** `level_duration` (winter clock), `good_nest_material`, `good_dexterity`
 - **Food:** `respawn_time`
 
@@ -150,11 +176,14 @@ Most numbers are `@export` variables, so you can tweak them in the Inspector:
 - Is 6 minutes of autumn too short or too long?
 - Do kids read or notice the fact cards?
 - On a phone or tablet: are the buttons big enough and in comfortable thumb reach? Is tapping items easy, or do kids miss?
+- Garden 2: do kids work out that compost heaps hide their smell, and that the ball distracts Biscuit?
+- Garden 3: is the owl's warning (hoot + red shadow) long and clear enough? Is the night too dark?
 
 ## Next steps (towards M2 / vertical slice)
 
 - Real hedgehog, cat and garden art, plus animations
-- Sound: snuffles, the beetle *crunch*, an adaptive music layer when the cat is near
-- Distractions (feather, yarn, ball), a dog with a scent-based search
+- An adaptive music layer when an animal is near
+- More distractions (feather and yarn for cats)
 - Colour-blind shapes for scent columns, voice-over for prompts and facts
 - Nature journal screen, world map with hedgehog highways, Explorer difficulty mode
+- Baby hoglets that follow you (GDD section 15.2)

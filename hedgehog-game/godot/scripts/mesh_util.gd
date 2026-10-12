@@ -132,7 +132,8 @@ static func _append(instance: MeshInstance3D, xform: Transform3D, data: Dictiona
 	# Transparent parts keep their own material.
 	for s in mesh.get_surface_count():
 		var check := instance.get_active_material(s) as BaseMaterial3D
-		if check and check.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+		if check and (check.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
+				or check.shading_mode != BaseMaterial3D.SHADING_MODE_PER_PIXEL):
 			return false
 	var normal_basis := xform.basis.inverse().transposed()
 	for s in mesh.get_surface_count():

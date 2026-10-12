@@ -25,7 +25,26 @@ const FACTS := {
 	"bonfire": ["Check before you burn", "Hedgehogs often sleep in piles of sticks and leaves. Always check bonfire piles for sleeping hedgehogs before lighting them!"],
 	"shed": ["Safe and dry", "Dry, sheltered spots under sheds, log piles or a hedgehog house make perfect places to hibernate."],
 	"winter": ["Getting sleepy", "When it gets cold and food runs out, hedgehogs hibernate. They sleep through winter and wake up in spring."],
+	"caterpillar": ["Wriggly snack", "Caterpillars are full of protein, which makes them a great hedgehog snack."],
+	"compost": ["Cosy compost", "Compost heaps are warm and full of bugs, so hedgehogs love them. Always check a compost heap before digging into it with a fork!"],
+	"dog": ["Super sniffers", "A dog's nose is many thousands of times better than ours. Dogs find things by smell much more than by sight."],
+	"ball": ["Playtime!", "Dogs love to chase and play. Keeping dogs busy and on a lead near wild corners helps hedgehogs stay safe."],
+	"hedgehog_house": ["A house for a hedgehog", "You can build or buy a hedgehog house. Put it in a quiet, shady corner with some dry leaves inside."],
+	"night": ["Night owls", "Hedgehogs are nocturnal: they sleep during the day and come out at night to look for food."],
+	"owl": ["Silent wings", "Owls fly almost silently thanks to soft, fringed feathers. That's why their shadow is the best warning!"],
 }
+
+## The gardens, in order. Each one unlocks when the one before is finished.
+const LEVELS := [
+	{"scene": "res://scenes/garden_1.tscn", "title": "The Cottage Garden"},
+	{"scene": "res://scenes/garden_2.tscn", "title": "The Allotments"},
+	{"scene": "res://scenes/garden_3.tscn", "title": "The Night Garden"},
+]
+const TITLE_SCENE := "res://scenes/title.tscn"
+const SAVE_PATH := "user://progress.cfg"
+
+## Best star rating per garden (0 = not finished yet).
+var best_stars: Array = [0, 0, 0]
 
 var unlocked_facts: Dictionary = {}
 ## True when on-screen touch controls should be shown and touch hints used.
@@ -41,11 +60,52 @@ func _ready() -> void:
 	if _force_touch:
 		Input.emulate_touch_from_mouse = true
 	touch_mode = _force_touch or DisplayServer.is_touchscreen_available()
+	_load_progress()
+
+
+# --- Gardens and progress ------------------------------------------------------
+
+func is_unlocked(index: int) -> bool:
+	return index == 0 or (index < LEVELS.size() and best_stars[index - 1] > 0)
+
+
+func has_level(index: int) -> bool:
+	return index >= 0 and index < LEVELS.size()
+
+
+func complete_level(index: int, stars: int) -> void:
+	best_stars[index] = maxi(best_stars[index], stars)
+	_save_progress()
+
+
+func go_to_level(index: int) -> void:
+	get_tree().change_scene_to_file(LEVELS[index]["scene"])
+
+
+func go_to_title() -> void:
+	get_tree().change_scene_to_file(TITLE_SCENE)
+
+
+func _load_progress() -> void:
+	var config := ConfigFile.new()
+	if config.load(SAVE_PATH) != OK:
+		return
+	for i in LEVELS.size():
+		best_stars[i] = int(config.get_value("stars", str(i), 0))
+
+
+func _save_progress() -> void:
+	var config := ConfigFile.new()
+	for i in LEVELS.size():
+		config.set_value("stars", str(i), best_stars[i])
+	config.save(SAVE_PATH)
 
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
 		set_touch_mode(true)
+	elif event is InputEventMouseButton and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return  # A touch, translated into a click so buttons work.
 	elif not _force_touch and (event is InputEventKey or event is InputEventJoypadButton
 			or event is InputEventMouseButton):
 		set_touch_mode(false)

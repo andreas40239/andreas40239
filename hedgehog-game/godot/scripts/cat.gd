@@ -21,6 +21,8 @@ enum State { PATROL, SUSPICIOUS, STALK, POUNCE, BORED, SEARCH }
 @export var bored_time := 7.0
 ## A sleeping cat ignores everything until wake_up() (used by the tutorial).
 @export var asleep := false
+## Eyes that shine in the dark (for night gardens).
+@export var glowing_eyes := false
 
 const POUNCE_WINDUP := 0.4
 const POUNCE_DURATION := 0.8
@@ -40,6 +42,7 @@ var _visual: Node3D
 var _label: Label3D
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _purr: AudioStreamPlayer3D
+var glow_eyes: Array = []
 var _bell_timer := 0.0
 var _meow_cooldown := 0.0
 
@@ -326,7 +329,12 @@ func _build_visual() -> void:
 	MeshUtil.add(_visual, MeshUtil.sphere(0.015), Color(0.9, 0.5, 0.5), Vector3(0, 0.43, 0.44))
 	for side in [-1.0, 1.0]:
 		MeshUtil.add(_visual, MeshUtil.cylinder(0.0, 0.045, 0.1), fur, Vector3(side * 0.07, 0.58, 0.29), Vector3.ONE, Vector3(0, 0, -side * 0.25))
-		MeshUtil.add(_visual, MeshUtil.sphere(0.022), Color(0.35, 0.75, 0.25), Vector3(side * 0.05, 0.48, 0.4))
+		var eye := MeshUtil.add(_visual, MeshUtil.sphere(0.022 if not glowing_eyes else 0.028), Color(0.35, 0.75, 0.25), Vector3(side * 0.05, 0.48, 0.4))
+		if glowing_eyes:
+			var mat: StandardMaterial3D = eye.mesh.material
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.albedo_color = Color(0.7, 1.0, 0.3)
+			glow_eyes.append(eye)
 		MeshUtil.add(_visual, MeshUtil.sphere(0.011), Color(0.05, 0.05, 0.05), Vector3(side * 0.05, 0.48, 0.42))
 		for front in [-1.0, 1.0]:
 			MeshUtil.add(_visual, MeshUtil.cylinder(0.035, 0.035, 0.22), fur, Vector3(side * 0.08, 0.11, front * 0.17))
@@ -336,7 +344,7 @@ func _build_visual() -> void:
 	MeshUtil.add(_visual, MeshUtil.cylinder(0.1, 0.1, 0.03), Color(0.8, 0.15, 0.2), Vector3(0, 0.38, 0.25), Vector3.ONE, Vector3(1.2, 0, 0))
 	MeshUtil.add(_visual, MeshUtil.sphere(0.025), Color(1.0, 0.85, 0.2), Vector3(0, 0.33, 0.32))
 
-	MeshUtil.merge(_visual)
+	MeshUtil.merge(_visual, glow_eyes)
 
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED

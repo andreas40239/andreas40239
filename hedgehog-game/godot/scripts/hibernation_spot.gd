@@ -7,7 +7,7 @@ signal hibernate_requested(spot: HibernationSpot)
 
 @export var secure := true
 @export var required_material := 3
-@export_enum("shed", "log_pile", "bonfire") var look: String = "shed"
+@export_enum("shed", "log_pile", "bonfire", "hedgehog_house") var look: String = "shed"
 ## Fact unlocked when the hedgehog checks this spot.
 @export var fact_id := "shed"
 
@@ -98,6 +98,14 @@ func _build_visual() -> void:
 						Vector3(cos(angle) * 0.3, 0.45, sin(angle) * 0.3), Vector3.ONE,
 						Vector3(sin(angle) * 0.45, 0, -cos(angle) * 0.45))
 			MeshUtil.add(visual, MeshUtil.sphere(0.5), Color(0.6, 0.4, 0.15), Vector3(0, 0.1, 0), Vector3(1.0, 0.4, 1.0))
+		"hedgehog_house":
+			# A little wooden house with a low entrance, built by a kind child.
+			var wood := Color(0.6, 0.42, 0.25)
+			MeshUtil.add(visual, MeshUtil.box(Vector3(1.0, 0.55, 0.9)), wood, Vector3(0, 0.275, -0.25))
+			MeshUtil.add(visual, MeshUtil.box(Vector3(0.62, 0.05, 1.1)), wood.darkened(0.3), Vector3(-0.28, 0.66, -0.25), Vector3.ONE, Vector3(0, 0, 0.5))
+			MeshUtil.add(visual, MeshUtil.box(Vector3(0.62, 0.05, 1.1)), wood.darkened(0.3), Vector3(0.28, 0.66, -0.25), Vector3.ONE, Vector3(0, 0, -0.5))
+			MeshUtil.add(visual, MeshUtil.box(Vector3(0.22, 0.2, 0.02)), Color(0.08, 0.06, 0.05), Vector3(0, 0.1, 0.21))
+			MeshUtil.add(visual, MeshUtil.box(Vector3(0.12, 0.03, 0.12)), Color(0.9, 0.85, 0.75), Vector3(0.35, 0.5, 0.21))
 		"shed":
-			pass  # The shed itself is part of the level scenery.
+			pass  # The shed (or decking) itself is part of the level scenery.
 	MeshUtil.merge(visual, [_nest])

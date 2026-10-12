@@ -150,7 +150,8 @@ func _run() -> void:
 
 
 func _load_level(with_tutorial: bool) -> void:
-	main = load("res://scenes/main.tscn").instantiate()
+	Game.best_stars = [0, 0, 0]  # Fresh progress, so the tutorial runs.
+	main = load("res://scenes/garden_1.tscn").instantiate()
 	main.get_node("Tutorial").enabled = with_tutorial
 	add_child(main)
 	player = main.get_node("Player")

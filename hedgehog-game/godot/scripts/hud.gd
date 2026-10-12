@@ -3,6 +3,10 @@ extends CanvasLayer
 ## nest material, season dial, hidden-eye, context prompt, toasts, fact
 ## cards, the hibernation fade and the results panel.
 
+signal play_again_pressed
+signal next_garden_pressed
+signal all_gardens_pressed
+
 const HELP_TEXT := "Move: WASD / arrows    Look: drag mouse or Z / X    Sniff: hold Space    Roll up: hold Shift    Interact: E    Restart: R"
 
 
@@ -42,21 +46,6 @@ class EyeIcon extends Control:
 		draw_circle(c, 5, Color(0.05, 0.05, 0.05))
 
 
-class StarRow extends Control:
-	var stars := 0
-
-	func _draw() -> void:
-		for i in 3:
-			var color := Color(1.0, 0.82, 0.2) if i < stars else Color(0.3, 0.3, 0.35)
-			var center := Vector2(size.x / 2.0 + (i - 1) * 80, size.y / 2.0)
-			var points := PackedVector2Array()
-			for k in 10:
-				var r := 32.0 if k % 2 == 0 else 13.0
-				var a := -PI / 2.0 + k * PI / 5.0
-				points.append(center + Vector2(cos(a), sin(a)) * r)
-			draw_colored_polygon(points, color)
-
-
 var _player: Hedgehog
 var _hearts: HeartRow
 var _dexterity_bar: ProgressBar
@@ -78,6 +67,12 @@ var _results: PanelContainer
 var _help: Label
 var _sleeping := false
 var _results_time := 0.0
+var _result_buttons: Array[Button] = []
+## Test builds show frames per second and the slowest recent frame, to help
+## track down hitches on real devices.
+var _perf_label: Label
+var _perf_worst := 0.0
+var _perf_timer := 0.0
 ## Taps right after the results appear are ignored, so a stray touch from
 ## the last moment of play doesn't skip the screen.
 const RESULTS_TAP_DELAY := 1.0
@@ -135,8 +130,30 @@ func show_toast(text: String) -> void:
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.8)
 
 
+## A big title card at the start of a garden, fading out after a while.
+func show_title(title: String, text: String, seconds := 6.0) -> void:
+	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", _panel_style())
+	_place(card, Control.PRESET_CENTER_TOP, Vector2(-320, 118), Vector2(640, 0))
+	add_child(card)
+	var box := VBoxContainer.new()
+	card.add_child(box)
+	var heading := _label(title, 32, HORIZONTAL_ALIGNMENT_CENTER)
+	heading.modulate = Color(1.0, 0.85, 0.4)
+	box.add_child(heading)
+	var body := _label(text, 21, HORIZONTAL_ALIGNMENT_CENTER)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(600, 0)
+	box.add_child(body)
+	var fade := create_tween()
+	fade.tween_interval(seconds)
+	fade.tween_property(card, "modulate:a", 0.0, 1.0)
+	fade.tween_callback(card.queue_free)
+
+
 ## criteria: Array of [description: String, achieved: bool]
-func play_hibernation(stars: int, criteria: Array, stats: Dictionary) -> void:
+func play_hibernation(stars: int, criteria: Array, stats: Dictionary, has_next := false) -> void:
 	for control in [_help, _stats_box, _bottom_box, _fact_panel]:
 		control.visible = false
 	_fact_queue.clear()
@@ -146,27 +163,24 @@ func play_hibernation(stars: int, criteria: Array, stats: Dictionary) -> void:
 	tween.tween_property(_overlay, "color", Color(0.15, 0.25, 0.5, 0.45), 3.0)
 	tween.tween_callback(show_toast.bind("Zzz... Sweet dreams. Spring is on its way."))
 	tween.tween_interval(3.0)
-	tween.tween_callback(_show_results.bind(stars, criteria, stats))
-
-
-## Any tap, click or key on the results screen plays again.
-func _input(event: InputEvent) -> void:
-	if not _results.visible or _results_time < RESULTS_TAP_DELAY:
-		return
-	var released: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and not event.pressed
-	var key: bool = (event is InputEventKey or event is InputEventJoypadButton) and event.pressed and not event.is_echo()
-	if released or key:
-		get_viewport().set_input_as_handled()
-		play_again()
-
-
-func play_again() -> void:
-	get_tree().reload_current_scene.call_deferred()
+	tween.tween_callback(_show_results.bind(stars, criteria, stats, has_next))
 
 
 func _process(delta: float) -> void:
+	if _perf_label:
+		_perf_worst = maxf(_perf_worst, delta)
+		_perf_timer += delta
+		if _perf_timer > 1.0:
+			_perf_label.text = "%d fps   slowest frame %d ms" % [Engine.get_frames_per_second(), int(_perf_worst * 1000.0)]
+			_perf_label.modulate = Color(1, 0.4, 0.4) if _perf_worst > 0.1 else Color(1, 1, 1, 0.6)
+			_perf_timer = 0.0
+			_perf_worst = 0.0
 	if _results.visible:
 		_results_time += delta
+		# Buttons wake up after a moment, so a stray touch can't skip the screen.
+		if _results_time >= RESULTS_TAP_DELAY:
+			for button in _result_buttons:
+				button.disabled = false
 	if _fact_timer > 0.0:
 		_fact_timer -= delta
 		if _fact_timer <= 0.0:
@@ -201,7 +215,7 @@ func _flash() -> void:
 	create_tween().tween_property(_overlay, "color", Color(1, 1, 1, 0), 0.6)
 
 
-func _show_results(stars: int, criteria: Array, stats: Dictionary) -> void:
+func _show_results(stars: int, criteria: Array, stats: Dictionary, has_next: bool) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	_results.add_child(box)
@@ -217,9 +231,22 @@ func _show_results(stars: int, criteria: Array, stats: Dictionary) -> void:
 		box.add_child(line)
 	box.add_child(_label("Food eaten: %d    Times hidden: %d    Times caught: %d" % [stats.food, stats.hidden, stats.caught], 18))
 	box.add_child(_label("Facts discovered: %d / %d" % [Game.unlocked_facts.size(), Game.FACTS.size()], 18))
-	var again := "Tap the screen to play again" if Game.touch_mode else "Press any key to play again"
-	box.add_child(_label(again, 22, HORIZONTAL_ALIGNMENT_CENTER))
+	if not has_next:
+		box.add_child(_label("You helped the hedgehog through every garden. Well done!", 20, HORIZONTAL_ALIGNMENT_CENTER))
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 16)
+	box.add_child(buttons)
+	var again := _button("Play again", play_again_pressed)
+	buttons.add_child(again)
+	var focus := again
+	if has_next:
+		var next := _button("Next garden  >", next_garden_pressed, Color(0.3, 0.6, 0.3))
+		buttons.add_child(next)
+		focus = next
+	buttons.add_child(_button("All gardens", all_gardens_pressed))
 	_results.visible = true
+	focus.grab_focus()
 	for i in stars:
 		get_tree().create_timer(0.6 + i * 0.45).timeout.connect(Sound.play.bind("star", -6.0, 1.0 + i * 0.26))
 	_results.modulate.a = 0.0
@@ -301,6 +328,11 @@ func _build() -> void:
 	Game.input_mode_changed.connect(func(touch: bool) -> void: _help.visible = not touch and not _sleeping)
 	add_child(_help)
 
+	if OS.is_debug_build():
+		_perf_label = _label("", 13, HORIZONTAL_ALIGNMENT_CENTER)
+		_place(_perf_label, Control.PRESET_CENTER_TOP, Vector2(-150, 2), Vector2(300, 18))
+		add_child(_perf_label)
+
 	# Centre: results panel (shown after hibernation).
 	_results = PanelContainer.new()
 	_place(_results, Control.PRESET_CENTER, Vector2(-300, -220), Vector2(600, 0))
@@ -327,6 +359,25 @@ func _label(text: String, font_size: int, align := HORIZONTAL_ALIGNMENT_LEFT) ->
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	label.add_theme_constant_override("outline_size", 6)
 	return label
+
+
+func _button(text: String, pressed_signal: Signal, color := Color(0.25, 0.32, 0.5)) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(180, 64)
+	button.add_theme_font_size_override("font_size", 24)
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = color.lightened(0.15) if state == "hover" or state == "focus" else color
+		if state == "disabled":
+			style.bg_color = color.darkened(0.3)
+		style.set_corner_radius_all(12)
+		style.set_content_margin_all(10)
+		button.add_theme_stylebox_override(state, style)
+	button.disabled = true  # Enabled after RESULTS_TAP_DELAY.
+	button.pressed.connect(func() -> void: pressed_signal.emit())
+	_result_buttons.append(button)
+	return button
 
 
 func _panel_style() -> StyleBoxFlat:
