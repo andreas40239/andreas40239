@@ -28,3 +28,14 @@ Dann gibt es einen Bonus und das nächste Level startet automatisch.
 - `scripts/main.gd`: Spiellogik, Kosten/Balancing, Benutzeroberfläche
 - `scripts/world.gd`: Spielwelt und Tsunami-Ablauf (Rückzug → Anrollen → Aufprall/Überflutung → Ablaufen)
 - `scripts/ocean_audio.gd`: prozeduraler Sound
+
+## Android (arm64)
+Fertige APK: [`apk/TsunamiMauerbau-arm64.apk`](apk/TsunamiMauerbau-arm64.apk) (Android 5.0+, nur arm64-v8a, Querformat).
+
+Installation: APK aufs Handy laden, öffnen und „Installation aus unbekannten Quellen“ für den Browser/Dateimanager erlauben.
+Auf dem Handy wird getippt statt geklickt; die Tastenkürzel B und P braucht man dort nicht.
+
+Selbst exportieren: In Godot unter *Editor → Export-Vorlagen verwalten* die Vorlagen für 4.3 installieren, in den
+Editor-Einstellungen Android-SDK und Debug-Keystore eintragen, dann *Projekt → Exportieren → Android* (Preset ist in
+`export_presets.cfg` bereits angelegt). Den Release-Keystore kann man per Umgebungsvariablen
+`GODOT_ANDROID_KEYSTORE_RELEASE_PATH/_USER/_PASSWORD` übergeben.
