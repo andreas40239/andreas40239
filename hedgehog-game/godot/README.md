@@ -24,7 +24,7 @@ All visuals are built from simple shapes. The goal is to find out whether the lo
 | Sniff (hold) | **Right thumb**: hold the *Sniff* button | Space | A / ✕ |
 | Roll into a ball (hold) | **Right thumb**: hold the *Roll* button | Shift | B / ○ |
 | Interact (eat, pick up, build nest, sleep) | **Tap the item** on the screen when it shows *Tap!* | E / Enter | X / □ |
-| Restart | Tap the results screen | R | Start |
+| Restart | Tap the results screen | R (or any key on the results screen) | Start |
 
 The touch controls show up automatically on touch screens and hide when a keyboard or gamepad is used.
 To try them on a PC, run the game with the `--touch` user argument (in Godot: *Project → Project Settings → Editor → Run → Main Run Args*: `-- --touch`) and use the mouse as a finger.
@@ -57,6 +57,26 @@ To turn the tutorial off, select the **Tutorial** node in `main.tscn` and untick
 | **Hibernation cut-scene** | `main.gd`, `scripts/hud.gd` | Snow, the hedgehog curls up and breathes, the camera circles, the screen fades blue, then a results panel. |
 | **Hedgehog facts** | `game.gd`, `hud.gd` | 13 real-world fact cards unlock as you play. |
 
+## Sound and music
+
+Every sound is synthesised by `tools/generate_sounds.py` (numpy + ffmpeg), so there are no third-party audio files or licences to worry about. Change a sound by editing its function and re-running the script. `scripts/sound.gd` (autoload `Sound`) plays them.
+
+| What you hear | When |
+|---|---|
+| Hedgehog footsteps (louder when dexterity is low), snuffling while sniffing, a contented snuffle when idle | Moving, sniffing, standing still |
+| A huff when curling up, a squeak and a *poof* when caught, soft snoring in the nest | Rolling, being caught, hibernating |
+| Crunch (beetles, apples), munch (worms, slugs), slurp and *bleh* (milk) | Eating |
+| Beetles scuttling in the leaves (only audible up close) | Near a beetle |
+| Rustling leaves | Picking up nest material, adding it to the nest, entering or leaving a bush |
+| Cat's collar bell (a handy warning!), a meow when it notices you, a hiss as it pounces, a bored *meh*, purring while it sleeps | Cat |
+| The neighbours' dog barking behind the fence | Every 20–40 s, from a random direction |
+| Crickets that fall silent as it gets colder | Ambience |
+| A gentle breeze that **picks up strongly in the last quarter of the winter clock**, with more and more gusts | Ambience |
+| Relaxing background music (soft pads, bass and a kalimba-like melody, 53 s loop) | Always |
+| Chimes for checkpoints, fact cards, tutorial steps and each star on the results screen | UI |
+
+Audio uses three buses (*Music*, *Ambience*, *SFX*) so volumes can be balanced or given sliders later.
+
 ### Project layout
 
 ```
@@ -69,6 +89,10 @@ scenes/
 scripts/              All gameplay code (GDScript)
   touch_controls.gd   Joystick, Sniff/Roll buttons, tap-to-use, swipe-to-look
   tutorial.gd         The first-garden tutorial
+  sound.gd            Sound effects, ambience and music
+sounds/               Generated .ogg files
+tools/generate_sounds.py
+                      Synthesises everything in sounds/
 export_presets.cfg    Android export settings
 tests/smoke_test.*    Automated play-through of the core loop
 ```
@@ -94,7 +118,13 @@ Or, with USB debugging on: `adb install -r hedgehog-highways.apk`.
 ## Automated test
 
 The smoke test plays through the whole loop headlessly in under a minute: eat, sniff, collect, hide, get caught, roll up, use the shed gap, hibernate.
-A second pass plays the whole tutorial with simulated touches: joystick, swipe, the Sniff and Roll buttons, and tapping food and leaves on screen.
+A second pass plays the whole tutorial with simulated touches: joystick, swipe, the Sniff and Roll buttons, and tapping food, leaves and the nest on screen.
+
+`tests/results_test.tscn` plays the real level, hibernates and taps the results screen to check that the level restarts.
+
+```bash
+godot --headless --fixed-fps 60 res://tests/results_test.tscn
+```
 
 ```bash
 cd hedgehog-game/godot

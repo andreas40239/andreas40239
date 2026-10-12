@@ -45,6 +45,10 @@ var _wobble := 0.0
 var _time := 0.0
 var _scents_shown := false
 var _last_dexterity_shown := -1
+var _step_timer := 0.0
+var _sniff_sound_timer := 0.0
+var _idle_sound_timer := 6.0
+var _snore: AudioStreamPlayer3D
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _camera: Node3D
 var _visual: Node3D
@@ -92,6 +96,7 @@ func _physics_process(delta: float) -> void:
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, facing, 1.0 - exp(-12.0 * delta))
 
 	_update_stats(delta)
+	_update_sounds(delta)
 	_update_visual(delta)
 	_update_scents()
 	_update_prompt()
@@ -193,6 +198,8 @@ func try_catch() -> bool:
 		Game.show_toast("Caught! Back to the last checkpoint...")
 	health_changed.emit(health, max_health)
 	caught_by_animal.emit()
+	Sound.play_at("squeak", global_position, -2.0)
+	Sound.play_at("poof", global_position, -6.0)
 	_respawn()
 	_invulnerable = 2.5
 	return true
@@ -204,6 +211,9 @@ func start_sleep(nest_position: Vector3) -> void:
 	velocity = Vector3.ZERO
 	var tween := create_tween()
 	tween.tween_property(self, "global_position", nest_position + Vector3.UP * 0.05, 1.0)
+	Sound.play_at("huff", global_position, -4.0)
+	_snore = Sound.attach_loop("snore", self, -8.0, 30.0)
+	get_tree().create_timer(2.5).timeout.connect(_snore.play)
 
 
 # --- Internals -----------------------------------------------------------------
@@ -232,6 +242,7 @@ func _set_rolled(rolled: bool) -> void:
 		is_sniffing = false
 		if not is_sleeping:
 			Game.unlock_fact("roll")
+			Sound.play_at("huff", global_position, -2.0)
 
 
 func _camera_relative(input: Vector2) -> Vector3:
@@ -281,6 +292,31 @@ func _update_stats(delta: float) -> void:
 	if int(dexterity) != _last_dexterity_shown:
 		_last_dexterity_shown = int(dexterity)
 		dexterity_changed.emit(dexterity)
+
+
+## Footsteps, snuffling while sniffing, and the odd contented snuffle.
+func _update_sounds(delta: float) -> void:
+	if is_sleeping:
+		return
+	var moving := Vector2(velocity.x, velocity.z).length()
+	if moving > 0.3 and is_on_floor():
+		_step_timer -= delta
+		if _step_timer <= 0.0:
+			_step_timer = clampf(0.5 / moving, 0.12, 0.35)
+			# Clumsy (low dexterity) hedgehogs are louder.
+			Sound.play_at("step", global_position, lerpf(-8.0, -16.0, dexterity / MAX_DEXTERITY), 0.2, 15.0)
+	if is_sniffing:
+		_sniff_sound_timer -= delta
+		if _sniff_sound_timer <= 0.0:
+			_sniff_sound_timer = randf_range(0.55, 0.75)
+			Sound.play_at("snuffle", global_position, -4.0, 0.12, 15.0)
+	else:
+		_sniff_sound_timer = 0.0
+	if moving < 0.1 and not is_rolled:
+		_idle_sound_timer -= delta
+		if _idle_sound_timer <= 0.0:
+			_idle_sound_timer = randf_range(5.0, 9.0)
+			Sound.play_at("snuffle", global_position, -12.0, 0.15, 12.0)
 
 
 func _update_visual(delta: float) -> void:

@@ -31,6 +31,7 @@ func interact(player: Hedgehog) -> void:
 		return
 	_taken = true
 	player.add_nest_material(amount)
+	Sound.play_at("rustle", global_position, 0.0, 0.1)
 	player.remove_interactable(self)
 	Game.show_toast("Picked up %s for the nest." % NAMES[kind])
 	Game.unlock_fact("nest")

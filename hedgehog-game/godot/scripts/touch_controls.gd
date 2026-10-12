@@ -82,17 +82,22 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and not visible:
 		# The first touch switches touch mode on; don't lose that touch.
 		Game.set_touch_mode(true)
-	if not visible:
-		return
+	if not visible or (_hud and _hud.is_showing_results()):
+		return  # The results screen handles its own taps.
 	if event is InputEventScreenTouch:
+		get_viewport().set_input_as_handled()
 		if event.pressed:
 			_touch_down(event.index, event.position)
 		else:
 			_touch_up(event.index, event.position)
-		get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag:
-		_touch_drag(event.index, event.position, event.relative)
 		get_viewport().set_input_as_handled()
+		_touch_drag(event.index, event.position, event.relative)
+
+
+func _exit_tree() -> void:
+	# Don't leave Sniff/Roll/movement "held down" when the level restarts.
+	_release_all()
 
 
 func _touch_down(finger: int, pos: Vector2) -> void:
@@ -155,9 +160,6 @@ func _touch_up(finger: int, pos: Vector2) -> void:
 ## Handles a tap at a screen position: uses the item under the finger.
 func tap(pos: Vector2) -> void:
 	_taps.append([pos, _time])
-	if _hud and _hud.is_showing_results():
-		get_tree().reload_current_scene()
-		return
 	var item := item_at(pos)
 	if item == null:
 		return

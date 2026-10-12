@@ -28,6 +28,7 @@ func _ready() -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if body is Hedgehog:
 		body.enter_hide()
+		Sound.play_at("bush", global_position, -2.0, 0.15, 20.0)
 		_set_see_through(true)
 		_rustle()
 
@@ -35,6 +36,7 @@ func _on_body_entered(body: Node3D) -> void:
 func _on_body_exited(body: Node3D) -> void:
 	if body is Hedgehog:
 		body.exit_hide()
+		Sound.play_at("bush", global_position, -8.0, 0.15, 20.0)
 		_set_see_through(false)
 		_rustle()
 

@@ -77,6 +77,10 @@ var _overlay: ColorRect
 var _results: PanelContainer
 var _help: Label
 var _sleeping := false
+var _results_time := 0.0
+## Taps right after the results appear are ignored, so a stray touch from
+## the last moment of play doesn't skip the screen.
+const RESULTS_TAP_DELAY := 1.0
 var _stats_box: VBoxContainer
 var _bottom_box: VBoxContainer
 
@@ -140,7 +144,24 @@ func play_hibernation(stars: int, criteria: Array, stats: Dictionary) -> void:
 	tween.tween_callback(_show_results.bind(stars, criteria, stats))
 
 
+## Any tap, click or key on the results screen plays again.
+func _input(event: InputEvent) -> void:
+	if not _results.visible or _results_time < RESULTS_TAP_DELAY:
+		return
+	var released: bool = (event is InputEventScreenTouch or event is InputEventMouseButton) and not event.pressed
+	var key: bool = (event is InputEventKey or event is InputEventJoypadButton) and event.pressed and not event.is_echo()
+	if released or key:
+		get_viewport().set_input_as_handled()
+		play_again()
+
+
+func play_again() -> void:
+	get_tree().reload_current_scene.call_deferred()
+
+
 func _process(delta: float) -> void:
+	if _results.visible:
+		_results_time += delta
 	if _fact_timer > 0.0:
 		_fact_timer -= delta
 		if _fact_timer <= 0.0:
@@ -150,6 +171,7 @@ func _process(delta: float) -> void:
 		_fact_title.text = "Hedgehog fact: " + fact[0]
 		_fact_text.text = fact[1]
 		_fact_panel.visible = true
+		Sound.play("chime_fact", -12.0)
 		_fact_timer = 8.0
 
 
@@ -190,9 +212,11 @@ func _show_results(stars: int, criteria: Array, stats: Dictionary) -> void:
 		box.add_child(line)
 	box.add_child(_label("Food eaten: %d    Times hidden: %d    Times caught: %d" % [stats.food, stats.hidden, stats.caught], 18))
 	box.add_child(_label("Facts discovered: %d / %d" % [Game.unlocked_facts.size(), Game.FACTS.size()], 18))
-	var again := "Tap the screen to play again" if Game.touch_mode else "Press R to play again"
+	var again := "Tap the screen to play again" if Game.touch_mode else "Press any key to play again"
 	box.add_child(_label(again, 22, HORIZONTAL_ALIGNMENT_CENTER))
 	_results.visible = true
+	for i in stars:
+		get_tree().create_timer(0.6 + i * 0.45).timeout.connect(Sound.play.bind("star", -6.0, 1.0 + i * 0.26))
 	_results.modulate.a = 0.0
 	create_tween().tween_property(_results, "modulate:a", 1.0, 0.8)
 

@@ -15,9 +15,13 @@ const KINDS := {
 ## Seconds until the food comes back. 0 = never.
 @export var respawn_time := 45.0
 
+## Sound played when eaten: crunchy beetles, munchy worms and slugs, slurpy milk.
+const EAT_SOUNDS := {"beetle": "crunch", "worm": "munch", "slug": "munch", "apple": "crunch", "milk": "slurp"}
+
 var _available := true
 var _visual: Node3D
 var _scent: Scent
+var _crawl: AudioStreamPlayer3D
 
 
 func _ready() -> void:
@@ -28,6 +32,10 @@ func _ready() -> void:
 	_scent = Scent.new()
 	_scent.color = Scent.FOOD
 	add_child(_scent)
+	if kind == "beetle":
+		# Beetles scuttle quietly in the leaves; you hear them when close.
+		_crawl = Sound.attach_loop("crawl", self, -10.0, 4.0)
+		_crawl.play(randf() * 2.0)
 
 
 func get_prompt(_player: Hedgehog) -> String:
@@ -44,6 +52,7 @@ func interact(player: Hedgehog) -> void:
 		return
 	var info: Dictionary = KINDS[kind]
 	player.eat(info["health"], info["dexterity"], info["bad"])
+	Sound.play_at(EAT_SOUNDS[kind], global_position, -2.0, 0.1)
 	if info["bad"]:
 		Game.show_toast("Yuck! The milk gives the hedgehog a tummy ache.")
 	else:
@@ -64,6 +73,8 @@ func _set_available(available: bool) -> void:
 	_scent.active = available
 	if not available:
 		_scent.set_revealed(false)
+	if _crawl:
+		_crawl.playing = available
 
 
 func _process(delta: float) -> void:

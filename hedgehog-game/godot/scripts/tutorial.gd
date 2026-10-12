@@ -146,6 +146,7 @@ func _complete_step() -> void:
 		_finish()
 		return
 	_text.text = "Great job!"
+	Sound.play("chime_step", -8.0)
 	_style.bg_color = Color(0.15, 0.45, 0.2, 0.9)
 	_set_highlight("")
 	_done_timer = DONE_PAUSE

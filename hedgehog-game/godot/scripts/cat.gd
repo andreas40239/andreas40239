@@ -39,6 +39,9 @@ var _player: Hedgehog
 var _visual: Node3D
 var _label: Label3D
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var _purr: AudioStreamPlayer3D
+var _bell_timer := 0.0
+var _meow_cooldown := 0.0
 
 
 func _ready() -> void:
@@ -52,6 +55,7 @@ func _ready() -> void:
 	collision.position.y = 0.275
 	add_child(collision)
 	_build_visual()
+	_purr = Sound.attach_loop("purr", self, -10.0, 10.0)
 
 	var path := get_node_or_null(patrol_path)
 	if path:
@@ -75,6 +79,8 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 	if asleep:
+		if not _purr.playing:
+			_purr.play()
 		velocity.x = 0.0
 		velocity.z = 0.0
 		move_and_slide()
@@ -155,6 +161,7 @@ func _physics_process(delta: float) -> void:
 			elif _timer > 4.0:
 				_set_state(State.PATROL)
 
+	_update_sounds(delta, desired)
 	velocity.x = desired.x
 	velocity.z = desired.z
 	move_and_slide()
@@ -191,13 +198,30 @@ func wake_up() -> void:
 	if not asleep:
 		return
 	asleep = false
+	_purr.stop()
+	Sound.play_at("meow_sleepy", global_position, 0.0, 0.05, 40.0)
 	_set_state(State.PATROL)
 
 
+## The collar bell jingles as the cat walks (a handy warning!), it meows
+## when it notices something, hisses as it pounces and says "meh" when bored.
+func _update_sounds(delta: float, desired: Vector3) -> void:
+	_meow_cooldown = maxf(_meow_cooldown - delta, 0.0)
+	if desired.length() > 0.3:
+		_bell_timer -= delta
+		if _bell_timer <= 0.0:
+			_bell_timer = randf_range(0.9, 1.6) * (2.0 if state == State.STALK else 1.0)
+			Sound.play_at("bell", global_position + Vector3.UP * 0.35, -10.0, 0.1, 18.0)
+
 func _set_state(new_state: State) -> void:
+	var old_state := state
 	state = new_state
 	_timer = 0.0
 	match new_state:
+		State.SUSPICIOUS:
+			if old_state == State.PATROL and _meow_cooldown <= 0.0:
+				_meow_cooldown = 6.0
+				Sound.play_at("meow", global_position, -2.0, 0.1, 35.0)
 		State.PATROL:
 			detection = 0.0
 		State.STALK:
@@ -207,9 +231,11 @@ func _set_state(new_state: State) -> void:
 			var direction := (_last_known - global_position)
 			direction.y = 0.0
 			_pounce_target = _last_known + direction.normalized() * 0.4
+			Sound.play_at("hiss", global_position, -4.0, 0.1, 25.0)
 		State.BORED:
 			detection = 0.0
 			_timer = bored_time
+			Sound.play_at("meh", global_position, -2.0, 0.08, 25.0)
 
 
 func _get_bored() -> void:

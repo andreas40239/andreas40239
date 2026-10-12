@@ -37,3 +37,4 @@ func _on_body_entered(body: Node3D) -> void:
 			mat.albedo_color = Color(0.95, 0.6, 0.15)
 		if announce:
 			Game.show_toast("Checkpoint! A cosy leaf circle.")
+			Sound.play("chime_checkpoint", -8.0)

@@ -13,6 +13,13 @@ var touch_controls: Control
 
 
 func _ready() -> void:
+	print("Sounds:")
+	var missing := []
+	for sound in Sound.ALL:
+		if Sound.stream(sound) == null:
+			missing.append(sound)
+	_check(missing.is_empty(), "all %d sounds load %s" % [Sound.ALL.size(), missing])
+
 	print("Core loop (keyboard):")
 	_load_level(false)
 	cat.process_mode = Node.PROCESS_MODE_DISABLED
@@ -220,6 +227,22 @@ func _run_touch_tutorial() -> void:
 	var before: int = player.stats.food
 	await _tap_world(far_food.global_position)
 	_check(player.stats.food == before, "tapping food that is out of reach does not eat it")
+
+	# Building the nest by tapping, with touch-friendly hints.
+	var toasts := []
+	Game.toast.connect(func(text: String) -> void: toasts.append(text))
+	var shed: HibernationSpot = main.get_node("HibernationSpots/UnderShed")
+	player.add_nest_material(3)
+	await _teleport(shed.global_position + Vector3(0, 0.05, 0.3))
+	await _frames(40)
+	await _tap_world(shed.global_position)
+	_check(shed.nest_amount >= 3, "tapping the nest adds the nest material")
+	_check(toasts.any(func(t: String) -> bool: return t.contains("Tap the nest again")), "touch players are told to tap (not press E) to hibernate")
+	_check(not toasts.any(func(t: String) -> bool: return t.contains("[E]")), "no keyboard hints are shown to touch players")
+	await _tap_world(shed.global_position)
+	_check(main.finished, "tapping the nest again hibernates")
+	await _frames(30)
+
 
 
 func _tap_world(world: Vector3) -> void:

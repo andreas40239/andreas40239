@@ -47,13 +47,19 @@ func get_prompt(player: Hedgehog) -> String:
 func interact(player: Hedgehog) -> void:
 	Game.unlock_fact(fact_id)
 	if not secure:
+		Sound.play_at("rustle", global_position, -4.0, 0.2)
 		Game.show_toast("Not safe! Someone might light this pile as a bonfire.")
 		return
 	if player.nest_material > 0:
 		nest_amount += player.take_nest_material()
 		_update_nest()
+		Sound.play_at("rustle", global_position, 0.0, 0.1)
+		get_tree().create_timer(0.25).timeout.connect(Sound.play_at.bind("rustle", global_position, -3.0, 0.1))
 		if can_hibernate():
-			Game.show_toast("The nest is cosy enough. Press [E] again to hibernate!")
+			if Game.touch_mode:
+				Game.show_toast("The nest is cosy enough. Tap the nest again to hibernate!")
+			else:
+				Game.show_toast("The nest is cosy enough. Press [E] again to hibernate!")
 		else:
 			Game.show_toast("The nest needs %d more." % (required_material - nest_amount))
 		return
