@@ -1,0 +1,18 @@
+Spielekiste – App-Icons (CreateForKids.ch)
+
+Pro Spiel ein Ordner mit vier PNG-Dateien:
+
+  playstore_512.png            512 x 512, quadratisch, ohne Transparenz an den Ecken.
+                               -> Google Play Console: "App-Symbol" (Google rundet selbst ab).
+
+  launcher_192.png             192 x 192, abgerundet mit transparenten Ecken.
+                               -> Godot: Export > Android > Launcher Icons > Main 192x192
+                               -> Android Studio / Kotlin: als Legacy-Launcher-Icon
+
+  adaptive_foreground_432.png  432 x 432, nur das Motiv auf transparentem Grund (in der sicheren Zone).
+  adaptive_background_432.png  432 x 432, nur der Farbverlauf.
+                               -> Godot: Launcher Icons > Adaptive Foreground / Adaptive Background
+                               -> Android Studio: Image Asset (Foreground- und Background-Layer)
+
+Die Motive sind Emojis aus der Schrift "Noto Color Emoji" (Google, SIL Open Font License 1.1),
+die auch in kommerziellen Apps verwendet werden darf.
