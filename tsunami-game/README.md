@@ -15,10 +15,11 @@ Jedes Level beginnt mit einem **Erdbeben**. Dann läuft ein **Countdown** bis zu
 | Aktion | Wie |
 |---|---|
 | Rohstoffe sammeln | Auf **Felsen** (Steine), **Wald** (Holz) oder **Sandhaufen** (Sand) tippen |
-| Mauer bauen | Material wählen: **Holz** (billig, schwach), **Stein**, **Beton** (teuer, sehr stabil). Tasten 1/2/3 |
+| Mauer bauen | Material wählen: **Holz** (billig, schwach), **Stein**, **Beton** (teuer, sehr stabil). Tasten 1/2/3. Ist die hintere Mauer 20 m hoch, wird davor eine **zweite Mauer** gebaut, ebenfalls bis 20 m. Beide zusammen schützen bis **40 m** |
+| Sanieren | Auf eine Holz- oder Steinschicht der Mauer tippen (oder „Sanieren“ im Reiter Schutz). Nach Bestätigung wird sie durch **Beton** ersetzt |
 | Werkzeuge | Spitzhacke, Axt, Schaufel: mehr Ertrag pro Tipp |
 | Baumaschinen | **Bagger** (Steine + Sand), **Holzernter** (Holz), **Betonmischer** (Beton aus Sand + Steinen), **Kran** (dickere Mauerschichten) |
-| Schutz & Dorf | **Wellenbrecher** (−6 % Wellenhöhe je Stufe), **Schutzwald** (−4 % je Stufe), **Warnboje** (genauere Höhenmessung), zerstörte **Häuser wieder aufbauen** |
+| Schutz | **Wellenbrecher** (−4 % Wellenhöhe je Stufe), **Schutzwald** (−3 % je Stufe), **Warnboje** (genauere Höhenmessung), zerstörte **Häuser wieder aufbauen** |
 | Früher auslösen | **JETZT auslösen** (Taste P): Wer nicht abwartet, bekommt für die restlichen Sekunden einen Rohstoff-Bonus |
 
 Die genaue Höhe der Welle kennt man vorher nicht. Hinweise gibt es trotzdem:
@@ -38,7 +39,9 @@ Die genaue Höhe der Welle kennt man vorher nicht. Hinweise gibt es trotzdem:
 - 2 Sterne: Kein Haus verloren, aber die Mauer ist gebrochen.
 - 1 Stern: Genau 1 Haus verloren.
 
-Danach startet automatisch das nächste, höhere Level. Sind alle Häuser zerstört, heißt es **Game Over**.
+Danach startet automatisch das nächste, höhere Level. Das letzte ist **Level 17** mit einem knapp 40 m hohen Tsunami. Wer es übersteht, hat **gewonnen**. Sind vorher alle Häuser zerstört, heißt es **Game Over**.
+
+Auch Kinder, die noch nicht schnell lesen, finden sich zurecht. Rohstoffe, Werkzeuge, Maschinen und Kosten werden als **Icons** angezeigt. Fehlt ein Rohstoff, wird seine Zahl rot.
 
 ## Technik
 - Grafik: alles prozedural mit `_draw()` gezeichnet (Wellen, Wasserstand, Überflutung, Gischt-Partikel, animierte Maschinen)
@@ -46,6 +49,7 @@ Danach startet automatisch das nächste, höhere Level. Sind alle Häuser zerst�
 - `scripts/main.gd`: Spiellogik, Kosten/Balancing, Benutzeroberfläche
 - `scripts/world.gd`: Spielwelt und Tsunami-Ablauf (Rückzug → Wellen mit Rissen/Treibgut → Überflutung → Ablaufen)
 - `scripts/ocean_audio.gd`: prozeduraler Sound
+- `icons/`: SVG-Icons für Rohstoffe, Werkzeuge, Maschinen und Mauern
 
 ## Android (arm64)
 Fertige APK: [`apk/TsunamiMauerbau-arm64.apk`](apk/TsunamiMauerbau-arm64.apk) (Android 5.0+, nur arm64-v8a, Querformat).

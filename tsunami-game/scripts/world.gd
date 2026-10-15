@@ -9,6 +9,7 @@ signal crack_failed(pos: Vector2)
 signal debris_hit(kind: String)
 signal debris_destroyed(kind: String, pos: Vector2)
 signal house_flooded(index: int)
+signal wall_tapped(layer_index: int)
 signal tsunami_finished
 
 const W := 1280.0
@@ -16,6 +17,8 @@ const H := 720.0
 const GROUND_Y := 470.0
 const WALL_X := 700.0
 const WALL_W := 44.0
+const FRONT_X := 792.0          # vordere Mauer (ab 20 m hinterer Mauer)
+const FRONT_W := 36.0
 const BEACH_X0 := WALL_X + WALL_W + 14.0
 const BEACH_X1 := 1010.0
 const SEA_FLOOR_Y := GROUND_Y + 95.0
@@ -50,7 +53,9 @@ var audio: Node         # ocean_audio.gd
 
 var px_per_m := 40.0
 var t := 0.0
-var display_wall_h := 0.0
+var display_wall_h := 0.0       # hintere Mauer
+var display_front_h := 0.0      # vordere Mauer
+var selected_layer := -1        # hervorgehobene Schicht (Sanieren-Dialog)
 var build_flash := 0.0
 var pre_retreat := 0.0  # vom Hauptskript gesetzt: Meer zieht sich vor dem Tsunami zurück (m)
 var quake := 0.0
@@ -69,6 +74,8 @@ var flood_h := 0.0
 var flood_front := WALL_X
 var flood_target_h := 0.0
 var flood_target_x := WALL_X
+var basin_h := 0.0              # Wasserstand zwischen den beiden Mauern
+var basin_target := 0.0
 var storm := 0.0
 var shake := 0.0
 
@@ -143,12 +150,38 @@ func sea_h(x: float) -> float:
 	return h
 
 
+func has_front() -> bool:
+	return game != null and game.front_height > 0.01
+
+
+func wall_left(w: int) -> float:
+	return FRONT_X if w == 1 else WALL_X
+
+
+func wall_width(w: int) -> float:
+	return FRONT_W if w == 1 else WALL_W
+
+
+func wall_h(w: int) -> float:
+	return game.front_height if w == 1 else game.back_height
+
+
+## Stelle, an der die Welle zuerst aufschlägt
+func impact_x() -> float:
+	return FRONT_X + FRONT_W if has_front() else WALL_X + WALL_W
+
+
+## Wasserstand direkt vor der hinteren Mauer
+func level_at_back() -> float:
+	return basin_h if has_front() else sea_h(WALL_X + WALL_W)
+
+
 func is_busy() -> bool:
 	return phase != Phase.IDLE
 
 
 func crack_center(c: Dictionary) -> Vector2:
-	return Vector2(WALL_X + WALL_W * 0.5, h_to_y(c.h))
+	return Vector2(wall_left(c.w) + wall_width(c.w) * 0.5, h_to_y(c.h))
 
 
 # ---------------------------------------------------------------- Steuerung
@@ -171,16 +204,19 @@ func start_tsunami(heights: Array, n_debris: int) -> void:
 	flood_front = WALL_X
 	flood_target_h = 0.0
 	flood_target_x = WALL_X
+	basin_h = 0.0
+	basin_target = 0.0
 	cracks.clear()
 	debris.clear()
 
 
 func add_cracks(n: int, life: float) -> void:
-	var wh: float = game.wall_height
+	var w := 1 if game.front_height > 0.4 else 0
+	var wh := wall_h(w)
 	if wh < 0.4:
 		return
 	for i in n:
-		cracks.append({"h": wh * randf_range(0.12, 0.92), "life": life, "max": life, "seed": randf() * 100.0})
+		cracks.append({"w": w, "h": wh * randf_range(0.12, 0.92), "life": life, "max": life, "seed": randf() * 100.0})
 
 
 func notify_built() -> void:
@@ -189,12 +225,14 @@ func notify_built() -> void:
 
 func on_breach() -> void:
 	shake = 1.5
-	_burst.position = Vector2(WALL_X + WALL_W * 0.5, h_to_y(display_wall_h))
+	var w := 1 if display_front_h > 0.01 else 0
+	_burst.position = Vector2(wall_left(w) + wall_width(w) * 0.5, h_to_y(display_front_h if w == 1 else display_wall_h))
 	_burst.restart()
 	_burst.emitting = true
 	# Nach dem Einsturz sind alle offenen Risse weg
 	cracks.clear()
-	display_wall_h = game.wall_height
+	display_wall_h = game.back_height
+	display_front_h = game.front_height
 
 
 func spawn_floater(pos: Vector2, text: String, color: Color) -> void:
@@ -223,7 +261,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			crack_fixed.emit(crack_center(c))
 			get_viewport().set_input_as_handled()
 			return
-	# 3. Rohstoffe sammeln
+	# 3. Mauerschicht antippen (Sanieren) – nur vor dem Tsunami
+	if game.state == game.State.PREP:
+		for w in [0, 1]:
+			var x0 := wall_left(w) - 10.0
+			if p.x >= x0 and p.x <= x0 + wall_width(w) + 20.0 and p.y <= GROUND_Y + 10.0 and p.y >= h_to_y(wall_h(w)) - 10.0:
+				var idx: int = game.layer_at(w, clampf((GROUND_Y - p.y) / px_per_m, 0.0, wall_h(w) - 0.01))
+				if idx >= 0:
+					wall_tapped.emit(idx)
+					get_viewport().set_input_as_handled()
+					return
+	# 4. Rohstoffe sammeln
 	for kind in RESOURCE_RECTS:
 		if (RESOURCE_RECTS[kind] as Rect2).has_point(p):
 			_hit[kind] = 1.0
@@ -240,8 +288,10 @@ func _process(delta: float) -> void:
 	_update_cracks(delta)
 	_update_debris(delta)
 
-	var target_wall: float = game.wall_height if game else 0.0
-	display_wall_h = move_toward(display_wall_h, target_wall, delta * maxf(2.0, absf(target_wall - display_wall_h) * 3.0))
+	var tb: float = game.back_height if game else 0.0
+	var tf: float = game.front_height if game else 0.0
+	display_wall_h = move_toward(display_wall_h, tb, delta * maxf(2.0, absf(tb - display_wall_h) * 3.0))
+	display_front_h = move_toward(display_front_h, tf, delta * maxf(2.0, absf(tf - display_front_h) * 3.0))
 	build_flash = maxf(0.0, build_flash - delta * 1.5)
 	cheer = maxf(0.0, cheer - delta)
 	for k in _hit:
@@ -250,7 +300,7 @@ func _process(delta: float) -> void:
 		_collapse[i] = minf(1.0, _collapse[i] + delta * 1.5)
 
 	# Maßstab so wählen, dass Mauer, erwartete Welle und sichtbare Welle ins Bild passen
-	var view := maxf(6.0, display_wall_h + 2.0)
+	var view := maxf(6.0, maxf(display_wall_h, display_front_h) + 2.0)
 	if game:
 		view = maxf(view, game.estimate().y * 1.12)
 	view = maxf(view, (SEA_REST + offset + amp) * 1.12)
@@ -293,10 +343,10 @@ func _update_debris(delta: float) -> void:
 		else:
 			d.x -= 190.0 * delta
 		d.rot = sin(t * 2.0 + d.off) * 0.25
-		if d.x <= WALL_X + WALL_W + 16.0:
+		if d.x <= impact_x() + 16.0:
 			debris.erase(d)
 			shake = maxf(shake, 0.6)
-			_burst.position = Vector2(WALL_X + WALL_W + 10.0, _debris_y(d))
+			_burst.position = Vector2(impact_x() + 10.0, _debris_y(d))
 			_burst.restart()
 			_burst.emitting = true
 			if audio:
@@ -305,6 +355,9 @@ func _update_debris(delta: float) -> void:
 
 
 func _update_tsunami(delta: float) -> void:
+	if phase != Phase.IMPACT:
+		basin_target = 0.0
+		basin_h = lerpf(basin_h, 0.0, 1.0 - exp(-delta * 1.2))
 	if phase == Phase.IDLE:
 		storm = move_toward(storm, 0.15 if pre_retreat > 0.0 else 0.0, delta * 0.5)
 		offset = lerpf(offset, -pre_retreat, 1.0 - exp(-delta * 1.5))
@@ -322,7 +375,7 @@ func _update_tsunami(delta: float) -> void:
 				_start_approach()
 		Phase.APPROACH:
 			var p := minf(phase_t / 3.8, 1.0)
-			crest_x = lerpf(W + 300.0, WALL_X + WALL_W, pow(p, 1.25))
+			crest_x = lerpf(W + 300.0, impact_x(), pow(p, 1.25))
 			amp = maxf(amp * 0.98, full * (0.2 + 0.8 * p * p))
 			offset = lerpf(offset, 0.0, 1.0 - exp(-delta * 1.5))
 			storm = maxf(storm, 0.35 + 0.65 * p)
@@ -368,13 +421,21 @@ func _start_approach() -> void:
 
 
 func _update_overflow(delta: float) -> void:
-	var wh: float = game.wall_height
-	var over := sea_h(WALL_X + WALL_W) - wh
+	if has_front():
+		var over_front: float = sea_h(impact_x()) - game.front_height
+		if over_front > 0.05:
+			basin_target = maxf(basin_target, over_front)
+		basin_h = move_toward(basin_h, basin_target, delta * 6.0)
+	var wh: float = game.back_height
+	var over := level_at_back() - wh
 	if over > 0.05:
 		flood_target_h = maxf(flood_target_h, over * 0.8 + 0.3)
 		flood_target_x = minf(flood_target_x, WALL_X - (40.0 + over * 90.0))
 		_spill.emitting = wh > 0.3
 		_spill.position = Vector2(WALL_X + WALL_W * 0.5, h_to_y(wh) - 4.0)
+	elif has_front() and sea_h(impact_x()) > game.front_height + 0.05:
+		_spill.emitting = true
+		_spill.position = Vector2(FRONT_X + FRONT_W * 0.5, h_to_y(game.front_height) - 4.0)
 	else:
 		_spill.emitting = false
 	flood_h = move_toward(flood_h, flood_target_h, delta * 3.0)
@@ -394,15 +455,15 @@ func _set_phase(p: Phase) -> void:
 
 func _on_impact() -> void:
 	var wave_h: float = waves[wave_idx]
-	crest_x = WALL_X + WALL_W
+	crest_x = impact_x()
 	amp = wave_h - SEA_REST
 	shake = clampf(0.4 + wave_h * 0.05, 0.4, 1.4)
 	for d in debris:
 		d.free = true
 	if audio:
 		audio.impact(1.0)
-	var top := minf(wave_h, game.wall_height)
-	_splash.position = Vector2(WALL_X + WALL_W + 6.0, h_to_y(top))
+	var top := minf(wave_h, game.front_height if has_front() else game.back_height)
+	_splash.position = Vector2(impact_x() + 6.0, h_to_y(top))
 	var power := clampf(sqrt(maxf(wave_h, 1.0)) * 170.0, 300.0, 1100.0)
 	_splash.initial_velocity_min = power * 0.5
 	_splash.initial_velocity_max = power
@@ -434,7 +495,9 @@ func _draw() -> void:
 		_draw_village()
 		if m.crane.level > 0:
 			_draw_crane(CRANE_X, m.crane.level)
-	_draw_wall()
+	_draw_basin()
+	_draw_wall(0)
+	_draw_wall(1)
 	_draw_cracks()
 	_draw_debris()
 	_draw_flood()
@@ -471,13 +534,14 @@ func _draw_sky() -> void:
 
 func _draw_sea() -> void:
 	var pts := PackedVector2Array()
-	var x := WALL_X + WALL_W
+	var x0 := impact_x()
+	var x := x0
 	while x <= W + 10.0:
 		pts.append(Vector2(x, h_to_y(sea_h(x))))
 		x += 8.0
 	var surface := pts.duplicate()
 	pts.append(Vector2(W + 10.0, H + 20.0))
-	pts.append(Vector2(WALL_X + WALL_W, H + 20.0))
+	pts.append(Vector2(x0, H + 20.0))
 	var deep := Color(0.05, 0.3, 0.5).lerp(Color(0.12, 0.25, 0.3), storm)
 	var shallow := Color(0.15, 0.55, 0.75).lerp(Color(0.25, 0.4, 0.45), storm)
 	var cols := PackedColorArray()
@@ -517,7 +581,7 @@ func _draw_defenses() -> void:
 	var d: Dictionary = game.defenses
 	# Schutzwald: Palmen auf dem Strand
 	for i in d.forest.level * 2:
-		var x: float = BEACH_X0 + 10.0 + i * 22.0
+		var x: float = FRONT_X + FRONT_W + 14.0 + i * 18.0
 		var y := _beach_y(x)
 		var sway := sin(t * 1.4 + i) * 3.0 + storm * sin(t * 6.0 + i) * 6.0
 		var top := Vector2(x + 6 + sway, y - 46)
@@ -709,7 +773,11 @@ func _person(feet: Vector2, shirt: Color, arms_up: bool) -> void:
 
 func _draw_crane(x: float, lvl: int) -> void:
 	var yel := Color(0.98, 0.78, 0.12)
-	var top_y := maxf(120.0, minf(GROUND_Y - 230.0, h_to_y(display_wall_h) - 55.0))
+	# Der Kran arbeitet an der Mauer, die gerade gebaut wird
+	var tw: int = maxi(game.build_target(), 0)
+	var tw_h := display_front_h if tw == 1 else display_wall_h
+	var tallest := maxf(display_wall_h, display_front_h)
+	var top_y := maxf(120.0, minf(GROUND_Y - 230.0, h_to_y(tallest) - 55.0))
 	draw_line(Vector2(x - 7, GROUND_Y), Vector2(x - 7, top_y), yel, 3.0)
 	draw_line(Vector2(x + 7, GROUND_Y), Vector2(x + 7, top_y), yel, 3.0)
 	var y := GROUND_Y
@@ -719,14 +787,14 @@ func _draw_crane(x: float, lvl: int) -> void:
 		draw_line(Vector2(x - 7 if left else x + 7, y), Vector2(x + 7 if left else x - 7, ny), yel.darkened(0.2), 2.0)
 		y = ny
 		left = not left
-	var jib_end := WALL_X + WALL_W + 30.0
+	var jib_end := wall_left(tw) + wall_width(tw) + 30.0
 	draw_line(Vector2(x - 46, top_y), Vector2(jib_end, top_y), yel, 5.0)
 	draw_line(Vector2(x, top_y - 24), Vector2(jib_end, top_y), yel.darkened(0.2), 2.0)
 	draw_line(Vector2(x, top_y - 24), Vector2(x - 46, top_y), yel.darkened(0.2), 2.0)
 	draw_rect(Rect2(x - 52, top_y + 2, 16, 16), Color(0.4, 0.4, 0.4))
 	draw_rect(Rect2(x - 6, top_y + 4, 14, 11), Color(0.6, 0.85, 1.0))
-	var trolley_x := WALL_X + WALL_W * 0.5 + sin(t * 0.8) * 8.0
-	var wall_top := h_to_y(display_wall_h)
+	var trolley_x := wall_left(tw) + wall_width(tw) * 0.5 + sin(t * 0.8) * 8.0
+	var wall_top := h_to_y(tw_h)
 	var hook_y := lerpf(top_y + 30.0, wall_top - 18.0, 0.5 + 0.5 * sin(t * 1.1)) if build_flash <= 0.0 \
 		else lerpf(wall_top - 18.0, top_y + 30.0, build_flash)
 	draw_rect(Rect2(trolley_x - 8, top_y + 2, 16, 6), Color(0.3, 0.3, 0.3))
@@ -735,15 +803,26 @@ func _draw_crane(x: float, lvl: int) -> void:
 	_level_tag(Vector2(x + 10, top_y + 30), lvl)
 
 
-func _draw_wall() -> void:
-	var h := display_wall_h
-	if h <= 0.01:
-		_text(Vector2(WALL_X - 30, GROUND_Y - 10), "Bauplatz", 14, Color(1, 1, 1, 0.8), true)
-		draw_rect(Rect2(WALL_X, GROUND_Y - 4, WALL_W, 4), Color(0.4, 0.4, 0.4))
+## Zeichnet die hintere (w = 0) oder vordere (w = 1) Mauer Schicht für Schicht.
+func _draw_wall(w: int) -> void:
+	var x0 := wall_left(w)
+	var ww := wall_width(w)
+	var h := display_front_h if w == 1 else display_wall_h
+	if w == 1:
+		if h <= 0.01:
+			return
+		# Fundament der vorderen Mauer reicht bis auf den abfallenden Strand
+		draw_rect(Rect2(x0, GROUND_Y, ww, _beach_y(x0 + ww) - GROUND_Y + 6.0), Color(0.5, 0.5, 0.5))
+	elif h <= 0.01:
+		_text(Vector2(x0 - 30, GROUND_Y - 10), "Bauplatz", 14, Color(1, 1, 1, 0.8), true)
+		draw_rect(Rect2(x0, GROUND_Y - 4, ww, 4), Color(0.4, 0.4, 0.4))
 		return
 	var acc := 0.0
 	var r := 0
-	for layer in game.layers:
+	for i in game.layers.size():
+		var layer: Dictionary = game.layers[i]
+		if layer.w != w:
+			continue
 		var lh: float = layer.h
 		if acc >= h:
 			break
@@ -752,42 +831,52 @@ func _draw_wall() -> void:
 		var y1 := h_to_y(h1)
 		var col: Color = MAT_COLORS[layer.m]
 		col = col.lightened(0.05 * (r % 2))
-		draw_rect(Rect2(WALL_X, y1, WALL_W, y0 - y1), col)
-		draw_line(Vector2(WALL_X, y1), Vector2(WALL_X + WALL_W, y1), col.darkened(0.4), 1.0)
+		draw_rect(Rect2(x0, y1, ww, y0 - y1), col)
+		draw_line(Vector2(x0, y1), Vector2(x0 + ww, y1), col.darkened(0.4), 1.0)
 		if y0 - y1 > 6.0:
 			match layer.m:
 				"wood":
 					for k in 3:
-						draw_line(Vector2(WALL_X + 11 + k * 11, y0), Vector2(WALL_X + 11 + k * 11, y1), col.darkened(0.3), 1.0)
+						var lx := x0 + ww * (k + 1) / 4.0
+						draw_line(Vector2(lx, y0), Vector2(lx, y1), col.darkened(0.3), 1.0)
 				"stone":
-					var bx := WALL_X + (WALL_W * 0.5 if r % 2 == 0 else WALL_W * 0.25)
+					var bx := x0 + (ww * 0.5 if r % 2 == 0 else ww * 0.25)
 					draw_line(Vector2(bx, y0), Vector2(bx, y1), col.darkened(0.35), 1.0)
 				"concrete":
-					draw_line(Vector2(WALL_X + 4, (y0 + y1) * 0.5), Vector2(WALL_X + WALL_W - 4, (y0 + y1) * 0.5), Color(0.45, 0.3, 0.25, 0.5), 1.0)
+					draw_line(Vector2(x0 + 4, (y0 + y1) * 0.5), Vector2(x0 + ww - 4, (y0 + y1) * 0.5), Color(0.45, 0.3, 0.25, 0.5), 1.0)
+		if i == selected_layer:
+			var pulse := 0.5 + 0.5 * sin(t * 8.0)
+			draw_rect(Rect2(x0 - 3, y1 - 1, ww + 6, y0 - y1 + 2), Color(1, 0.9, 0.2, 0.25 + 0.25 * pulse))
+			draw_rect(Rect2(x0 - 3, y1 - 1, ww + 6, y0 - y1 + 2), Color(1, 0.9, 0.2), false, 3.0)
 		acc += lh
 		r += 1
 	var top := h_to_y(h)
-	draw_rect(Rect2(WALL_X - 3, top - 5, WALL_W + 6, 6), Color(0.35, 0.36, 0.4))
+	draw_rect(Rect2(x0 - 3, top - 5, ww + 6, 6), Color(0.35, 0.36, 0.4))
 	# Beschädigung sichtbar machen
 	var hp_ratio: float = game.wall_hp / maxf(game.wall_max_hp, 1.0)
 	if hp_ratio < 0.7:
 		var dmg := 1.0 - hp_ratio
-		draw_rect(Rect2(WALL_X, top, WALL_W, GROUND_Y - top), Color(0.2, 0.1, 0.05, dmg * 0.35))
-	if build_flash > 0.0:
-		draw_rect(Rect2(WALL_X - 3, top - 5, WALL_W + 6, 16), Color(1, 1, 0.6, build_flash * 0.6))
-	_text(Vector2(WALL_X + 2, top - 10), "%.1f m" % h, 15, Color.WHITE, true)
+		draw_rect(Rect2(x0, top, ww, GROUND_Y - top), Color(0.2, 0.1, 0.05, dmg * 0.35))
+	if build_flash > 0.0 and game.build_target() == w:
+		draw_rect(Rect2(x0 - 3, top - 5, ww + 6, 16), Color(1, 1, 0.6, build_flash * 0.6))
+	_text(Vector2(x0 + 1, top - 10), "%.1f m" % h, 14, Color.WHITE, true)
+	if w == 1:
+		var total := display_wall_h + display_front_h
+		_text(Vector2(x0 - 20, top - 28), "Schutz %.1f m" % total, 15, Color(0.7, 1.0, 0.7), true)
 
 
 func _draw_cracks() -> void:
 	for c in cracks:
 		var p := crack_center(c)
+		var x0 := wall_left(c.w)
+		var ww := wall_width(c.w)
 		var k: float = c.life / c.max
 		var blink := 0.5 + 0.5 * sin(t * (10.0 + (1.0 - k) * 20.0))
 		var rng := RandomNumberGenerator.new()
 		rng.seed = int(c.seed * 1000.0)
 		var pts := PackedVector2Array()
 		for i in 7:
-			pts.append(Vector2(WALL_X + i * WALL_W / 6.0, p.y + rng.randf_range(-7, 7)))
+			pts.append(Vector2(x0 + i * ww / 6.0, p.y + rng.randf_range(-7, 7)))
 		draw_polyline(pts, Color(0.15, 0.05, 0.05), 3.0)
 		draw_circle(p, 30.0, Color(1, 0.2, 0.1, 0.12 + 0.18 * blink))
 		draw_arc(p, 30.0, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(1, 0.3 + 0.6 * k, 0.1), 5.0)
@@ -814,17 +903,33 @@ func _draw_debris() -> void:
 		draw_arc(p + Vector2(0, -8), 36.0, 0, TAU, 32, Color(1, 0.9, 0.3, 0.5 + 0.4 * sin(t * 8.0)), 2.0)
 
 
+## Wasser, das über eine Mauer schwappt und auf der Landseite herabstürzt
+func _draw_cascade(x0: float, ww: float, level: float, wall_top: float, floor_y: float, water: Color) -> void:
+	if wall_top <= 0.3 or h_to_y(level) + 10.0 >= h_to_y(wall_top):
+		return
+	var ys := h_to_y(level)
+	var yw := h_to_y(wall_top)
+	draw_colored_polygon(PackedVector2Array([Vector2(x0 + ww, ys), Vector2(x0, ys + 6.0),
+		Vector2(x0, yw), Vector2(x0 + ww, yw)]), water)
+	draw_colored_polygon(PackedVector2Array([Vector2(x0, ys + 6.0), Vector2(x0 - 30.0, minf(ys + 26.0, floor_y - 4.0)),
+		Vector2(x0 - 34.0, floor_y), Vector2(x0, floor_y)]), water)
+
+
+## Wasser zwischen vorderer und hinterer Mauer
+func _draw_basin() -> void:
+	if not has_front() or basin_h * px_per_m < 3.0:
+		return
+	var x0 := WALL_X + WALL_W
+	var y := h_to_y(basin_h + 0.08 * sin(t * 4.0))
+	draw_rect(Rect2(x0, y, FRONT_X - x0, _beach_y(FRONT_X) - y + 4.0), Color(0.15, 0.45, 0.7, 0.85))
+	draw_line(Vector2(x0, y), Vector2(FRONT_X, y), Color(0.85, 0.95, 1.0, 0.8), 2.0)
+
+
 func _draw_flood() -> void:
 	var water := Color(0.15, 0.45, 0.7, 0.78)
-	var sea_wall := sea_h(WALL_X + WALL_W)
-	var wall_h := display_wall_h
-	if wall_h > 0.3 and h_to_y(sea_wall) + 10.0 < h_to_y(wall_h):
-		var ys := h_to_y(sea_wall)
-		var yw := h_to_y(wall_h)
-		draw_colored_polygon(PackedVector2Array([Vector2(WALL_X + WALL_W, ys), Vector2(WALL_X, ys + 6.0),
-			Vector2(WALL_X, yw), Vector2(WALL_X + WALL_W, yw)]), water)
-		draw_colored_polygon(PackedVector2Array([Vector2(WALL_X, ys + 6.0), Vector2(WALL_X - 30.0, minf(ys + 26.0, GROUND_Y - 4.0)),
-			Vector2(WALL_X - 34.0, GROUND_Y), Vector2(WALL_X, GROUND_Y)]), water)
+	if has_front():
+		_draw_cascade(FRONT_X, FRONT_W, sea_h(impact_x()), display_front_h, _beach_y(FRONT_X), water)
+	_draw_cascade(WALL_X, WALL_W, level_at_back(), display_wall_h, GROUND_Y, water)
 	if flood_h * px_per_m > 3.0 and flood_front < WALL_X - 12.0:
 		var pts := PackedVector2Array()
 		var x := WALL_X
@@ -849,7 +954,7 @@ func _draw_estimate() -> void:
 		draw_rect(Rect2(WALL_X - 30, y0, W - WALL_X + 30, maxf(2.0, y1 - y0)), Color(1, 0.2, 0.15, a))
 		draw_line(Vector2(WALL_X - 30, y0), Vector2(W, y0), Color(1, 0.3, 0.2, 0.8), 2.0)
 		var label := "Erwartet: %.1f m" % e.y if is_equal_approx(e.x, e.y) else "Erwartet: %.1f – %.1f m" % [e.x, e.y]
-		_text(Vector2(WALL_X + 70, y0 - 8), label, 17, Color(1, 0.6, 0.55), true)
+		_text(Vector2(WALL_X + 140, maxf(y0 - 8, 132.0)), label, 17, Color(1, 0.6, 0.55), true)
 	elif game.last_height > 0.0:
 		var y := h_to_y(game.last_height)
 		var x := WALL_X - 40.0
