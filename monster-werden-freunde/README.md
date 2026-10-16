@@ -4,7 +4,7 @@ Gewaltfreies Tower-Defense-Spiel für Kinder von 6–8 Jahren, umgesetzt nach de
 (Konzeptversion 1.0). Engine: **Godot 4.7.2**, GDScript, 2D. Zielplattform: **Android arm64-v8a**,
 Querformat, für Tablets und große Handys.
 
-Downloads (Version 1.2.0, versionCode 4):
+Downloads (Version 1.2.1, versionCode 5, Paketname `com.ForKids.MonsterWerdenFreunde`):
 
 * **APK zum Installieren:** [`../dist/MonsterWerdenFreunde.apk`](../dist/MonsterWerdenFreunde.apk)
 * **App Bundle für Google Play:** [`../dist/MonsterWerdenFreunde.aab`](../dist/MonsterWerdenFreunde.aab)
