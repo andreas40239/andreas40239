@@ -1,11 +1,32 @@
 # Monster werden Freunde
 
 Gewaltfreies Tower-Defense-Spiel für Kinder von 6–8 Jahren, umgesetzt nach dem Game Design Document
-(Konzeptversion 1.0). Engine: **Godot 4.4.1**, GDScript, 2D. Zielplattform: **Android arm64-v8a**,
+(Konzeptversion 1.0). Engine: **Godot 4.7.2**, GDScript, 2D. Zielplattform: **Android arm64-v8a**,
 Querformat, für Tablets und große Handys.
 
-**APK zum Installieren:** [`../dist/MonsterWerdenFreunde.apk`](../dist/MonsterWerdenFreunde.apk)
-(Release-Build, signiert, nur arm64-v8a, Android 5.0+, keine Berechtigungen, offline).
+Downloads (Version 1.2.0, versionCode 4):
+
+* **APK zum Installieren:** [`../dist/MonsterWerdenFreunde.apk`](../dist/MonsterWerdenFreunde.apk)
+* **App Bundle für Google Play:** [`../dist/MonsterWerdenFreunde.aab`](../dist/MonsterWerdenFreunde.aab)
+* **Play-Store-Icon (512×512):** [`../dist/PlayStore_Icon_512.png`](../dist/PlayStore_Icon_512.png)
+
+Beide Builds: Release, signiert, nur arm64-v8a, Android 7.0+ (minSdk 24), Ziel-API 36,
+16-KB-Speicherseiten-tauglich, keine Berechtigungen, offline.
+
+### Play Store
+
+* Die AAB ist mit dem Upload-Schlüssel des Projekts signiert (nicht im Repository). Bei der
+  ersten Veröffentlichung „Play App Signing“ aktivieren; Google signiert die ausgelieferten APKs.
+* Ziel-API 36 und 16-KB-Seitenausrichtung der nativen Bibliotheken (Pflicht für neue Apps) sind
+  erfüllt – deshalb wurde in 1.2.0 von Godot 4.4.1 auf 4.7.2 umgestellt.
+* Inhaltseinstufung: Spiel ohne Gewalt, ohne Werbung, ohne Käufe, ohne Datenerhebung
+  (Datensicherheit: „keine Daten erhoben/geteilt“). Zielgruppe Kinder → Richtlinie „Familien“ beachten.
+
+### App-Icons
+
+Die App-Icons sind vorgegebene Grafiken in `art/icons/`: `icon_192.png` (Launcher),
+`icon_bg_432.png` / `icon_fg_432.png` (adaptives Icon), `icon_mono_432.png` (monochromes
+Android-13-Icon, aus dem Vordergrund abgeleitet), `icon_store_512.png` (Play Store, auch `icon.png`).
 
 ## Spielprinzip
 
@@ -97,14 +118,20 @@ godot --headless --path . res://tests/TestRunner.tscn    # Akzeptanztests AT-01.
 godot --headless --fixed-fps 60 --path . res://tests/Simulation.tscn   # Balancing-Bot
 ```
 
-Android-Export (Godot 4.4.1 + Export-Templates, Android SDK mit build-tools, JDK 17+):
+Android-Export (Godot 4.7.2 + Export-Templates, Android SDK mit platforms;android-36 und
+build-tools 36.1.0, JDK 17+):
 
 ```bash
 export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=/pfad/release.keystore
 export GODOT_ANDROID_KEYSTORE_RELEASE_USER=<alias>
 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=<passwort>
 godot --headless --path . --export-release "Android" ../dist/MonsterWerdenFreunde.apk
+godot --headless --path . --export-release "Android AAB" ../dist/MonsterWerdenFreunde.aab
 ```
+
+Für die AAB (Gradle-Build) einmal im Editor *Projekt → Android-Build-Vorlage installieren*
+ausführen (legt den ignorierten Ordner `android/` an). Gradle lädt beim ersten Build Bibliotheken
+von Google Maven und Maven Central.
 
 Die beiliegende APK ist mit einem eigens erzeugten Schlüssel signiert, der nicht im Repository
 liegt. Für eine Veröffentlichung (z. B. Google Play) mit einem eigenen Schlüssel neu exportieren.

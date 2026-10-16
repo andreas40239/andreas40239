@@ -91,6 +91,11 @@ def render(size, with_bg, monster_scale, rounded=False):
 
 
 def main():
+    # Seit Version 1.2 sind die App-Icons vorgegebene Grafiken (art/icons/). Nur mit --force neu erzeugen.
+    import sys
+    if "--force" not in sys.argv:
+        print("App-Icons sind vorgegeben - nichts überschrieben. Mit --force trotzdem neu erzeugen.")
+        return
     os.makedirs(OUT, exist_ok=True)
     render(192, True, 0.30, rounded=True).save(os.path.join(OUT, "icon_192.png"))
     render(432, False, 0.20).save(os.path.join(OUT, "icon_fg_432.png"))
