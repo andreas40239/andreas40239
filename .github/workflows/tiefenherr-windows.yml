@@ -1,0 +1,39 @@
+name: Tiefenherr Windows-Build
+
+on:
+  push:
+    paths:
+      - "tiefenherr/**"
+      - ".github/workflows/tiefenherr-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  export-windows:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Godot und Export-Vorlagen laden
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Projekt importieren und Windows-Build exportieren
+        run: |
+          GODOT=./Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          mkdir -p "$GITHUB_WORKSPACE/tiefenherr/build"
+          $GODOT --headless --path tiefenherr --import
+          $GODOT --headless --path tiefenherr --export-release "Windows Desktop" "$GITHUB_WORKSPACE/tiefenherr/build/Tiefenherr.exe"
+          ls -la tiefenherr/build
+          test -s tiefenherr/build/Tiefenherr.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tiefenherr-Windows
+          path: tiefenherr/build/
