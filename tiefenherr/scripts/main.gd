@@ -8,6 +8,8 @@ const RigScript := preload("res://scripts/camera_rig.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const ProjectileScript := preload("res://scripts/projectile.gd")
 const SETTINGS_PATH := "user://settings.cfg"
+const SAVE_DIR := "user://saves"
+const SLOTS := 6
 
 var world: World
 var rig
@@ -19,8 +21,14 @@ var units_root: Node3D
 var fx_root: Node3D
 
 var heart_hp := Defs.HEART_HP
-var heart_gold := Defs.START_GOLD
-var mana := Defs.START_MANA
+var heart_gold := 1500
+var mana := 300.0
+var level_i := 0
+var lvl := {}
+var waves: Array = []
+var clouds: Array = []
+var trap_t := 0.0
+var last_shot: Image
 var game_time := 0.0
 var state := "menu"
 var tool := "select"
@@ -30,7 +38,7 @@ var drag_start := Vector2.ZERO
 var drag_tile := INVALID
 var hover_tile := INVALID
 var wave := 0
-var wave_timer := Defs.FIRST_WAVE
+var wave_timer := 300.0
 var wave_warned := false
 var hero_queue: Array = []
 var hero_spawn_t := 0.0
@@ -47,7 +55,7 @@ var heart_alarm_t := 0.0
 var speed_levels := [1.0, 2.0, 3.0]
 var speed_i := 0
 var stats := {"killed": 0, "lost": 0, "dug": 0, "gold_mined": 0}
-var settings := {"master": 0.8, "music": 0.6, "sfx": 0.8, "quality": 2, "fullscreen": false, "edge": true}
+var settings := {"master": 0.8, "music": 0.6, "sfx": 0.8, "quality": 2, "fullscreen": false, "edge": true, "gamma": 1.0, "progress": 0}
 var autotest := false
 var _at_t := 0.0
 var _at_step := 0
@@ -63,8 +71,32 @@ func _ready() -> void:
 	world = World.new()
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
-	world.generate(randi())
+	var loaded := {}
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--level="):
+			Defs.next_level = int(a.substr(8)) - 1
+		elif a == "--autoload":
+			Defs.pending_load = slot_path("autotest")
+	if Defs.pending_load != "":
+		loaded = _read_save(Defs.pending_load)
+		Defs.pending_load = ""
+	level_i = clampi(loaded.get("level", Defs.next_level), 0, Defs.LEVELS.size() - 1)
+	Defs.next_level = level_i
+	lvl = Defs.LEVELS[level_i]
+	waves = []
+	for w in lvl["waves"]:
+		waves.append(Defs.parse_wave(w))
+	heart_gold = lvl["start_gold"]
+	mana = lvl["start_mana"]
+	wave_timer = lvl["first_wave"]
+	world.generate(lvl)
+	var claimed_portals := []
+	if not loaded.is_empty():
+		claimed_portals = world.load_state(loaded["world"])
 	world.build_visuals()
+	for k in claimed_portals.size():
+		if claimed_portals[k]:
+			world.activate_portal(world.portals[k])
 	units_root = Node3D.new()
 	units_root.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(units_root)
@@ -78,8 +110,11 @@ func _ready() -> void:
 	hud = HudScript.new()
 	add_child(hud)
 	hud.setup(self)
-	for i in 4:
-		spawn_unit("imp", world.free_tile_near(world.heart_tile, 3))
+	if loaded.is_empty():
+		for i in 4:
+			spawn_unit("imp", world.free_tile_near(world.heart_tile, 3))
+	else:
+		_apply_save(loaded)
 	_refresh_jobs()
 	apply_settings()
 	set_tool("select")
@@ -93,6 +128,9 @@ func _ready() -> void:
 	if autotest:
 		start_game()
 		Engine.time_scale = 8.0
+	elif Defs.autostart:
+		Defs.autostart = false
+		start_game(loaded.is_empty())
 	elif showcase != "":
 		_showcase(showcase)
 	else:
@@ -102,31 +140,162 @@ func _ready() -> void:
 		rig.input_enabled = false
 		hud.show_menu("main")
 		if menushot != "":
+			for a2 in OS.get_cmdline_user_args():
+				if a2.begins_with("--menu="):
+					hud.show_menu(a2.substr(7), "main")
 			await get_tree().create_timer(4.0, true).timeout
 			get_viewport().get_texture().get_image().save_png(menushot)
 			get_tree().quit()
 
 
-func start_game() -> void:
+func start_game(fresh := true) -> void:
 	state = "play"
 	get_tree().paused = false
 	rig.attract = false
 	rig.input_enabled = true
 	hud.show_menu("")
-	rig.jump_to(world.tile_center(world.heart_tile) + Vector3(0, 0, 3))
-	message("Willkommen, Tiefenherr! Markiere Felsen zum Graben (Linksklick ziehen).", Color(1.0, 0.85, 0.45))
-	message("Beanspruche das lila Portal und baue Hort + Pilzfarm.", Color(0.8, 0.7, 1.0))
+	if fresh:
+		rig.yaw = wrapf(rig.yaw, -PI, PI)
+		rig.yaw_target = 0.35
+		rig.jump_to(world.tile_center(world.heart_tile) + Vector3(0, 0, 3))
+		message("Level %d: %s" % [level_i + 1, lvl["name"]], Color(1.0, 0.85, 0.45))
+		message(lvl["desc"], Color(0.9, 0.85, 0.75))
+		if level_i == 0:
+			message("Markiere Felsen zum Graben (Linksklick ziehen), beanspruche das lila Portal, baue Hort + Pilzfarm.", Color(0.8, 0.7, 1.0))
+	else:
+		message("Spielstand geladen.", Color(0.7, 1.0, 0.7))
+
+
+## Startet ein Level neu (Szene wird neu aufgebaut).
+func start_level(i: int) -> void:
+	Defs.next_level = i
+	Defs.pending_load = ""
+	Defs.autostart = true
+	_reload()
 
 
 func restart() -> void:
+	start_level(level_i)
+
+
+func to_main_menu() -> void:
+	Defs.autostart = false
+	_reload()
+
+
+func _reload() -> void:
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	get_tree().reload_current_scene()
 
 
+# ================================================================ Speichern / Laden
+func slot_path(slot: String) -> String:
+	return SAVE_DIR.path_join("slot_%s.sav" % slot)
+
+
+func _read_save(path: String) -> Dictionary:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var d = f.get_var()
+	if typeof(d) != TYPE_DICTIONARY or d.get("v", 0) != 1:
+		return {}
+	return d
+
+
+func slot_info(slot: String) -> Dictionary:
+	var d := _read_save(slot_path(slot))
+	if d.is_empty():
+		return {}
+	var info := {"level": d["level"], "time": d["game_time"], "date": d["date"], "wave": d["wave"], "tex": null}
+	var img := Image.new()
+	if img.load(slot_path(slot).replace(".sav", ".png")) == OK:
+		info["tex"] = ImageTexture.create_from_image(img)
+	return info
+
+
+func save_game(slot: String) -> void:
+	if state != "play":
+		return
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var ul := []
+	for u in units:
+		if u.dead:
+			continue
+		ul.append({"k": u.kind, "x": u.position.x, "z": u.position.z, "lvl": u.level, "xp": u.xp, "hp": u.hp,
+			"car": u.carried, "hun": u.hunger, "tir": u.tired, "unh": u.unhappy, "lair": u.lair_idx})
+	var d := {"v": 1, "level": level_i, "world": world.save_state(), "heart_hp": heart_hp, "heart_gold": heart_gold,
+		"mana": mana, "game_time": game_time, "wave": wave, "wave_timer": wave_timer, "wave_warned": wave_warned,
+		"hero_queue": hero_queue.duplicate(), "payday_t": payday_t, "portal_t": portal_t, "stats": stats.duplicate(),
+		"units": ul, "cam": [rig.focus_target.x, rig.focus_target.z, rig.yaw_target, rig.dist_target, rig.pitch_target],
+		"date": Time.get_datetime_string_from_system(false, true).substr(0, 16)}
+	var f := FileAccess.open(slot_path(slot), FileAccess.WRITE)
+	if f == null:
+		message("Speichern fehlgeschlagen!", Color(1.0, 0.4, 0.3))
+		return
+	f.store_var(d)
+	f.close()
+	var img := last_shot if last_shot != null else get_viewport().get_texture().get_image()
+	if img != null and not img.is_empty():
+		var th: Image = img.duplicate()
+		th.resize(384, int(384.0 * th.get_height() / maxf(1.0, th.get_width())), Image.INTERPOLATE_BILINEAR)
+		th.save_png(slot_path(slot).replace(".sav", ".png"))
+	message("Spiel gespeichert (%s)." % ("Schnellspeicher" if slot == "quick" else "Platz " + slot), Color(0.7, 1.0, 0.7))
+	Sfx.play("order", -4.0)
+
+
+func load_game(slot: String) -> void:
+	if not FileAccess.file_exists(slot_path(slot)):
+		if state == "play":
+			message("Kein Spielstand vorhanden.", Color(1.0, 0.6, 0.4))
+		Sfx.play("error", -4.0)
+		return
+	Defs.pending_load = slot_path(slot)
+	Defs.autostart = true
+	_reload()
+
+
+func _apply_save(d: Dictionary) -> void:
+	heart_hp = d["heart_hp"]
+	heart_gold = d["heart_gold"]
+	mana = d["mana"]
+	game_time = d["game_time"]
+	wave = d["wave"]
+	wave_timer = d["wave_timer"]
+	wave_warned = d["wave_warned"]
+	hero_queue = d["hero_queue"].duplicate()
+	payday_t = d["payday_t"]
+	portal_t = d["portal_t"]
+	for k in d["stats"].keys():
+		stats[k] = d["stats"][k]
+	for e in d["units"]:
+		var pos := Vector3(e["x"], 0, e["z"])
+		var u := spawn_unit(e["k"], world.pos_to_tile(pos), e["lvl"])
+		if u == null:
+			continue
+		u.position = pos
+		u.xp = e["xp"]
+		u.hp = minf(e["hp"], u.max_hp)
+		u.carried = e["car"]
+		u.hunger = e["hun"]
+		u.tired = e["tir"]
+		u.unhappy = e["unh"]
+		u.lair_idx = e["lair"]
+	var c: Array = d["cam"]
+	rig.jump_to(Vector3(c[0], 0, c[1]), true)
+	rig.yaw = c[2]
+	rig.yaw_target = c[2]
+	rig.dist = c[3]
+	rig.dist_target = c[3]
+	rig.pitch = c[4]
+	rig.pitch_target = c[4]
+
+
 func open_pause_menu() -> void:
 	if state != "play":
 		return
+	last_shot = get_viewport().get_texture().get_image()
 	get_tree().paused = true
 	rig.input_enabled = false
 	hud.show_menu("pause")
@@ -145,9 +314,9 @@ func _setup_env() -> void:
 	env.background_color = Color(0.008, 0.006, 0.01)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.42, 0.36, 0.5)
-	env.ambient_light_energy = 0.45
+	env.ambient_light_energy = 0.95
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = 1.25
 	env.tonemap_white = 6.0
 	env.glow_enabled = true
 	env.glow_intensity = 0.7
@@ -159,7 +328,7 @@ func _setup_env() -> void:
 	env.ssao_intensity = 2.2
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.05, 0.03, 0.06)
-	env.fog_density = 0.004
+	env.fog_density = 0.002
 	env.volumetric_fog_density = 0.012
 	env.volumetric_fog_albedo = Color(0.7, 0.6, 0.65)
 	env.volumetric_fog_length = 80.0
@@ -171,7 +340,7 @@ func _setup_env() -> void:
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-62, 35, 0)
 	sun.light_color = Color(0.55, 0.62, 0.9)
-	sun.light_energy = 0.5
+	sun.light_energy = 1.0
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 90.0
 	add_child(sun)
@@ -204,6 +373,23 @@ func apply_settings() -> void:
 		var is_fs := cur == DisplayServer.WINDOW_MODE_FULLSCREEN or cur == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
 		if fs != is_fs:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fs else DisplayServer.WINDOW_MODE_WINDOWED)
+	# Gamma-Korrektur über eine 1D-Farbkorrektur-LUT
+	var gamma: float = clampf(settings["gamma"], 0.5, 2.5)
+	var gr := Gradient.new()
+	var go := PackedFloat32Array()
+	var gc := PackedColorArray()
+	for k in 17:
+		var x := k / 16.0
+		var v := pow(x, 1.0 / gamma)
+		go.append(x)
+		gc.append(Color(v, v, v))
+	gr.offsets = go
+	gr.colors = gc
+	var gt := GradientTexture1D.new()
+	gt.gradient = gr
+	gt.width = 256
+	env.adjustment_enabled = true
+	env.adjustment_color_correction = gt
 	var q: int = settings["quality"]
 	var vp := get_viewport()
 	env.ssao_enabled = q >= 1
@@ -253,6 +439,7 @@ func _process(delta: float) -> void:
 		payday_t = 180.0
 		_payday()
 	_update_waves(delta)
+	_update_traps(delta)
 	_separate(delta)
 	Sfx.battle_target = 1.0 if hero_count() > 0 else 0.0
 
@@ -280,12 +467,12 @@ func message_once(key: String, txt: String, col := Color(0.95, 0.9, 0.8), cool :
 
 
 # ================================================================ Einheiten
-func spawn_unit(kind: String, t: Vector2i, lvl := 1) -> Unit:
+func spawn_unit(kind: String, t: Vector2i, ulvl := 1) -> Unit:
 	if t == INVALID:
 		return null
 	var u := Unit.new()
 	units_root.add_child(u)
-	u.setup(self, kind, t, lvl)
+	u.setup(self, kind, t, ulvl)
 	units.append(u)
 	return u
 
@@ -335,6 +522,7 @@ func on_unit_died(u: Unit, _killer: Unit) -> void:
 		stats["killed"] += 1
 		var bounty := 50 * u.level
 		add_gold(bounty)
+		world.float_text(u.global_position + Vector3(0, 1.8, 0), "+%d" % bounty, Color(1.0, 0.85, 0.3))
 		message_once("bounty", "Held besiegt! +%d Gold Kopfgeld" % bounty, Color(1.0, 0.85, 0.4), 3.0)
 	else:
 		stats["lost"] += 1
@@ -497,8 +685,10 @@ func deposit_gold(imp: Unit, t: Vector2i) -> void:
 	imp.carried = 0
 	if stored > 0:
 		Sfx.play_at("gold", imp.global_position, -2.0)
+		world.float_text(imp.global_position + Vector3(0, 1.4, 0), "+%d" % stored, Color(1.0, 0.85, 0.3))
 	if stored < amount:
-		message_once("full", "Deine Lager sind voll! Baue eine größere Schatzkammer.", Color(1.0, 0.7, 0.3))
+		world.float_text(imp.global_position + Vector3(0, 2.0, 0), "Lager voll!", Color(1.0, 0.35, 0.25))
+		message_once("full", "Deine Lager sind voll – Gold geht verloren! Baue eine größere Schatzkammer [1].", Color(1.0, 0.45, 0.3), 12.0)
 
 
 func imp_cost() -> int:
@@ -594,10 +784,15 @@ func _find_job(imp: Unit, kind: String) -> Dictionary:
 			cands = fort_cands
 	if cands.is_empty():
 		return {}
+	var storage_full := total_gold() >= gold_capacity()
+	if storage_full and kind == "dig":
+		message_once("full", "Deine Lager sind voll – Gold wird nicht mehr abgebaut! Baue eine größere Schatzkammer [1].", Color(1.0, 0.45, 0.3), 20.0)
 	var scored := []
 	for t in cands:
 		var i := world.idx(t)
 		if reserved.has(i) and is_instance_valid(reserved[i]) and reserved[i] != imp:
+			continue
+		if kind == "dig" and storage_full and (world.type[i] == T.GOLD or world.type[i] == T.GEM):
 			continue
 		scored.append([(t - imp.tile).length_squared(), t])
 	if scored.is_empty():
@@ -723,13 +918,13 @@ func _try_portal_spawn() -> void:
 
 
 func call_wave_early() -> void:
-	if state == "play" and wave < Defs.WAVES.size():
+	if state == "play" and wave < waves.size():
 		wave_timer = minf(wave_timer, 5.0)
 		wave_warned = true
 
 
 func _update_waves(delta: float) -> void:
-	if wave < Defs.WAVES.size():
+	if wave < waves.size():
 		wave_timer -= delta
 		if wave_timer <= 30.0 and not wave_warned:
 			wave_warned = true
@@ -737,23 +932,23 @@ func _update_waves(delta: float) -> void:
 			message("Die Helden sammeln sich am Tor! Angriff in 30 Sekunden.", Color(0.7, 0.85, 1.0))
 		if wave_timer <= 0.0:
 			wave += 1
-			hero_queue = Defs.WAVES[wave - 1].duplicate()
-			wave_timer = Defs.WAVE_GAP
+			hero_queue = waves[wave - 1].duplicate()
+			wave_timer = lvl["gap"]
 			wave_warned = false
 			Sfx.play("alarm")
-			message("Welle %d von %d: Die Helden greifen an!" % [wave, Defs.WAVES.size()], Color(0.6, 0.8, 1.0))
+			message("Welle %d von %d: Die Helden greifen an!" % [wave, waves.size()], Color(0.6, 0.8, 1.0))
 	if not hero_queue.is_empty():
 		hero_spawn_t -= delta
 		if hero_spawn_t <= 0.0:
 			hero_spawn_t = 1.4
 			var kind: String = hero_queue.pop_front()
-			var t := world.free_tile_near(world.gate_tile, 3)
-			var lvl := 1 + (wave - 1) / 2
-			var h := spawn_unit(kind, t, lvl)
+			var t := world.free_tile_near(world.gates[randi() % world.gates.size()], 3)
+			var hl: int = 1 + (wave - 1) / 2 + lvl["hero_lvl"]
+			var h := spawn_unit(kind, t, hl)
 			if h:
 				world.burst(h.global_position + Vector3(0, 0.8, 0), Color(0.8, 0.9, 1.0), 24, 3.0, 0.9)
 				Sfx.play_at("spawn", h.global_position)
-	elif wave >= Defs.WAVES.size() and hero_count() == 0 and state == "play":
+	elif wave >= waves.size() and hero_count() == 0 and state == "play":
 		_end(true)
 
 
@@ -775,6 +970,9 @@ func damage_heart(a: float) -> void:
 func _end(win: bool) -> void:
 	state = "won" if win else "lost"
 	Engine.time_scale = 1.0
+	if win and not autotest:
+		settings["progress"] = maxi(settings["progress"], mini(level_i + 1, Defs.LEVELS.size() - 1))
+		save_settings()
 	Sfx.battle_target = 0.0
 	Sfx.play("victory" if win else "defeat")
 	if autotest:
@@ -783,7 +981,7 @@ func _end(win: bool) -> void:
 	await get_tree().create_timer(1.5, true).timeout
 	get_tree().paused = true
 	rig.input_enabled = false
-	hud.show_end(win, stats, game_time)
+	hud.show_end(win, stats, game_time, win and level_i + 1 < Defs.LEVELS.size())
 
 
 # ================================================================ Werkzeuge & Eingabe
@@ -815,6 +1013,9 @@ func _update_hint() -> void:
 				var r := int(tool.substr(4))
 				var ri: Dictionary = Defs.ROOM_INFO[r]
 				h = "%s bauen: %d Gold/Feld · auf eigenem Boden ziehen" % [ri["name"], ri["cost"]]
+			elif tool.begins_with("trap_"):
+				var ti: Dictionary = Defs.TRAP_INFO[tool.substr(5)]
+				h = "%s: %d Gold + %d Mana · %s" % [ti["name"], ti["gold"], ti["mana"], "auf befestigte Wand neben Boden klicken" if ti["wall"] else "auf eigenen freien Boden klicken/ziehen"]
 			elif tool == "spell_imp":
 				h = "Wichtel beschwören: %d Mana · Klick auf eigenen Boden" % imp_cost()
 			elif tool.begins_with("spell_"):
@@ -832,7 +1033,7 @@ func _tile_desc(t: Vector2i) -> String:
 		T.ROCK: return "Fels"
 		T.GOLD: return "Goldader (Rest: %d)" % int(world.dig_hp[i] * 25.0)
 		T.GEM: return "Edelsteinader (unerschöpflich)"
-		T.WALL: return "Befestigte Wand"
+		T.WALL: return "Befestigte Wand" + (" mit " + Defs.TRAP_INFO[world.traps[i]["type"]]["name"] if world.traps.has(i) else "")
 		T.HEART: return "Dungeon-Herz (%d / %d)" % [int(heart_hp), int(Defs.HEART_HP)]
 		T.PORTAL: return "Portal"
 		T.GATE: return "Heldentor"
@@ -841,6 +1042,8 @@ func _tile_desc(t: Vector2i) -> String:
 		if world.room[i] == R.TREASURY:
 			s += " (%d Gold)" % world.store.get(i, 0)
 		return s
+	if world.traps.has(i):
+		return Defs.TRAP_INFO[world.traps[i]["type"]]["name"]
 	return "Eigener Boden" if world.own[i] == 1 else "Unbeanspruchter Boden"
 
 
@@ -896,6 +1099,8 @@ func _update_hover() -> void:
 			world.set_preview(_drag_rect(), Defs.ROOM_INFO[int(tool.substr(4))]["color"], false)
 		elif tool == "sell":
 			world.set_preview(_drag_rect(), Color(1.0, 0.25, 0.2), false)
+		elif tool.begins_with("trap_"):
+			world.set_preview(_drag_rect(), Color(1.0, 0.55, 0.1), Defs.TRAP_INFO[tool.substr(5)]["wall"])
 		return
 	var col := Color(1, 1, 1)
 	var tall := world.is_tall(hover_tile)
@@ -913,11 +1118,13 @@ func _update_hover() -> void:
 		_:
 			if tool.begins_with("room"):
 				col = Defs.ROOM_INFO[int(tool.substr(4))]["color"]
+			elif tool.begins_with("trap_"):
+				col = Color(0.3, 1.0, 0.3) if world.can_place_trap(hover_tile, tool.substr(5)) else Color(1.0, 0.2, 0.15)
 	if tool == "spell_bolt" or tool == "spell_heal":
 		var rr := 1 if tool == "spell_bolt" else 4
 		world.set_preview(Rect2i(hover_tile - Vector2i(rr, rr), Vector2i(rr * 2 + 1, rr * 2 + 1)), col, false)
 	else:
-		world.set_preview(Rect2i(hover_tile, Vector2i.ONE), col, tall and (tool == "dig" or tool == "select"))
+		world.set_preview(Rect2i(hover_tile, Vector2i.ONE), col, tall and (tool == "dig" or tool == "select" or tool == "trap_wallspike"))
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -981,6 +1188,14 @@ func _on_key(k: InputEventKey) -> void:
 		KEY_2: set_tool("room%d" % R.LAIR)
 		KEY_3: set_tool("room%d" % R.FARM)
 		KEY_4: set_tool("room%d" % R.TRAINING)
+		KEY_5: set_tool("trap_spike")
+		KEY_6: set_tool("trap_wallspike")
+		KEY_7: set_tool("trap_fire")
+		KEY_8: set_tool("trap_poison")
+		KEY_F5:
+			last_shot = null
+			save_game("quick")
+		KEY_F9: load_game("quick")
 		KEY_X: set_tool("sell")
 		KEY_C: set_tool("spell_imp")
 		KEY_V: set_tool("spell_bolt")
@@ -1035,6 +1250,8 @@ func _on_left_release(pos: Vector2, shift: bool) -> void:
 		_:
 			if tool.begins_with("room"):
 				_build(_drag_rect(), int(tool.substr(4)))
+			elif tool.begins_with("trap_"):
+				_place_traps(_drag_rect(), tool.substr(5))
 
 
 func _set_selection(arr: Array) -> void:
@@ -1127,7 +1344,7 @@ func _build(r: Rect2i, room_type: int) -> void:
 	for y in range(r.position.y, r.end.y):
 		for x in range(r.position.x, r.end.x):
 			var t := Vector2i(x, y)
-			if world.is_own_floor(t) and world.get_room(t) == R.NONE:
+			if world.is_own_floor(t) and world.get_room(t) == R.NONE and not world.traps.has(world.idx(t)):
 				if not spend_gold(cost):
 					broke = true
 					break
@@ -1152,6 +1369,10 @@ func _sell(r: Rect2i) -> void:
 	for y in range(r.position.y, r.end.y):
 		for x in range(r.position.x, r.end.x):
 			var t := Vector2i(x, y)
+			if world.inb(t) and world.traps.has(world.idx(t)):
+				refund += Defs.TRAP_INFO[world.traps[world.idx(t)]["type"]]["gold"] / 2
+				world.remove_trap(t)
+				sold += 1
 			var rm := world.get_room(t)
 			if rm == R.NONE:
 				continue
@@ -1166,6 +1387,86 @@ func _sell(r: Rect2i) -> void:
 	if sold > 0:
 		add_gold(refund)
 		Sfx.play("gold", -3.0)
+
+
+func _place_traps(r: Rect2i, kind: String) -> void:
+	var ti: Dictionary = Defs.TRAP_INFO[kind]
+	var placed := 0
+	var broke := false
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			var t := Vector2i(x, y)
+			if not world.can_place_trap(t, kind):
+				continue
+			if mana < ti["mana"] or total_gold() < ti["gold"]:
+				broke = true
+				break
+			spend_gold(ti["gold"])
+			mana -= ti["mana"]
+			world.set_trap(t, kind)
+			world.burst(world.tile_center(t) + Vector3(0, 0.4, 0), Color(1.0, 0.55, 0.1), 14, 2.5, 0.5)
+			placed += 1
+		if broke:
+			break
+	if placed > 0:
+		Sfx.play("build", -2.0)
+	if broke:
+		message_once("notrap", "Nicht genug Gold oder Mana für %s!" % ti["name"], Color(1.0, 0.5, 0.3), 3.0)
+		Sfx.play("error", -4.0)
+	elif placed == 0:
+		message_once("notrappos", "%s: %s" % [ti["name"], "nur in befestigte Wände neben Boden." if ti["wall"] else "nur auf eigenem Boden ohne Raum."], Color(1.0, 0.7, 0.4), 3.0)
+		Sfx.play("error", -4.0)
+
+
+func _enemies_near(c: Vector3, radius_tiles: float) -> Array:
+	var out := []
+	var r := radius_tiles * Defs.TILE
+	for u in units:
+		if u.team == 2 and not u.dead and Vector2(u.position.x - c.x, u.position.z - c.z).length() <= r:
+			out.append(u)
+	return out
+
+
+func _update_traps(delta: float) -> void:
+	trap_t -= delta
+	if trap_t > 0.0:
+		return
+	var dt := 0.15 - trap_t
+	trap_t = 0.15
+	for i in world.traps.keys():
+		var tr: Dictionary = world.traps[i]
+		tr["cd"] -= dt
+		if tr["cd"] > 0.0:
+			continue
+		var ti: Dictionary = Defs.TRAP_INFO[tr["type"]]
+		var c := world.tile_center(world.to_t(i))
+		var hit := _enemies_near(c, ti["radius"])
+		if hit.is_empty():
+			continue
+		tr["cd"] = ti["cd"]
+		world.trap_fx(i)
+		match tr["type"]:
+			"poison":
+				clouds.append({"pos": c, "t": 6.0, "r": ti["radius"], "dmg": ti["dmg"], "tick": 0.0})
+				Sfx.play_at("spawn", c, -4.0)
+			"fire":
+				Sfx.play_at("zap", c, -3.0)
+				for u in hit:
+					u.take_damage(ti["dmg"], null)
+			_:
+				Sfx.play_at("swing", c, 2.0)
+				Sfx.play_at("dig", c, -2.0)
+				for u in hit:
+					u.take_damage(ti["dmg"], null)
+	for cl in clouds.duplicate():
+		cl["t"] -= dt
+		cl["tick"] -= dt
+		if cl["tick"] <= 0.0:
+			cl["tick"] = 0.6
+			for u in _enemies_near(cl["pos"], cl["r"]):
+				u.take_damage(cl["dmg"] * 0.6, null)
+		if cl["t"] <= 0.0:
+			clouds.erase(cl)
 
 
 func _cast(spell: String, t: Vector2i) -> void:
@@ -1231,12 +1532,17 @@ func _showcase(dir: String) -> void:
 			if world.get_type(t) == T.ROCK and _has_own_neighbor(t):
 				world.set_tile(t, T.WALL, 1)
 	heart_gold = 2000
+	mana = 2000.0
 	_build(Rect2i(14, 8, 3, 2), R.TREASURY)
 	_build(Rect2i(17, 8, 3, 2), R.LAIR)
 	_build(Rect2i(14, 11, 3, 2), R.FARM)
 	_build(Rect2i(17, 11, 4, 2), R.TRAINING)
 	add_gold(1500)
 	world.toggle_marks(Rect2i(8, 15, 3, 3), true)
+	_place_traps(Rect2i(21, 10, 1, 1), "spike")
+	_place_traps(Rect2i(21, 11, 1, 1), "fire")
+	_place_traps(Rect2i(21, 12, 1, 1), "poison")
+	_place_traps(Rect2i(14, 7, 8, 1), "wallspike")
 	for k in ["worm", "bat", "kobold", "brute", "worm", "kobold"]:
 		spawn_unit(k, world.free_tile_near(Vector2i(19, 10), 2))
 	for k in ["knight", "archer", "priest", "dwarf"]:
@@ -1265,20 +1571,35 @@ func _showcase(dir: String) -> void:
 # ================================================================ Autotest (headless)
 func _autotest(delta: float) -> void:
 	_at_t += delta
+	var h := world.heart_tile
 	if _at_step == 0:
 		_at_step = 1
-		# Tunnel zum ersten Portal und Goldadern markieren
-		world.toggle_marks(Rect2i(14, 10, 8, 1), true)
-		world.toggle_marks(Rect2i(15, 8, 2, 3), true)
-		world.toggle_marks(Rect2i(8, 14, 3, 3), true)
-	if _at_step == 1 and _at_t > 40.0:
+		if not ("--autoload" in OS.get_cmdline_user_args()):
+			var pc: Vector2i = world.portals[0]["center"]
+			# Tunnel zum ersten Portal (L-förmig) und Goldadern markieren
+			world.toggle_marks(Rect2i(mini(h.x, pc.x), h.y, absi(pc.x - h.x) + 1, 1), true)
+			world.toggle_marks(Rect2i(pc.x, mini(h.y, pc.y), 1, absi(pc.y - h.y) + 1), true)
+			world.toggle_marks(Rect2i(h.x - 6, h.y - 6, 13, 13), true)
+		else:
+			print("[AT] loaded: gold=%d mana=%d units=%d traps=%d rooms=%s wave=%d t=%d claimed=%d" % [total_gold(), int(mana), units.size(), world.traps.size(), str(world.room_count), wave, int(game_time), world.claimed_count])
+	if _at_step == 1 and _at_t > 60.0:
 		_at_step = 2
-		_build(Rect2i(7, 7, 3, 2), R.LAIR)
-		_build(Rect2i(12, 7, 2, 2), R.FARM)
-		_build(Rect2i(7, 12, 2, 2), R.TREASURY)
-		_build(Rect2i(12, 12, 2, 2), R.TRAINING)
-		_cast("imp", Vector2i(8, 10))
-		print("[AT] rooms ", world.room_count, " gold=", total_gold())
+		_build(Rect2i(h.x - 3, h.y - 3, 3, 2), R.LAIR)
+		_build(Rect2i(h.x + 2, h.y - 3, 2, 2), R.FARM)
+		_build(Rect2i(h.x - 3, h.y + 2, 2, 2), R.TREASURY)
+		_build(Rect2i(h.x + 2, h.y + 2, 2, 2), R.TRAINING)
+		_cast("imp", h + Vector2i(-2, 0))
+		_place_traps(Rect2i(h.x - 3, h.y, 1, 1), "spike")
+		_place_traps(Rect2i(h.x + 3, h.y, 1, 1), "fire")
+		_place_traps(Rect2i(h.x, h.y + 3, 1, 1), "poison")
+		_place_traps(Rect2i(h.x - 4, h.y - 4, 9, 1), "wallspike")
+		print("[AT] rooms ", world.room_count, " gold=", total_gold(), " traps=", world.traps.size())
+	if _at_step == 2 and _at_t > 200.0:
+		_at_step = 3
+		if "--autosave" in OS.get_cmdline_user_args():
+			save_game("autotest")
+			print("[AT] saved: gold=%d mana=%d units=%d traps=%d rooms=%s wave=%d t=%d claimed=%d" % [total_gold(), int(mana), units.size(), world.traps.size(), str(world.room_count), wave, int(game_time), world.claimed_count])
+			get_tree().quit()
 	if int(_at_t) % 30 == 0 and int(_at_t - delta) % 30 != 0:
 		var claimed_p := 0
 		for p in world.portals:
@@ -1287,6 +1608,6 @@ func _autotest(delta: float) -> void:
 		print("[AT] t=%d gold=%d mana=%d imps=%d crea=%d heroes=%d claimed=%d marked=%d portals=%d wave=%d heart=%d fps=%d" % [
 			int(game_time), total_gold(), int(mana), count_units("imp"), creature_count(), hero_count(),
 			world.claimed_count, world.marked.size(), claimed_p, wave, int(heart_hp), Engine.get_frames_per_second()])
-	if _at_t > 1500.0 or state != "play":
+	if _at_t > 3000.0 or state != "play":
 		print("[AT] done state=", state, " stats=", stats)
 		get_tree().quit()

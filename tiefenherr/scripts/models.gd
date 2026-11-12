@@ -201,6 +201,30 @@ static func build(kind: String) -> Node3D:
 			var pk := _pivot(root, "tool", Vector3(0.3, 0.55, 0.05))
 			_p(pk, _box(0.05, 0.65, 0.05), mat(Color(0.35, 0.22, 0.12)), Vector3(0, 0.28, 0.05))
 			_p(pk, _box(0.5, 0.07, 0.08), mat(Color(0.6, 0.6, 0.65), 0.0, 0.9, 0.3), Vector3(0, 0.6, 0.05))
+		"paladin":
+			var gold := mat(Color(0.95, 0.78, 0.3), 0.25, 0.9, 0.25)
+			var white := mat(Color(0.92, 0.92, 0.95), 0.0, 0.3, 0.5)
+			_p(root, _cap(0.34, 1.1), gold, Vector3(0, 1.0, 0))
+			_p(root, _sph(0.27), gold, Vector3(0, 1.75, 0))
+			_p(root, _box(0.36, 0.06, 0.06), mat(Color(0.1, 0.1, 0.12)), Vector3(0, 1.78, 0.25))
+			_p(root, _box(0.75, 1.3, 0.05), white, Vector3(0, 1.0, -0.33), Vector3(0.12, 0, 0))
+			var halo2 := TorusMesh.new()
+			halo2.inner_radius = 0.26
+			halo2.outer_radius = 0.32
+			_p(root, halo2, mat(Color(1.0, 0.95, 0.6), 6.0), Vector3(0, 2.15, 0))
+			_p(root, _box(0.7, 0.9, 0.08), white, Vector3(-0.42, 1.05, 0.18), Vector3(0, 0.3, 0))
+			_p(root, _box(0.12, 0.5, 0.03), gold, Vector3(-0.44, 1.05, 0.24), Vector3(0, 0.3, 0))
+			var hm := _pivot(root, "tool", Vector3(0.45, 1.1, 0.1))
+			_p(hm, _cyl(0.04, 0.04, 1.3), mat(Color(0.4, 0.28, 0.15)), Vector3(0, 0.5, 0.05))
+			_p(hm, _box(0.5, 0.3, 0.3), mat(Color(0.8, 0.82, 0.9), 0.4, 0.95, 0.2), Vector3(0, 1.15, 0.05))
+			_p(root, _cap(0.12, 0.6), gold, Vector3(-0.16, 0.3, 0))
+			_p(root, _cap(0.12, 0.6), gold, Vector3(0.16, 0.3, 0))
+			var pl := OmniLight3D.new()
+			pl.light_color = Color(1.0, 0.9, 0.6)
+			pl.omni_range = 5.0
+			pl.light_energy = 1.2
+			pl.position = Vector3(0, 2.0, 0)
+			root.add_child(pl)
 	return root
 
 

@@ -18,7 +18,8 @@ var claimed_count := 0
 var astar := AStarGrid2D.new()
 var astar_h := AStarGrid2D.new()
 var heart_tile := Vector2i(10, 10)
-var gate_tile := Vector2i(46, 46)
+var gates: Array = []
+var traps := {}
 var portals: Array = []
 var dirty := true
 
@@ -38,6 +39,7 @@ var _burst_mats := {}
 var _burst_mesh: BoxMesh
 var _spin_nodes: Array = []
 var _deco_mats := {}
+var _trap_nodes := {}
 
 
 # ---------------------------------------------------------------- Hilfsfunktionen
@@ -98,7 +100,10 @@ func _h(x: int, y: int, s: int = 0) -> int:
 
 
 # ---------------------------------------------------------------- Generierung
-func generate(seed_val: int) -> void:
+func generate(def: Dictionary) -> void:
+	var seed_val: int = def["seed"]
+	var gold_thr: float = def["gold"]
+	var cave_thr: float = def["cave"]
 	var n := W * H
 	type.resize(n)
 	own.resize(n)
@@ -118,35 +123,40 @@ func generate(seed_val: int) -> void:
 			var c := cave_n.get_noise_2d(x, y)
 			if x < 1 or y < 1 or x >= W - 1 or y >= H - 1:
 				type[i] = T.BEDROCK
-			elif gold_n.get_noise_2d(x, y) > 0.45:
+			elif gold_n.get_noise_2d(x, y) > gold_thr:
 				type[i] = T.GOLD
-			elif c > 0.52:
+			elif c > cave_thr:
 				type[i] = T.FLOOR
 			elif c < -0.64:
 				type[i] = T.BEDROCK
 			else:
 				type[i] = T.ROCK
 	# Startbereich
-	heart_tile = Vector2i(10, 10)
-	_fill(Rect2i(4, 4, 13, 13), T.ROCK, 0)
-	_fill(Rect2i(7, 7, 7, 7), T.FLOOR, 1)
-	_fill(Rect2i(9, 9, 3, 3), T.HEART, 1)
-	_fill(Rect2i(15, 8, 2, 3), T.GOLD, 0)
-	_fill(Rect2i(8, 15, 3, 2), T.GOLD, 0)
+	heart_tile = def["heart"]
+	var h := heart_tile
+	_fill(Rect2i(h.x - 6, h.y - 6, 13, 13), T.ROCK, 0)
+	_fill(Rect2i(h.x - 3, h.y - 3, 7, 7), T.FLOOR, 1)
+	_fill(Rect2i(h.x - 1, h.y - 1, 3, 3), T.HEART, 1)
+	var gx := 5 if h.x < W / 2 else -6
+	var gy := 5 if h.y < H / 2 else -6
+	_fill(Rect2i(h.x + gx, h.y - 2, 2, 3), T.GOLD, 0)
+	_fill(Rect2i(h.x - 2, h.y + gy, 3, 2), T.GOLD, 0)
 	# Portale
 	portals.clear()
-	for pc in [Vector2i(24, 12), Vector2i(29, 31)]:
+	for pc in def["portals"]:
 		_fill(Rect2i(pc.x - 3, pc.y - 3, 7, 7), T.ROCK, 0)
 		_fill(Rect2i(pc.x - 2, pc.y - 2, 5, 5), T.FLOOR, 0)
 		_fill(Rect2i(pc.x - 1, pc.y - 1, 3, 3), T.PORTAL, 0)
 		portals.append({"center": pc, "claimed": false, "node": null})
-	# Edelsteinader
-	_fill(Rect2i(7, 22, 6, 5), T.ROCK, 0)
-	_fill(Rect2i(9, 24, 2, 1), T.GEM, 0)
-	# Heldentor
-	gate_tile = Vector2i(W - 10, H - 10)
-	_fill(Rect2i(gate_tile.x - 4, gate_tile.y - 4, 9, 9), T.FLOOR, 0)
-	_fill(Rect2i(gate_tile.x - 1, gate_tile.y - 1, 3, 3), T.GATE, 2)
+	# Edelsteinadern
+	for g in def["gems"]:
+		_fill(Rect2i(g.x - 2, g.y - 2, 6, 5), T.ROCK, 0)
+		_fill(Rect2i(g.x, g.y, 2, 1), T.GEM, 0)
+	# Heldentore
+	gates = def["gates"].duplicate()
+	for gt in gates:
+		_fill(Rect2i(gt.x - 4, gt.y - 4, 9, 9), T.FLOOR, 0)
+		_fill(Rect2i(gt.x - 1, gt.y - 1, 3, 3), T.GATE, 2)
 	# Rand erzwingen
 	for y in H:
 		for x in W:
@@ -154,10 +164,7 @@ func generate(seed_val: int) -> void:
 				type[y * W + x] = T.BEDROCK
 	for i in n:
 		dig_hp[i] = Defs.tile_hp(type[i])
-	claimed_count = 0
-	for i in n:
-		if own[i] == 1 and type[i] == T.FLOOR:
-			claimed_count += 1
+	_recount()
 	# Pfadfindung
 	for a in [astar, astar_h]:
 		a.region = Rect2i(0, 0, W, H)
@@ -175,9 +182,51 @@ func generate(seed_val: int) -> void:
 			_update_astar(Vector2i(x, y))
 
 
+func _recount() -> void:
+	claimed_count = 0
+	for k in room_count.keys():
+		room_count[k] = 0
+	for i in type.size():
+		if own[i] == 1 and type[i] == T.FLOOR:
+			claimed_count += 1
+		if room[i] != R.NONE:
+			room_count[room[i]] += 1
+
+
+func save_state() -> Dictionary:
+	var pc := []
+	for p in portals:
+		pc.append(p["claimed"])
+	var tr := {}
+	for i in traps.keys():
+		tr[i] = {"type": traps[i]["type"], "cd": traps[i]["cd"]}
+	return {"type": type, "own": own, "room": room, "dig_hp": dig_hp, "marked": marked.keys(),
+		"store": store.duplicate(), "portals": pc, "traps": tr}
+
+
+## Nach generate() und vor build_visuals() aufrufen.
+func load_state(d: Dictionary) -> Array:
+	type = d["type"]
+	own = d["own"]
+	room = d["room"]
+	dig_hp = d["dig_hp"]
+	marked.clear()
+	for i in d["marked"]:
+		marked[i] = true
+	store = d["store"].duplicate()
+	traps.clear()
+	for i in d["traps"].keys():
+		traps[i] = {"type": d["traps"][i]["type"], "cd": d["traps"][i]["cd"]}
+	_recount()
+	for y in H:
+		for x in W:
+			_update_astar(Vector2i(x, y))
+	return d["portals"]
+
+
 func _fill(r: Rect2i, ty: int, ow: int) -> void:
-	for y in range(r.position.y, r.end.y):
-		for x in range(r.position.x, r.end.x):
+	for y in range(maxi(1, r.position.y), mini(H - 1, r.end.y)):
+		for x in range(maxi(1, r.position.x), mini(W - 1, r.end.x)):
 			var i := y * W + x
 			type[i] = ty
 			own[i] = ow
@@ -232,6 +281,10 @@ func set_tile(t: Vector2i, ty: int, ow: int) -> void:
 	var now_claimed := ty == T.FLOOR and ow == 1
 	if was_claimed != now_claimed:
 		claimed_count += 1 if now_claimed else -1
+	if traps.has(i):
+		var wall_trap: bool = Defs.TRAP_INFO[traps[i]["type"]]["wall"]
+		if (wall_trap and ty != T.WALL) or (not wall_trap and (ty != T.FLOOR or ow != 1)):
+			remove_trap(t)
 	_update_astar(t)
 	dirty = true
 	_refresh_area(t)
@@ -400,7 +453,7 @@ func build_visuals() -> void:
 	_mark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_mark_mat.albedo_color = Color(1.0, 0.85, 0.2, 0.28)
 	var mark_mesh := BoxMesh.new()
-	mark_mesh.size = Vector3(Defs.TILE * 1.03, Defs.WALL_H + 0.06, Defs.TILE * 1.03)
+	mark_mesh.size = Vector3(Defs.TILE * 1.03, Defs.WALL_H, Defs.TILE * 1.03)
 	_make_mm("mark", mark_mesh, _mark_mat, false)
 
 	_preview_mat = StandardMaterial3D.new()
@@ -420,7 +473,10 @@ func build_visuals() -> void:
 	_build_heart()
 	for p in portals:
 		p["node"] = _build_portal(tile_center(p["center"]), Color(0.65, 0.3, 1.0), false)
-	_build_portal(tile_center(gate_tile), Color(0.75, 0.9, 1.0), true)
+	for gt in gates:
+		_build_portal(tile_center(gt), Color(0.75, 0.9, 1.0), true)
+	for i in traps.keys():
+		_build_trap(i)
 	for y in H:
 		for x in W:
 			_refresh_deco(Vector2i(x, y))
@@ -629,7 +685,15 @@ func _rebuild() -> void:
 				var b := Basis.from_scale(Vector3(1.0, sy, 1.0))
 				buckets[key2].append(Transform3D(b, c + Vector3(0, Defs.WALL_H * sy * 0.5, 0)))
 			if marked.has(i):
-				buckets["mark"].append(Transform3D(Basis(), c + Vector3(0, Defs.WALL_H * 0.5, 0)))
+				var my := 1.0
+				if ty == T.ROCK:
+					my = 0.96 + float(_h(x, y) % 1000) / 1000.0 * 0.14
+				elif ty == T.GOLD:
+					my = 0.98 + float(_h(x, y) % 1000) / 1000.0 * 0.1
+				elif ty == T.GEM:
+					my = 1.05
+				my += 0.03
+				buckets["mark"].append(Transform3D(Basis.from_scale(Vector3(1.0, my, 1.0)), c + Vector3(0, Defs.WALL_H * my * 0.5, 0)))
 	for k in buckets.keys():
 		var mm: MultiMesh = _mm[k].multimesh
 		var arr: Array = buckets[k]
@@ -642,7 +706,7 @@ func _process(delta: float) -> void:
 	_time += delta
 	if dirty:
 		_rebuild()
-	_mark_mat.albedo_color.a = 0.2 + 0.12 * sin(_time * 4.0)
+	_mark_mat.albedo_color.a = 0.34 + 0.14 * sin(_time * 4.0)
 	for f in _flicker:
 		var l: OmniLight3D = f[0]
 		if is_instance_valid(l):
@@ -723,6 +787,8 @@ func _refresh_deco(t: Vector2i) -> void:
 				_flicker.erase(f)
 		tn.queue_free()
 		_torch.erase(i)
+	if traps.has(i) and traps[i]["type"] == "wallspike":
+		_build_trap(i)
 	var ty := type[i]
 	var c := tile_center(t)
 	var hv := _h(t.x, t.y, 9)
@@ -1023,3 +1089,210 @@ func lightning(pos: Vector3) -> void:
 	var tw := create_tween()
 	tw.tween_property(l, "light_energy", 0.0, 0.45)
 	tw.tween_callback(n.queue_free)
+
+
+func float_text(pos: Vector3, txt: String, col: Color) -> void:
+	var l := Label3D.new()
+	l.text = txt
+	l.modulate = col
+	l.font_size = 72
+	l.outline_size = 18
+	l.pixel_size = 0.012
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.fixed_size = false
+	add_child(l)
+	l.global_position = pos
+	var tw := create_tween()
+	tw.tween_property(l, "position:y", pos.y + 2.5, 1.4)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 1.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_callback(l.queue_free)
+
+
+# ---------------------------------------------------------------- Fallen
+func can_place_trap(t: Vector2i, kind: String) -> bool:
+	if not inb(t) or traps.has(idx(t)):
+		return false
+	var i := idx(t)
+	if Defs.TRAP_INFO[kind]["wall"]:
+		if type[i] != T.WALL or own[i] != 1:
+			return false
+		for nb in neighbors4(t):
+			if is_walkable(nb):
+				return true
+		return false
+	return type[i] == T.FLOOR and own[i] == 1 and room[i] == R.NONE
+
+
+func set_trap(t: Vector2i, kind: String) -> void:
+	var i := idx(t)
+	traps[i] = {"type": kind, "cd": 1.0}
+	_build_trap(i)
+
+
+func remove_trap(t: Vector2i) -> void:
+	var i := idx(t)
+	traps.erase(i)
+	if _trap_nodes.has(i):
+		_trap_nodes[i].queue_free()
+		_trap_nodes.erase(i)
+
+
+func _cone(r: float, h: float) -> CylinderMesh:
+	var c := CylinderMesh.new()
+	c.top_radius = 0.0
+	c.bottom_radius = r
+	c.height = h
+	c.radial_segments = 8
+	return c
+
+
+func _build_trap(i: int) -> void:
+	if _trap_nodes.has(i):
+		_trap_nodes[i].queue_free()
+	var t := to_t(i)
+	var n := Node3D.new()
+	n.position = tile_center(t)
+	add_child(n)
+	_trap_nodes[i] = n
+	var iron := _dmat("trapiron", Color(0.2, 0.2, 0.23), 0.0, 0.85, 0.4)
+	var steel := _dmat("trapsteel", Color(0.75, 0.77, 0.82), 0.0, 0.95, 0.2)
+	var plate := BoxMesh.new()
+	plate.size = Vector3(1.7, 0.06, 1.7)
+	match traps[i]["type"]:
+		"spike":
+			_add_mesh(n, plate, iron, Vector3(0, 0.03, 0))
+			var sp := Node3D.new()
+			sp.name = "spikes"
+			sp.position = Vector3(0, -1.0, 0)
+			n.add_child(sp)
+			for sy in 3:
+				for sx in 3:
+					_add_mesh(sp, _cone(0.1, 1.1), steel, Vector3((sx - 1) * 0.5, 0.55, (sy - 1) * 0.5))
+					var hole := CylinderMesh.new()
+					hole.top_radius = 0.11
+					hole.bottom_radius = 0.11
+					hole.height = 0.02
+					_add_mesh(n, hole, _dmat("traphole", Color(0.02, 0.02, 0.02)), Vector3((sx - 1) * 0.5, 0.065, (sy - 1) * 0.5))
+		"wallspike":
+			var sp2 := Node3D.new()
+			sp2.name = "spikes"
+			n.add_child(sp2)
+			for nb in neighbors4(t):
+				if not is_walkable(nb):
+					continue
+				var d := Vector3(nb.x - t.x, 0, nb.y - t.y)
+				var side := Vector3(d.z, 0, d.x)
+				var face := BoxMesh.new()
+				face.size = Vector3(1.3, 1.3, 0.08) if absf(d.z) > 0.5 else Vector3(0.08, 1.3, 1.3)
+				_add_mesh(n, face, iron, d * (Defs.TILE * 0.5 + 0.03) + Vector3(0, 1.1, 0))
+				for k in 4:
+					var off := side * ((k % 2) - 0.5) * 0.7 + Vector3(0, 0.8 + (k / 2) * 0.6, 0)
+					var m := _add_mesh(sp2, _cone(0.09, 1.3), steel, d * (Defs.TILE * 0.5 - 0.55) + off)
+					m.rotation = Vector3(d.z * PI * 0.5, 0, -d.x * PI * 0.5)
+					m.set_meta("dir", d)
+					m.set_meta("base", m.position)
+		"fire":
+			_add_mesh(n, plate, iron, Vector3(0, 0.03, 0))
+			var ring := TorusMesh.new()
+			ring.inner_radius = 0.35
+			ring.outer_radius = 0.5
+			_add_mesh(n, ring, iron, Vector3(0, 0.08, 0), Vector3.ZERO, Vector3(1, 0.5, 1))
+			var ember := CylinderMesh.new()
+			ember.top_radius = 0.34
+			ember.bottom_radius = 0.34
+			ember.height = 0.05
+			_add_mesh(n, ember, _dmat("trapember", Color(1.0, 0.4, 0.08), 3.5), Vector3(0, 0.07, 0))
+		"poison":
+			var disc := CylinderMesh.new()
+			disc.top_radius = 0.8
+			disc.bottom_radius = 0.85
+			disc.height = 0.06
+			_add_mesh(n, disc, iron, Vector3(0, 0.03, 0))
+			var pool := CylinderMesh.new()
+			pool.top_radius = 0.55
+			pool.bottom_radius = 0.55
+			pool.height = 0.03
+			_add_mesh(n, pool, _dmat("trappoison", Color(0.35, 0.9, 0.15), 2.0), Vector3(0, 0.065, 0))
+			for k in 3:
+				var a := k * TAU / 3.0
+				_add_mesh(n, _cone(0.08, 0.5), _dmat("trapfang", Color(0.85, 0.9, 0.7), 0.0, 0.2, 0.4), Vector3(cos(a) * 0.68, 0.3, sin(a) * 0.68))
+
+
+func trap_fx(i: int) -> void:
+	if not _trap_nodes.has(i):
+		return
+	var n: Node3D = _trap_nodes[i]
+	var c := n.position
+	match traps[i]["type"]:
+		"spike":
+			var sp: Node3D = n.get_node("spikes")
+			var tw := create_tween()
+			tw.tween_property(sp, "position:y", 0.0, 0.07)
+			tw.tween_interval(0.5)
+			tw.tween_property(sp, "position:y", -1.0, 0.5)
+			burst(c + Vector3(0, 0.3, 0), Color(0.7, 0.7, 0.75), 10, 3.0, 0.4)
+		"wallspike":
+			for m in n.get_node("spikes").get_children():
+				var d: Vector3 = m.get_meta("dir")
+				var base: Vector3 = m.get_meta("base")
+				var tw2 := create_tween()
+				tw2.tween_property(m, "position", base + d * 1.1, 0.07)
+				tw2.tween_interval(0.45)
+				tw2.tween_property(m, "position", base, 0.5)
+		"fire":
+			var p := CPUParticles3D.new()
+			p.one_shot = true
+			p.amount = 90
+			p.lifetime = 0.9
+			p.explosiveness = 0.7
+			p.direction = Vector3.UP
+			p.spread = 80.0
+			p.initial_velocity_min = 3.0
+			p.initial_velocity_max = 8.0
+			p.gravity = Vector3(0, 3.0, 0)
+			p.scale_amount_min = 1.5
+			p.scale_amount_max = 3.5
+			p.mesh = _burst_mesh
+			p.material_override = _dmat("fireball", Color(1.0, 0.45, 0.08), 7.0)
+			add_child(p)
+			p.global_position = c + Vector3(0, 0.2, 0)
+			p.emitting = true
+			var l := OmniLight3D.new()
+			l.light_color = Color(1.0, 0.5, 0.15)
+			l.light_energy = 12.0
+			l.omni_range = 11.0
+			l.position = Vector3(0, 1.5, 0)
+			p.add_child(l)
+			var tw3 := create_tween()
+			tw3.tween_property(l, "light_energy", 0.0, 0.9)
+			tw3.tween_interval(0.5)
+			tw3.tween_callback(p.queue_free)
+		"poison":
+			var p2 := CPUParticles3D.new()
+			p2.amount = 120
+			p2.lifetime = 1.3
+			p2.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+			p2.emission_box_extents = Vector3(Defs.TILE * 2.0, 0.2, Defs.TILE * 2.0)
+			p2.direction = Vector3.DOWN
+			p2.spread = 5.0
+			p2.initial_velocity_min = 2.0
+			p2.initial_velocity_max = 3.0
+			p2.gravity = Vector3(0, -3.0, 0)
+			p2.scale_amount_min = 0.5
+			p2.scale_amount_max = 1.1
+			p2.mesh = _burst_mesh
+			p2.material_override = _dmat("poisondrop", Color(0.4, 1.0, 0.2), 4.0)
+			add_child(p2)
+			p2.global_position = c + Vector3(0, 3.6, 0)
+			var l2 := OmniLight3D.new()
+			l2.light_color = Color(0.4, 1.0, 0.2)
+			l2.light_energy = 2.5
+			l2.omni_range = 9.0
+			l2.position = Vector3(0, -1.8, 0)
+			p2.add_child(l2)
+			var tw4 := create_tween()
+			tw4.tween_interval(6.0)
+			tw4.tween_callback(func(): p2.emitting = false)
+			tw4.tween_property(l2, "light_energy", 0.0, 1.2)
+			tw4.tween_callback(p2.queue_free)
