@@ -5,7 +5,7 @@ extends Node3D
 
 const LANE := 0.7
 const RUNOUT := 64.0              # so weit außerhalb des Spielfelds starten/enden die Autos
-const STOP_BEFORE := 2.55         # Haltelinie vor der Mitte des Bahnübergangs
+const STOP_BEFORE := 3.0         # Haltelinie vor der Mitte des Bahnübergangs
 const ACC := 3.2
 const DEC := 7.0
 

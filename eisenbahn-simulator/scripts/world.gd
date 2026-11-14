@@ -71,7 +71,7 @@ func setup(level_index: int) -> void:
 	add_child(_pieces_root)
 	var sol := solve()
 	par = int(sol["cost"]) + (start_tiles.size() + goal_tiles.size()) * G.COST[G.Kind.STATION]
-	budget = int(ceil(par * 1.5 / 10.0)) * 10
+	budget = int(ceil(par * float(level.get("budget_factor", 1.5)) / 10.0)) * 10
 
 
 # ====================================================================== Karte
@@ -449,8 +449,17 @@ func _build_scenery() -> void:
 						deco_cells.append([c, 1, flowers.size()])
 						flowers.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * rng.randf_range(0.9, 1.5)), p))
 						flower_t.append(Color.WHITE)
-	# Wald rund um das Spielfeld
+	# Wald rund um das Spielfeld: vereinfachte Bäume, nur der nahe Ring wirft Schatten
 	var m := MARGIN
+	var lite: Array = []          # [near/far][Nadel/Laub][Variante] -> [Transforms, Farben]
+	for ring in 2:
+		var kinds := []
+		for kd in 2:
+			var vars := []
+			for v in 3:
+				vars.append([[], []])
+			kinds.append(vars)
+		lite.append(kinds)
 	for tz in range(-m, h + m):
 		for tx in range(-m, w + m):
 			if tx >= 0 and tz >= 0 and tx < w and tz < h:
@@ -459,22 +468,29 @@ func _build_scenery() -> void:
 				continue
 			var dist := maxi(maxi(-tx, tx - (w - 1)), maxi(-tz, tz - (h - 1)))
 			var n := _noise.get_noise_2d(tx * 9.0, tz * 9.0) * 0.5 + 0.5
-			var dens := clampf(0.12 + dist * 0.11, 0.0, 0.62) * (0.45 + n * 1.1)
-			if dist > 11:
-				dens *= 0.55
+			var dens := clampf(0.1 + dist * 0.1, 0.0, 0.5) * (0.45 + n * 1.1)
+			if dist > 9:
+				dens *= 0.6
 			var ctr := Vector3((tx + 0.5) * G.T, 0, (tz + 0.5) * G.T)
-			for i in 3:
+			for i in 2:
 				if rng.randf() > dens:
 					continue
-				var p: Vector3 = ctr + spots[i] + Vector3(rng.randf_range(-0.6, 0.6), 0, rng.randf_range(-0.6, 0.6))
+				var p: Vector3 = ctr + spots[i * 2] + Vector3(rng.randf_range(-0.9, 0.9), 0, rng.randf_range(-0.9, 0.9))
 				var v := rng.randi() % 3
 				var tint := Color.from_hsv(0.0, 0.0, rng.randf_range(0.8, 1.0))
-				if n > 0.5 or rng.randf() < 0.25:
-					con[v].append(_tree_xf(p, rng, 0.95, 1.55))
-					con_t[v].append(tint)
-				else:
-					dec[v].append(_tree_xf(p, rng, 0.9, 1.4))
-					dec_t[v].append(tint)
+				var kd := 0 if (n > 0.5 or rng.randf() < 0.25) else 1
+				var ring := 0 if dist <= 4 else 1
+				var xf := _tree_xf(p, rng, 1.0, 1.6) if kd == 0 else _tree_xf(p, rng, 0.95, 1.45)
+				lite[ring][kd][v][0].append(xf)
+				lite[ring][kd][v][1].append(tint)
+	for ring in 2:
+		for kd in 2:
+			for v in 3:
+				var data: Array = lite[ring][kd][v]
+				if data[0].is_empty():
+					continue
+				var mesh: Mesh = Models.conifer_lite(v) if kd == 0 else Models.decid_lite(v)
+				_mm(mesh, data[0], data[1], ring == 0)
 	for v in 3:
 		if not con[v].is_empty():
 			_mm(Models.conifer_mesh(v), con[v], con_t[v])

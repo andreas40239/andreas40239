@@ -287,6 +287,35 @@ static func decid_mesh(variant: int) -> ArrayMesh:
 	return mk.build(Mats.all())
 
 
+## Vereinfachte Bäume für den Wald außerhalb des Spielfelds (wenige Dreiecke).
+static func conifer_lite(variant: int) -> ArrayMesh:
+	var mk := MeshKit.new()
+	var cols := [Color("2f6b43"), Color("3a7d4c"), Color("2a6240")]
+	var c: Color = cols[variant % 3]
+	mk.cyl(0.1, 0.08, 0.5, Vector3.ZERO, C_TRUNK.darkened(0.1), 4, Vector3.UP, false, false)
+	var y := 0.4
+	var r := 0.95
+	for i in 2 + (variant % 2):
+		var h := 1.5 - i * 0.15
+		mk.push_at(Vector3(0, y, 0), 25.0 * i)
+		mk.cyl(r, 0.0, h, Vector3.ZERO, c.darkened(0.16), 5, Vector3.UP, false, false, c.lightened(0.16 + i * 0.03))
+		mk.pop()
+		y += h * 0.55
+		r *= 0.72
+	return mk.build(Mats.all())
+
+
+static func decid_lite(variant: int) -> ArrayMesh:
+	var rng := _rng(250 + variant)
+	var mk := MeshKit.new()
+	var cols := [Color("68ab45"), Color("7cbd52"), Color("549a43")]
+	var c: Color = cols[variant % 3]
+	mk.cyl(0.13, 0.09, 1.0, Vector3.ZERO, C_TRUNK, 4, Vector3.UP, false, false)
+	var rad := Vector3(0.95, 0.85, 0.95) if variant % 3 != 2 else Vector3(0.72, 1.15, 0.72)
+	mk.blob(rad, Vector3(0, 1.8, 0), c.lightened(0.05), 0, 0.14, rng, c.darkened(0.3))
+	return mk.build(Mats.all())
+
+
 static func rock_mesh(variant: int) -> ArrayMesh:
 	var rng := _rng(300 + variant)
 	var mk := MeshKit.new()

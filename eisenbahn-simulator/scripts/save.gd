@@ -8,7 +8,6 @@ static var stars: Array[int] = []
 static var music_on := true
 static var sfx_on := true
 static var layouts: Dictionary = {}
-static var tutorial_seen := false
 
 
 static func load_all() -> void:
@@ -22,7 +21,6 @@ static func load_all() -> void:
 		stars[i] = int(cf.get_value("progress", "stars_%d" % i, 0))
 	music_on = bool(cf.get_value("settings", "music", true))
 	sfx_on = bool(cf.get_value("settings", "sfx", true))
-	tutorial_seen = bool(cf.get_value("settings", "tutorial_seen", false))
 	var l: Variant = cf.get_value("layouts", "data", {})
 	if l is Dictionary:
 		layouts = l
@@ -34,7 +32,6 @@ static func store() -> void:
 		cf.set_value("progress", "stars_%d" % i, stars[i])
 	cf.set_value("settings", "music", music_on)
 	cf.set_value("settings", "sfx", sfx_on)
-	cf.set_value("settings", "tutorial_seen", tutorial_seen)
 	cf.set_value("layouts", "data", layouts)
 	cf.save(PATH)
 

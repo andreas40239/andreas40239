@@ -10,7 +10,7 @@ const MUSIC := {
 }
 const SFX := {
 	"chuff": ["res://assets/audio/sfx/chuff1.wav", "res://assets/audio/sfx/chuff2.wav", "res://assets/audio/sfx/chuff3.wav", "res://assets/audio/sfx/chuff4.wav"],
-	"whistle": ["res://assets/audio/sfx/whistle.ogg"],
+	"whistle": ["res://assets/audio/sfx/whistle.ogg", "res://assets/audio/sfx/whistle2.ogg"],
 	"hiss": ["res://assets/audio/sfx/hiss.ogg"],
 	"brake": ["res://assets/audio/sfx/brake.ogg"],
 	"bump": ["res://assets/audio/sfx/bump.wav"],

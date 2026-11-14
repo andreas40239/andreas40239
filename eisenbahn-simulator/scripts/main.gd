@@ -34,6 +34,7 @@ var _menu_t := 0.0
 var _result_pending := false
 var _was_braking := false
 var _last_active := {}
+var _idle_touch := 0.0
 
 
 func _ready() -> void:
@@ -288,6 +289,7 @@ func enter_drive() -> void:
 	world.set_build_view(false)
 	_spawn_train()
 	rig.target = train.loco
+	rig.target_dir = 1.0
 	rig.follow = true
 	rig.zoom = clampf(rig.zoom, rig.zoom_min, 40.0)
 	hud.show_screen("drive")
@@ -393,6 +395,13 @@ func _process(dt: float) -> void:
 					train.place_at_start()
 		Mode.DRIVE:
 			_update_drive_hud()
+			# nach dem Verschieben der Karte folgt die Kamera bald wieder dem Zug
+			if _touches.is_empty():
+				_idle_touch += dt
+				if _idle_touch > 2.5 and train != null and train.state == Train.State.RUN and absf(train.speed) > 0.3:
+					rig.follow = true
+			else:
+				_idle_touch = 0.0
 
 
 func _autopilot(_dt: float) -> void:
@@ -461,6 +470,11 @@ func _update_drive_hud() -> void:
 	if train == null:
 		return
 	hud.set_speed(train.speed * G.KMH)
+	# Verfolger- und Führerstandkamera blicken in Fahrtrichtung
+	if train.speed < -0.2:
+		rig.target_dir = -1.0
+	elif train.speed > 0.2 or train.throttle > 0.05:
+		rig.target_dir = 1.0
 	var sw := train.next_switch(36.0) if train.state == Train.State.RUN else null
 	if sw != null:
 		hud.set_switch_info(true, "Weiche: " + _switch_text(sw))
@@ -534,8 +548,6 @@ func _tile_at(screen_pos: Vector2) -> Variant:
 
 
 func _unhandled_input(e: InputEvent) -> void:
-	if OS.is_debug_build() and e is InputEventScreenTouch and OS.get_cmdline_user_args().has("--debug"):
-		print("[input] touch ", (e as InputEventScreenTouch).position, " pressed=", (e as InputEventScreenTouch).pressed, " mode=", mode, " dlg=", hud.has_dialog())
 	if world == null or mode == Mode.MENU or hud.has_dialog():
 		return
 	if e is InputEventMouseButton:

@@ -69,10 +69,11 @@ func setup(w: World) -> void:
 	# Dampfwolken
 	var qm := QuadMesh.new()
 	qm.size = Vector2(1, 1)
-	qm.material = Mats.get_mat("puff")
 	for i in 22:
 		var mi := MeshInstance3D.new()
 		mi.mesh = qm
+		# eigenes Material je Wolke: Ausblenden über die Deckkraft funktioniert in jedem Renderer
+		mi.material_override = (Mats.get_mat("puff") as StandardMaterial3D).duplicate()
 		mi.visible = false
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.top_level = true
@@ -363,7 +364,7 @@ func _scan() -> void:
 	var dir := move_dir()
 	if dir == 0:
 		return
-	var look := 8.0 + absf(speed) * 2.4
+	var look := 6.5 + absf(speed) * 2.0
 	var res := walk(head if dir > 0 else tail, look * dir, false)
 	ahead = res["entered"]
 	if res["end"] and not res["buffer"]:
@@ -419,4 +420,4 @@ func _update_puffs(dt: float) -> void:
 		n.global_position += (p["vel"] as Vector3) * dt
 		var sz: float = p["size"] * (0.5 + 2.4 * k)
 		n.scale = Vector3(sz, sz, sz)
-		n.transparency = clampf(0.15 + k * k * 0.85, 0.0, 1.0)
+		(n.material_override as StandardMaterial3D).albedo_color = Color(1, 1, 1, 1.0 - clampf(0.15 + k * k * 0.85, 0.0, 1.0))

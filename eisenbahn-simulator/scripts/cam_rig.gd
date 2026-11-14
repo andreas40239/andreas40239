@@ -77,10 +77,10 @@ func fit(world_w: float, world_h: float, aspect: float) -> void:
 	focus = Vector3(world_w * 0.5, 0, world_h * 0.5)
 	bounds = Rect2(0, 0, world_w, world_h)
 	var diag := (world_w + world_h) * 0.7071
-	var need_h := diag * sin(ELEV) + 6.0
+	var need_h := diag * sin(ELEV) + 3.0
 	var need_w := diag + 4.0
 	# Platz für die Leisten oben (ca. 10 %) und unten (ca. 18 %) freihalten
-	zoom = maxf(need_h / 0.72, need_w / aspect)
+	zoom = maxf(need_h / 0.8, need_w / aspect)
 	zoom_max = zoom * 1.25
 	zoom = clampf(zoom, zoom_min, zoom_max)
 	# Spielfeld etwas nach oben rücken (untere Leiste ist höher)
@@ -116,8 +116,9 @@ func _apply(dt: float) -> void:
 		var fwd := -tb.z * target_dir
 		var tp := target.global_position
 		if mode == Mode.CHASE:
-			var want_pos := tp - fwd * 9.5 + Vector3(0, 5.2, 0)
-			var want_look := tp + fwd * 5.0 + Vector3(0, 1.2, 0)
+			var side := fwd.cross(Vector3.UP).normalized()
+			var want_pos := tp - fwd * 13.5 + side * 4.2 + Vector3(0, 6.6, 0)
+			var want_look := tp + fwd * 2.5 + Vector3(0, 1.0, 0)
 			if not _chase_init:
 				_chase_pos = want_pos
 				_chase_look = want_look
@@ -128,13 +129,13 @@ func _apply(dt: float) -> void:
 			cam.global_position = _chase_pos
 			cam.look_at(_chase_look, Vector3.UP)
 		else:
-			var want_look := tp + fwd * 14.0 + Vector3(0, 1.0, 0)
+			var want_look := tp + fwd * 14.0 + Vector3(0, 1.3, 0)
 			if not _chase_init:
 				_chase_look = want_look
 				_chase_init = true
 			_chase_look = _chase_look.lerp(want_look, clampf(dt * 6.0, 0.0, 1.0))
 			# Blick über das Führerhausdach nach vorn (rückwärts: vom Kohlenkasten nach hinten)
-			var off := Vector3(0, 2.5, 0.75) if target_dir > 0.0 else Vector3(0, 2.5, 1.2)
+			var off := Vector3(0, 2.42, 0.1) if target_dir > 0.0 else Vector3(0, 2.5, 1.5)
 			cam.global_position = target.global_transform * off
 			cam.look_at(_chase_look, Vector3.UP)
 

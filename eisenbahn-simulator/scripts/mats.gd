@@ -71,7 +71,6 @@ static func _build() -> void:
 	puff.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	puff.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	puff.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	puff.vertex_color_use_as_albedo = true
 	puff.billboard_keep_scale = true
 	puff.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_m["puff"] = puff
