@@ -1,0 +1,9 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+# Build-Ausgaben
+/build/
+*.apk
+*.aab
+*.idsig
