@@ -1,0 +1,6 @@
+.godot/
+*.tmp
+/android/
+*.keystore
+/build/*.idsig
+__pycache__/
