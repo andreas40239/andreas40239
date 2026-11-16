@@ -1,5 +1,6 @@
 extends Node
-## Kopflose Pruefung der Level 1-10 gegen die Levelprogression (GDD Abschnitt 5 und 6).
+## Kopflose Pruefung der Level 1-15 gegen die Levelprogression (GDD Abschnitt 5 und 6;
+## Level 11-15 sind eine Zugabe mit eigenen Werten).
 ##
 ## Start:  godot --headless --path . --fixed-fps 60 res://tests/level_test.tscn
 ## Beendet sich mit Exit-Code 0 (alles gruen) oder 1 (mindestens ein Fehler).
@@ -24,7 +25,15 @@ const TABLE := [
 	[T.NACHT, 4, 2, 1, 2, 2, "wenig"],
 	[T.NACHT, 5, 2, 1, 3, 3, "wenig"],
 	[T.NACHT, 5, 2, 1, 3, 3, "wenig"],
+	# Zugabe: Kiosk, Markisentreppe, lange Leitung, Dachmarathon, Finale
+	[T.TAG, 3, 2, 1, 2, 2, "mittel"],
+	[T.TAG, 4, 2, 1, 3, 2, "mittel"],
+	[T.DAEMMERUNG, 5, 2, 1, 3, 3, "wenig"],
+	[T.NACHT, 5, 2, 2, 3, 3, "wenig"],
+	[T.NACHT, 6, 2, 2, 4, 3, "wenig"],
 ]
+## Level mit Stromleitungen zum Balancieren.
+const WIRE_LEVELS := [5, 7, 8, 9, 10, 13, 15]
 const DENSITY := {"viel": 1.5, "mittel": 1.0, "wenig": 0.6}
 ## GDD Abschnitt 13: nur wenige echte Lichtquellen je Level.
 const MAX_LIGHTS := 6
@@ -104,8 +113,14 @@ func _test_level(number: int) -> void:
 	var night := data.time_of_day == T.NACHT and number >= 7
 	_check((level.get_node_or_null("Nachtsicht") != null) == night,
 		"L%d Sicht %s" % [number, "eingeschraenkt" if night else "frei"])
-	if number >= 5 and number != 6:
+	if WIRE_LEVELS.has(number):
 		_check(level.get_node("Leitungen").get_child_count() >= 1, "L%d hat Leitungen zum Balancieren" % number)
+	if number == 11:
+		var kiosks := 0
+		for part in level.get_node("Welt").get_children():
+			if part is AssetPiece and part.kind == AssetKit.Kind.PERIPTERO:
+				kiosks += 1
+		_check(kiosks >= 2, "L11 fuehrt den Kiosk als Stufe ein (%d)" % kiosks)
 	if number >= 2:
 		var gaps := 0
 		for part in level.get_node("Welt").get_children():

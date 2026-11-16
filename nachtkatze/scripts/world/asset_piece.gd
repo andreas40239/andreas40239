@@ -29,6 +29,13 @@ class_name AssetPiece
 		yaw_degrees = value
 		_apply()
 
+## Farbton des Bauteils (AssetKit.FARBTOENE) - gibt ganzen Haeusern eine
+## eigene Putzfarbe.
+@export_range(0, 5) var farbton: int = 0:
+	set(value):
+		farbton = value
+		_apply()
+
 func _ready() -> void:
 	_apply()
 
@@ -39,7 +46,7 @@ func _apply() -> void:
 	if mesh_instance == null:
 		return
 	mesh_instance.mesh = AssetKit.get_mesh(kind, tiles)
-	mesh_instance.material_override = AssetKit.get_material()
+	mesh_instance.material_override = AssetKit.get_tinted_material(farbton)
 	mesh_instance.rotation.y = deg_to_rad(yaw_degrees)
 	_rebuild_collision()
 

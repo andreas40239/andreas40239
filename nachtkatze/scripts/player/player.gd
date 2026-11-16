@@ -51,7 +51,6 @@ const GRAB_COOLDOWN := 0.35
 const BALANCE_SPEED := 2.8
 ## Wie weit die Pfoten beim Aufsetzen neben der Leitung liegen duerfen.
 const BALANCE_CATCH := 0.12
-const BALANCE_WOBBLE := 0.09
 
 # --- Treffer (GDD Abschnitt 3) ---------------------------------------------
 const INVULNERABLE_TIME := 1.0
@@ -79,6 +78,8 @@ var facing: float = 1.0
 var is_invulnerable: bool = false
 
 @onready var visual: Node3D = $Visual
+## Die sichtbare Katze mit ihren Animationen (GDD Abschnitt 10).
+var rig: CreatureRig = null
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var climb_sensor: Area3D = $ClimbSensor
 
@@ -114,6 +115,10 @@ var _scratch_timer := 0.0
 
 func _ready() -> void:
 	add_to_group("player")
+	rig = CreatureRig.new()
+	rig.name = "Figur"
+	visual.add_child(rig)
+	rig.setup(CreatureRig.Preset.SPIELERKATZE)
 	health = max_health
 	_spawn_position = global_position
 	_last_safe_position = global_position
@@ -147,6 +152,7 @@ func _physics_process(delta: float) -> void:
 	_track_safe_position(delta)
 	if global_position.y < fall_limit_y:
 		_on_fell_out_of_level()
+	_update_animation()
 
 # --- Zustaende --------------------------------------------------------------
 
@@ -178,6 +184,7 @@ func _process_ground_and_air(delta: float, move_input: Vector2) -> void:
 		if not on_floor and fall_speed > LANDING_SOUND_SPEED:
 			Sfx.play(&"landung", clampf((fall_speed - 8.0) * 0.6, -6.0, 3.0))
 			_step_timer = STEP_INTERVAL
+			rig.trigger(&"land")
 		_set_state(State.RUN if absf(velocity.x) > 0.1 else State.IDLE)
 		_update_steps(delta)
 	else:
@@ -267,9 +274,8 @@ func _process_balance(delta: float, move_input: Vector2) -> void:
 	global_position.x = next_x
 	global_position.y = _active_wire.height_at(next_x) + _half_height()
 
-	# Leichtes Schwanken zeigt, dass es wackelig ist.
+	# Das Schwanken und der ausgleichende Schwanz kommen aus der Animation.
 	_balance_time += delta
-	visual.rotation.z = sin(_balance_time * 5.0) * BALANCE_WOBBLE
 	_update_steps(delta * 0.8)
 
 func _process_hang(_delta: float, move_input: Vector2) -> void:
@@ -441,6 +447,41 @@ func _update_scratching(delta: float) -> void:
 		_scratch_timer = SCRATCH_INTERVAL
 		Sfx.play(&"kratzen", -2.0)
 
+## Waehlt die Animation passend zum Zustand (GDD Abschnitt 10).
+func _update_animation() -> void:
+	if rig == null:
+		return
+	rig.vertical_speed = velocity.y
+	rig.move_speed = absf(velocity.x) / RUN_SPEED
+	match state:
+		State.IDLE:
+			rig.play(&"idle")
+		State.RUN:
+			rig.play(&"run")
+		State.AIR:
+			rig.play(&"jump")
+		State.CLIMB:
+			rig.climb_speed = velocity.y / CLIMB_SPEED
+			rig.play(&"climb")
+		State.HANG:
+			rig.play(&"hang")
+		State.MANTLE:
+			rig.play(&"mantle")
+		State.HURT:
+			rig.play(&"hurt")
+		State.DEAD:
+			rig.play(&"dead")
+		State.VICTORY:
+			rig.play(&"victory")
+		State.BALANCE:
+			rig.move_speed = absf(velocity.x) / BALANCE_SPEED
+			rig.play(&"balance")
+
+## Kurzes Fressen - vom Futter ausgeloest.
+func play_eat() -> void:
+	if rig != null:
+		rig.trigger(&"eat")
+
 func _lock_z_axis() -> void:
 	# GDD Abschnitt 8: nur eine Spielebene, Z-Achse der Figur gesperrt.
 	global_position.z = 0.0
@@ -550,9 +591,13 @@ func _on_fell_out_of_level() -> void:
 		_start_invulnerability()
 
 ## Levelziel erreicht: Siegeszustand, keine Steuerung mehr (GDD Abschnitt 12).
-func win() -> void:
+## look_at_x: wohin sich die Katze setzt - zum Napf gewandt.
+func win(look_at_x: float = NAN) -> void:
 	if state == State.DEAD:
 		return
+	if not is_nan(look_at_x) and not is_equal_approx(look_at_x, global_position.x):
+		facing = signf(look_at_x - global_position.x)
+		visual.rotation.y = 0.0 if facing > 0.0 else PI
 	velocity = Vector3.ZERO
 	is_invulnerable = true
 	_invulnerable_timer = 9999.0

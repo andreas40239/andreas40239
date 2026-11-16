@@ -1,6 +1,6 @@
 # Nachtkatze – Anforderungen an Grafik-Assets
 
-Stand: 2026-09-22
+Stand: 2026-09-22 (Nachtrag 2026-11-16: Die Grafik ist inzwischen vollständig prozedural im Projekt entstanden – Kit nach Athener Vorbild, Figuren und Animationen, siehe `nachtkatze/README.md`. Dieses Dokument gilt weiter, falls einzelne Teile später durch gezeichnete Modelle ersetzt werden sollen.)
 
 Die Assets ersetzen ein prozedurales Low-Poly-Kit, das bereits im Spiel steht. Wer sie baut, muss drei Dinge treffen: das Maßraster (1 Einheit = 1 m, Module zu 2 und 4 m), den Pivot je Bauteiltyp und den Farbweg über Vertex-Farben statt Texturen.
 

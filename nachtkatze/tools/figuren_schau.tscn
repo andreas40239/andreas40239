@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://tools/figuren_schau.gd" id="1_schau"]
+
+[sub_resource type="Environment" id="Environment_schau"]
+background_mode = 1
+background_color = Color(0.78, 0.84, 0.9, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.76, 0.86, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 3
+
+[node name="FigurenSchau" type="Node3D"]
+script = ExtResource("1_schau")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_schau")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8779, 0.3733, -0.2999, -0, 0.6262, 0.7796, 0.4789, -0.6845, 0.5498, 0, 14, 0)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, -2.4, 12)
+projection = 1
+size = 7.4

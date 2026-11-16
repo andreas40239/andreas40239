@@ -45,6 +45,7 @@ func _on_body_entered(body: Node3D) -> void:
 		player.heal_full()
 	else:
 		player.heal(1)
+	player.play_eat()
 	Sfx.play(&"knuspern", 2.0 if kind == Kind.GANZER_FISCH else 0.0)
 	collected.emit(kind)
 	set_deferred("monitoring", false)
@@ -58,15 +59,11 @@ func _apply() -> void:
 	if collision == null or mesh_instance == null:
 		return
 	var is_big := kind == Kind.GANZER_FISCH
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = Vector3(0.45, 0.12, 0.12) if not is_big else Vector3(0.55, 0.26, 0.2)
-	mesh_instance.mesh = box_mesh
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.95, 0.95, 0.88) if not is_big else Color(0.55, 0.78, 0.95)
-	material.emission_enabled = true
-	material.emission = material.albedo_color
-	material.emission_energy_multiplier = 0.35
-	mesh_instance.set_surface_override_material(0, material)
+	mesh_instance.mesh = AssetKit.get_mesh(
+		AssetKit.Kind.GANZER_FISCH if is_big else AssetKit.Kind.FISCHGRAETE)
+	mesh_instance.material_override = AssetKit.get_character_material()
+	# Etwas vergroessert, damit Futter auch aus der Ferne auffaellt.
+	mesh_instance.scale = Vector3.ONE * (1.25 if is_big else 1.35)
 	var shape := SphereShape3D.new()
 	shape.radius = 0.45
 	collision.shape = shape

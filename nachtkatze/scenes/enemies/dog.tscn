@@ -1,15 +1,6 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/dog.gd" id="1_dog"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_koerper"]
-size = Vector3(0.62, 0.3, 0.3)
-
-[sub_resource type="BoxMesh" id="BoxMesh_kopf"]
-size = Vector3(0.26, 0.24, 0.24)
-
-[sub_resource type="BoxMesh" id="BoxMesh_rute"]
-size = Vector3(0.22, 0.07, 0.07)
 
 [sub_resource type="BoxMesh" id="BoxMesh_warnbalken"]
 size = Vector3(0.07, 0.2, 0.07)
@@ -30,19 +21,8 @@ script = ExtResource("1_dog")
 
 [node name="Visual" type="Node3D" parent="."]
 
-[node name="Koerper" type="MeshInstance3D" parent="Visual"]
-mesh = SubResource("BoxMesh_koerper")
-
-[node name="Kopf" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 0.15, 0)
-mesh = SubResource("BoxMesh_kopf")
-
-[node name="Rute" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.38, 0.14, 0)
-mesh = SubResource("BoxMesh_rute")
-
 [node name="WarnZeichen" type="Node3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.62, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.34, 0.5, 0)
 visible = false
 
 [node name="Balken" type="MeshInstance3D" parent="Visual/WarnZeichen"]

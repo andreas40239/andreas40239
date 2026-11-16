@@ -74,6 +74,7 @@ func _physics_process(delta: float) -> void:
 
 	_lock_z_axis()
 	move_and_slide()
+	_update_animation()
 
 # --- Zustaende --------------------------------------------------------------
 
@@ -173,10 +174,32 @@ func _enter(new_state: State, duration: float) -> void:
 	_play_state_sound(new_state)
 	if new_state != State.WARNUNG:
 		_set_warning_visible(false)
-	if visual != null:
-		# Schlafender Hund liegt flach, wacher Hund steht.
-		var lying := new_state == State.SCHLAFEN
-		visual.scale = Vector3(1.0, 0.55, 1.0) if lying else Vector3.ONE
+
+## Animation je Zustand (GDD Abschnitt 10): Schlafen, Ruhen, Patrouille,
+## Warnung, Jagen, Bellen nach oben, Rueckkehr.
+func _update_animation() -> void:
+	if rig == null:
+		return
+	var params: Dictionary = PARAMS[dog_size]
+	match state:
+		State.SCHLAFEN:
+			rig.play(&"sleep")
+		State.RUHEN:
+			rig.play(&"rest")
+		State.PATROUILLE:
+			rig.move_speed = absf(velocity.x) / float(params["patrol_speed"])
+			rig.play(&"walk")
+		State.WARNUNG:
+			rig.play(&"warn")
+		State.JAGEN:
+			# In den Sprintpausen des kleinen Hundes steht er hechelnd da.
+			rig.move_speed = absf(velocity.x) / float(params["chase_speed"])
+			rig.play(&"chase" if absf(velocity.x) > 0.2 else &"rest")
+		State.BELLEN_NACH_OBEN:
+			rig.play(&"bark_up")
+		State.RUECKKEHR:
+			rig.move_speed = absf(velocity.x) / float(params["patrol_speed"])
+			rig.play(&"retreat")
 
 ## Warnung: der kleine Hund klaefft, der grosse knurrt (GDD Abschnitt 4).
 ## Bellen nach oben klingt beim kleinen Hund heller.
@@ -216,11 +239,5 @@ func _apply_size() -> void:
 		hit_collision.shape = hit_shape
 	if visual != null:
 		visual.scale = Vector3.ONE * params["scale"]
-	# Grosse Hunde sind dunkler - im Graubox-Level sonst kaum zu unterscheiden.
-	var body := get_node_or_null("Visual/Koerper") as MeshInstance3D
-	if body != null:
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.62, 0.45, 0.28) if dog_size == DogSize.KLEIN \
-			else Color(0.34, 0.29, 0.26)
-		material.roughness = 0.95
-		body.set_surface_override_material(0, material)
+	_build_rig(CreatureRig.Preset.KLEINER_HUND if dog_size == DogSize.KLEIN
+		else CreatureRig.Preset.GROSSER_HUND)

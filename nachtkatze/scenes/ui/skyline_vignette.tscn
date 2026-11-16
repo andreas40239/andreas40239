@@ -1,5 +1,7 @@
 [gd_scene load_steps=17 format=3]
 
+[ext_resource type="Script" path="res://scripts/ui/title_cat.gd" id="9_titlecat"]
+
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_daemmerung"]
 sky_top_color = Color(0.16, 0.13, 0.32, 1)
 sky_horizon_color = Color(0.82, 0.42, 0.26, 1)
@@ -170,30 +172,8 @@ surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
 
 [node name="Katze" type="Node3D" parent="."]
 transform = Transform3D(1.6, 0, 0, 0, 1.6, 0, 0, 0, 1.6, 6, 3.84, 1)
-
-[node name="Koerper" type="MeshInstance3D" parent="Katze"]
-mesh = SubResource("CapsuleMesh_katze")
-surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
-
-[node name="Kopf" type="MeshInstance3D" parent="Katze"]
-transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0.18, 0.22, 0)
-mesh = SubResource("CapsuleMesh_katze")
-surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
-
-[node name="OhrVorn" type="MeshInstance3D" parent="Katze"]
-transform = Transform3D(0.18, 0, 0, 0, 0.3, 0, 0, 0, 0.18, 0.24, 0.38, 0.05)
-mesh = SubResource("BoxMesh_schornstein")
-surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
-
-[node name="OhrHinten" type="MeshInstance3D" parent="Katze"]
-transform = Transform3D(0.18, 0, 0, 0, 0.3, 0, 0, 0, 0.18, 0.11, 0.38, -0.05)
-mesh = SubResource("BoxMesh_schornstein")
-surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
-
-[node name="Schwanz" type="MeshInstance3D" parent="Katze"]
-transform = Transform3D(0.1, -0.42, 0, 0.42, 0.1, 0, 0, 0, 0.28, -0.24, 0.06, 0)
-mesh = SubResource("CapsuleMesh_katze")
-surface_material_override/0 = SubResource("StandardMaterial3D_silhouette")
+script = ExtResource("9_titlecat")
+silhouette = SubResource("StandardMaterial3D_silhouette")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 12)

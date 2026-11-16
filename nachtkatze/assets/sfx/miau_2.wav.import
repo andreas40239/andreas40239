@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://6huiihrglgym"
-path="res://.godot/imported/miau.wav-4321c2f54e3388a60d234c4caecbd78b.sample"
+uid="uid://cd5kyjhvex8w2"
+path="res://.godot/imported/miau_2.wav-bf5a05bee04d65338d17bb57945dd016.sample"
 
 [deps]
 
-source_file="res://assets/sfx/miau.wav"
-dest_files=["res://.godot/imported/miau.wav-4321c2f54e3388a60d234c4caecbd78b.sample"]
+source_file="res://assets/sfx/miau_2.wav"
+dest_files=["res://.godot/imported/miau_2.wav-bf5a05bee04d65338d17bb57945dd016.sample"]
 
 [params]
 

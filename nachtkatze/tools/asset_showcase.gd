@@ -25,8 +25,18 @@ const GROUPS := [
 		AssetKit.Kind.OLIVENBAUM, AssetKit.Kind.OLEANDERBUSCH]},
 	{"name": "Untergrund", "kinds": [
 		AssetKit.Kind.STRASSEN_SEGMENT, AssetKit.Kind.MAUERSTUECK]},
+	{"name": "Athen - Fassaden", "kinds": [
+		AssetKit.Kind.GESCHOSS_BALKONTUER, AssetKit.Kind.GESCHOSS_FENSTER,
+		AssetKit.Kind.LADENZEILE, AssetKit.Kind.HAUSEINGANG]},
+	{"name": "Athen - Balkon und Dach", "kinds": [
+		AssetKit.Kind.MARKISE_OFFEN_GRUEN, AssetKit.Kind.BALKONPFLANZEN,
+		AssetKit.Kind.WAESCHELEINE, AssetKit.Kind.BLUMENTOPF, AssetKit.Kind.PERGOLA]},
+	{"name": "Athen - Strasse", "kinds": [
+		AssetKit.Kind.ORANGENBAUM, AssetKit.Kind.PERIPTERO, AssetKit.Kind.MUELLCONTAINER,
+		AssetKit.Kind.MUELLCONTAINER_BLAU, AssetKit.Kind.MOPED,
+		AssetKit.Kind.GEPARKTES_AUTO_SILBER]},
 	{"name": "Landmarken und Futter", "kinds": [
-		AssetKit.Kind.KIRCHTURM, AssetKit.Kind.TANKSTELLE,
+		AssetKit.Kind.KIRCHTURM, AssetKit.Kind.TANKSTELLE, AssetKit.Kind.AKROPOLIS,
 		AssetKit.Kind.FISCHGRAETE, AssetKit.Kind.GANZER_FISCH,
 		AssetKit.Kind.FUTTERNAPF]},
 ]

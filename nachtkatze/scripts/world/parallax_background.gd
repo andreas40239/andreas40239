@@ -51,11 +51,11 @@ func _build_layer_mesh(index: int, config: Dictionary) -> ArrayMesh:
 		0:
 			return BackgroundKit.mountains(width, 52.0, layer_seed)
 		1:
-			return BackgroundKit.city_blocks(width, 12.0, 26.0, 8.0,
-				Color(0.58, 0.62, 0.76, 0.0), layer_seed, true)
+			return BackgroundKit.city_blocks(width, 8.0, 17.0, 8.0,
+				Color(0.86, 0.86, 0.88, 0.0), layer_seed, true)
 		_:
 			return BackgroundKit.city_blocks(width, 7.0, 15.0, 6.0,
-				Color(0.68, 0.67, 0.74, 0.0), layer_seed, false)
+				Color(0.90, 0.87, 0.82, 0.0), layer_seed, false)
 
 func _follow() -> void:
 	if _target == null:

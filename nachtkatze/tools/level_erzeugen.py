@@ -12,6 +12,7 @@ Aufruf:  python3 nachtkatze/tools/level_erzeugen.py
 """
 import math
 import os
+import random
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -20,12 +21,15 @@ K = dict(GESCHOSS=0, BALKON=1, MARKISE_OFFEN=2, MARKISE_ZU=3, DACH=4, HAUS=5,
          SOLAR=6, SAT=7, ANTENNE=8, KLIMA=9, LATERNE=10, STROMMAST=11, LEITUNG=12,
          PARKAUTO=13, FAHRAUTO=14, ZAUN=15, ZAUN_LUECKE=16, TOR=17, KIEFER=18,
          ZYPRESSE=19, OLIVE=20, OLEANDER=21, KIRCHTURM=22, TANKSTELLE=23,
-         GRAETE=24, FISCH=25, NAPF=26, STRASSE=27, MAUER=28, REGENRINNE=29)
+         GRAETE=24, FISCH=25, NAPF=26, STRASSE=27, MAUER=28, REGENRINNE=29,
+         GESCHOSS_TUER=30, GESCHOSS_FENSTER=31, LADEN=32, EINGANG=33, MARKISE_GRUEN=34,
+         BALKONPFLANZEN=35, WAESCHE=36, BLUMENTOPF=37, PERGOLA=38, ORANGE=39, KIOSK=40,
+         CONTAINER=41, CONTAINER_BLAU=42, MOPED=43, PARKAUTO_SILBER=44, AKROPOLIS=45)
 
 def xform(x, y, z):
     return "transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %s, %s, %s)" % (x, y, z)
 
-def piece(name, parent, kind, x, y, z, tiles=1, solid=True, yaw=0.0):
+def piece(name, parent, kind, x, y, z, tiles=1, solid=True, yaw=0.0, tone=0):
     lines = ['[node name="%s" parent="%s" instance=ExtResource("piece")]' % (name, parent),
              xform(x, y, z), "kind = %d" % kind]
     if tiles != 1:
@@ -34,6 +38,8 @@ def piece(name, parent, kind, x, y, z, tiles=1, solid=True, yaw=0.0):
         lines.append("solid = false")
     if yaw:
         lines.append("yaw_degrees = %s" % yaw)
+    if tone:
+        lines.append("farbton = %d" % tone)
     return "\n".join(lines) + "\n"
 
 def node(name, parent, res, x, y, z, props=()):
@@ -367,6 +373,16 @@ class LevelBuilder:
         self.lamp_lights = 0
         ## Feste Hindernisse auf der Fahrbahn (x0, x1, Name) - Autos fahren nicht hindurch.
         self.street_obstacles = []
+        ## Hohe Hindernisse, die auch die Katze am Boden aufhalten (x0, x1, Oberkante).
+        self.barriers = []
+        ## Grundrisse der Haeuser (x0, x1) - dort steht Strassendeko vor der Fassade.
+        self.buildings = []
+        ## Fester Zufall je Level: gleiche Nummer, gleiche Dekoration.
+        self.rng = random.Random(number * 7919 + 13)
+        self.deco_spots = []
+        self.pending_lamps = []
+        self.trees = []
+        self.last_tone = -1
         self.goal = None
         self.start_x = 0.5
         self.end_x = 0.0
@@ -381,9 +397,9 @@ class LevelBuilder:
         self.used_names.add(name)
         return name
 
-    def add_piece(self, section, base, kind, x, y, z, tiles=1, solid=True, yaw=0.0):
+    def add_piece(self, section, base, kind, x, y, z, tiles=1, solid=True, yaw=0.0, tone=0):
         self.parts[section].append(piece(self.unique(base), section, K[kind], num(x), num(y),
-                                         num(z), tiles, solid, num(yaw) if yaw else 0.0))
+                                         num(z), tiles, solid, num(yaw) if yaw else 0.0, tone))
 
     def add_node(self, section, base, res, x, y, z, props=()):
         name = self.unique(base)
@@ -406,9 +422,26 @@ class LevelBuilder:
         self.street_obstacles.append((x - 2.5, x + 2.5, "Randhaus"))
 
     def facade(self, x0, tiles, floors, base="Fassade"):
+        """Athener Wohnblock: je Haus eine Putzfarbe, im Erdgeschoss Laeden und der
+        Hauseingang, darueber wechselnd Fenster, Rolllaeden und Balkontueren."""
+        # Nachbarhaeuser nie in derselben Farbe
+        tone = self.rng.choice([t for t in range(6) if t != self.last_tone])
+        self.last_tone = tone
+        entrance = self.rng.randrange(tiles)
+        self.buildings.append((x0, x0 + tiles * 4.0))
         for floor in range(floors):
-            self.add_piece("Welt", "%s%d" % (base, floor), "GESCHOSS", x0 + tiles * 2.0,
-                           floor * FLOOR, -1, tiles=tiles, solid=False)
+            for tile in range(tiles):
+                if floor == 0:
+                    kind = "EINGANG" if tile == entrance else \
+                        ("LADEN" if self.rng.random() < 0.6 else "GESCHOSS_FENSTER")
+                else:
+                    kind = self.rng.choice(["GESCHOSS", "GESCHOSS_TUER", "GESCHOSS_FENSTER",
+                                            "GESCHOSS_TUER"])
+                self.add_piece("Welt", "%s%d_" % (base, floor), kind, x0 + tile * 4.0 + 2.0,
+                               floor * FLOOR, -1, solid=False, tone=tone)
+
+    def in_building(self, x, margin=0.3):
+        return any(a - margin <= x <= b + margin for a, b in self.buildings)
 
     def roof(self, x0, x1, top, props=True):
         modules = int(round((x1 - x0) / 2.0))
@@ -420,7 +453,11 @@ class LevelBuilder:
                            solid=False)
             self.add_piece("Zierde", "Klimageraet", "KLIMA", x0 + width * 0.55, top, -0.9,
                            solid=False)
-            if width >= 12:
+            if width >= 12 and self.rng.random() < 0.5:
+                # Dachterrasse mit Pergola - typisch fuer Athens Flachdaecher
+                self.add_piece("Zierde", "Pergola", "PERGOLA", x0 + width * 0.8, top, -0.55,
+                               solid=False)
+            elif width >= 12:
                 self.add_piece("Zierde", "Antenne", "ANTENNE", x0 + width * 0.8, top, -0.7,
                                solid=False)
             else:
@@ -433,9 +470,27 @@ class LevelBuilder:
         self.platform("Balkon", xc - tiles, xc + tiles, top, "balkon")
         if awning:
             self.add_piece("Zierde", "Markise", "MARKISE_ZU", xc, top + 2.2, -0.8, solid=False)
+        self._dress_balcony(xc, top, tiles, awning)
 
-    def awning(self, xc, y):
-        self.add_piece("Welt", "MarkiseOffen", "MARKISE_OFFEN", xc, y, 0)
+    def _dress_balcony(self, xc, top, tiles, has_rolled_awning):
+        """Topfpflanzen, Waesche und ausgefahrene Markisen - alles hinter der
+        Spielebene, damit nichts die Katze verdeckt."""
+        slots = [xc - tiles + 1.0 + 2.0 * i for i in range(tiles)]
+        self.rng.shuffle(slots)
+        if self.rng.random() < 0.75:
+            self.add_piece("Zierde", "Balkonpflanzen", "BALKONPFLANZEN", slots[0], top, -0.92,
+                           solid=False)
+        if len(slots) > 1 and self.rng.random() < 0.45:
+            self.add_piece("Zierde", "Waesche", "WAESCHE", slots[1], top, -0.95, solid=False)
+        if not has_rolled_awning and self.rng.random() < 0.55:
+            kind = "MARKISE_GRUEN" if self.rng.random() < 0.6 else "MARKISE_OFFEN"
+            self.add_piece("Zierde", "Sonnenmarkise", kind, slots[-1], top + 2.15, -1.28,
+                           solid=False)
+
+    def awning(self, xc, y, green=False):
+        """Ausgefahrene Markise in der Spielebene - eine federnde Stufe."""
+        self.add_piece("Welt", "MarkiseOffen", "MARKISE_GRUEN" if green else "MARKISE_OFFEN",
+                       xc, y, 0)
         self.platform("Markise", xc - 1.1, xc + 1.1, y + 0.32, "markise")
 
     def gutter(self, x, y0, y1, direction, visual=True):
@@ -465,7 +520,27 @@ class LevelBuilder:
         else:
             self.add_piece("Welt", "Zaun", "ZAUN", x, 0, 0)
 
+    def dumpster(self, x, blue=False):
+        """Muellcontainer: Stufe fuer die Katze, Hindernis fuer Hunde."""
+        self.add_piece("Welt", "Muellcontainer", "CONTAINER_BLAU" if blue else "CONTAINER",
+                       x, 0, 0)
+        self.street_obstacles.append((x - 0.68, x + 0.68, "Muellcontainer"))
+        self.platform("Muellcontainer", x - 0.68, x + 0.68, 1.15, "container")
+
+    def kiosk(self, x):
+        """Periptero: sperrt die Strasse (auch fuer die Katze). Nur ueber sein
+        Dach geht es weiter - dafuer braucht es davor einen Muellcontainer."""
+        self.add_piece("Welt", "Kiosk", "KIOSK", x, 0, 0)
+        self.street_obstacles.append((x - 1.3, x + 1.3, "Kiosk"))
+        self.barriers.append((x - 0.8, x + 0.8, 2.6))
+        self.platform("Kiosk", x - 1.3, x + 1.3, 2.6, "kiosk")
+
     def parked_car(self, x):
+        if self.rng.random() < 0.5:
+            self.add_piece("Welt", "GeparktesAuto", "PARKAUTO_SILBER", x, 0, 0)
+            self.street_obstacles.append((x - 1.8, x + 1.8, "geparktes Auto"))
+            self.platform("GeparktesAuto", x - 1.8, x + 1.8, 1.4, "auto")
+            return
         self.add_piece("Welt", "GeparktesAuto", "PARKAUTO", x, 0, 0)
         self.street_obstacles.append((x - 1.8, x + 1.8, "geparktes Auto"))
         self.platform("GeparktesAuto", x - 1.8, x + 1.8, 1.4, "auto")
@@ -475,18 +550,55 @@ class LevelBuilder:
         self.street_obstacles.append((x - 1.0, x + 1.0, "Mauer"))
         self.platform("Mauer", x - 1.0, x + 1.0, 0.55, "mauer")
 
-    def lamp(self, x, light=False, z=-2.2):
-        self.add_piece("Zierde", "Laterne", "LATERNE", x, 0, z, solid=False)
-        if light and self.time != 0:
-            self.lamp_lights += 1
-            self.parts["Lichter"].append(
-                '[node name="%s" type="OmniLight3D" parent="Lichter"]\n%s\n'
-                'light_color = %s\nlight_energy = %s\nomni_range = 7.5\n'
-                % (self.unique("Laternenlicht"), xform(num(x + 0.62), 2.85, num(z + 0.9)),
-                   LAMP_COLOR, "2.2" if self.time == 2 else "1.4"))
+    def lamp(self, x, light=False, z=None):
+        """Laterne. Gesetzt wird sie erst beim Schreiben: dann stehen alle Haeuser
+        fest, und sie kommt vor die Fassade statt hinein."""
+        self.deco_spots.append(x)
+        self.pending_lamps.append((x, light, z))
+
+    def _place_lamps(self):
+        for x, light, z in self.pending_lamps:
+            if z is None:
+                z = -0.72 if self.in_building(x, 0.8) else -2.2
+            self.add_piece("Zierde", "Laterne", "LATERNE", x, 0, z, solid=False)
+            if light and self.time != 0:
+                self.lamp_lights += 1
+                self.parts["Lichter"].append(
+                    '[node name="%s" type="OmniLight3D" parent="Lichter"]\n%s\n'
+                    'light_color = %s\nlight_energy = %s\nomni_range = 7.5\n'
+                    % (self.unique("Laternenlicht"), xform(num(x + 0.62), 2.85, num(z + 0.9)),
+                       LAMP_COLOR, "2.2" if self.time == 2 else "1.4"))
+        self.pending_lamps = []
 
     def deco(self, kind, x, y=0.0, z=-2.5, yaw=0.0):
+        if y == 0.0:
+            self.deco_spots.append(x)
+            if z < -1.2 and kind in ("ZYPRESSE", "OLIVE", "KIEFER", "OLEANDER", "ORANGE"):
+                self.trees.append((kind, x))
         self.add_piece("Zierde", kind.capitalize(), kind, x, y, z, solid=False, yaw=yaw)
+
+    def dress_street(self):
+        """Strassendeko nach Zufall: Mopeds vor den Fassaden, Bitterorangen,
+        Zypressen und abgestellte Muellcontainer in den Luecken."""
+        x = 7.0
+        while x < self.end_x - 6.0:
+            spot = x + self.rng.uniform(-1.2, 1.2)
+            free = all(abs(spot - other) > 2.2 for other in self.deco_spots)
+            if free and self.in_building(spot, -0.6):
+                if self.rng.random() < 0.45:
+                    self.add_piece("Zierde", "Moped", "MOPED", spot, 0, -0.62, solid=False,
+                                   yaw=self.rng.choice([0, 0, 180]))
+                    self.deco_spots.append(spot)
+            elif free and not self.in_building(spot, 1.2):
+                roll = self.rng.random()
+                if roll < 0.6:
+                    self.add_piece("Zierde", "Orangenbaum", "ORANGE", spot, 0, -2.3, solid=False,
+                                   yaw=self.rng.uniform(0, 360))
+                elif roll < 0.8:
+                    self.add_piece("Zierde", "Container", self.rng.choice(["CONTAINER", "CONTAINER_BLAU"]),
+                                   spot, 0, -2.2, solid=False)
+                self.deco_spots.append(spot)
+            x += 5.5
 
     def wire(self, x0, spans, height=4.6):
         """Strommasten mit durchhaengenden Leitungen zum Balancieren (ab Level 5).
@@ -550,6 +662,7 @@ class LevelBuilder:
         self.boundary(-4.5)
         self.deco("ZYPRESSE", -1.0, z=-2.6)
         self.deco("OLEANDER", 3.0, z=-2.3, yaw=40)
+        self.deco("ORANGE", 7.0, z=-2.4, yaw=25)
         self.wall(5.0)
         self.lamp(2.2, light=True)
 
@@ -616,10 +729,13 @@ class LevelBuilder:
             if p["kind"] != "strasse":
                 result.append(dict(p, danger=False))
                 continue
-            cuts = sorted({p["x0"], p["x1"]} | {c for a, b in danger for c in (a, b)
+            walls = [(a, b) for a, b, _top in self.barriers]
+            cuts = sorted({p["x0"], p["x1"]} | {c for a, b in danger + walls for c in (a, b)
                                                  if p["x0"] < c < p["x1"]})
             for a, b in zip(cuts, cuts[1:]):
                 middle = (a + b) / 2.0
+                if any(lo <= middle <= hi for lo, hi in walls):
+                    continue   # hier steht ein Kiosk - keine Strasse
                 hot = any(lo <= middle <= hi for lo, hi in danger)
                 result.append(dict(p, x0=a, x1=b, danger=hot))
         return result
@@ -644,6 +760,11 @@ class LevelBuilder:
                         limit = 2.1 if (round(near, 2), round(q["y"], 2)) in ledge_at else 1.6
                         if dy <= limit:
                             edges[i].add(j)
+                    continue
+                # Ein Kiosk dazwischen ist zu hoch zum Ueberspringen.
+                lo, hi = min(p["x1"], q["x1"]), max(p["x0"], q["x0"])
+                if any(lo - 0.05 <= a and b <= hi + 0.05 and max(p["y"], q["y"]) + 1.7 < top
+                       for a, b, top in self.barriers):
                     continue
                 near = q["x0"] if q["x0"] >= p["x1"] else q["x1"]
                 has_ledge = (round(near, 2), round(q["y"], 2)) in ledge_at
@@ -683,6 +804,10 @@ class LevelBuilder:
                         and p["kind"] != "leitung":
                     problems.append("Kletterzone x=%s: %s im Weg (y=%s)"
                                     % (num(x), p["name"], num(p["y"])))
+        # Baeume gehoeren in die Luecken, nicht in die Haeuser.
+        for kind, x in self.trees:
+            if self.in_building(x, 0.4):
+                problems.append("%s bei x=%s steht im Haus" % (kind, num(x)))
         # Fahrende Autos: ihr Abschnitt muss frei von festen Hindernissen sein.
         for x_min, x_max in self.cars:
             for a, b, what in self.street_obstacles:
@@ -728,6 +853,8 @@ class LevelBuilder:
         problems = self.validate()
         if problems:
             raise SystemExit("Level %d: %s" % (self.number, "; ".join(problems)))
+        self._place_lamps()
+        self.dress_street()
         root = "Level%02d" % self.number
         exts = [("data", "Resource", "res://resources/levels/%s" % self.data_name())] + EXTS + [
             ("car", "PackedScene", "res://scenes/enemies/car.tscn"),
@@ -1148,8 +1275,216 @@ def level_10():
     return lv
 
 
+# --- Level 11-15: Zugabe ueber das GDD hinaus ---------------------------------
+
+def awning_stairs(lv, x0, base_y, green=False):
+    """Zwei ausgefahrene Markisen als Treppe ins naechste Geschoss.
+    x0: linke Kante des unteren Balkons (6 m breit); oben liegt der Balkon ab x0 + 9,2."""
+    lv.awning(x0 + 4.9, base_y + 0.78, green)
+    lv.awning(x0 + 7.6, base_y + 1.88, not green)
+
+
+def level_11():
+    """Tag, 3 Stockwerke, 2 kleine + 1 grosser Hund, 2 Katzen, 2 Autos.
+    Neu: Kiosk (Periptero) und Muellcontainer als Stufen."""
+    lv = LevelBuilder(11, "Am Periptero", 0, 3, 1.0)
+    lv.street(-8, 120)
+    lv.start_area()
+    x = lv.row_block(9, 3, 2, [(1, 11, 2), (1, 18, 3)], mid_gutters=[(14, 0, 3, 1)])
+    lv.dog(16, patrol=3.0)
+    lv.car(8, 21, direction=-1, pause=8.0)
+    lv.food(11, 3)
+    lv.food(16, 0)
+    # Der Kiosk sperrt die Strasse: ueber den Container aufs Kioskdach, von dort
+    # auf den ersten Balkon.
+    lv.dumpster(23.4)
+    lv.kiosk(25.8)
+    lv.food(25.8, 2.6)
+    x = lv.row_block(28.5, 4, 3, [(1, 31.5, 3), (1, 39.5, 3), (2, 35.5, 2)],
+                     mid_gutters=[(35.5, 0, 3, 1), (33.0, 3, 6, 1)])
+    lv.cat(36.5, 9, half_width=3.0)
+    lv.food(36.5, 9, whole=True)
+    lv.food(35.5, 6)
+    lv.dog(38, big=True, patrol=2.5)
+    lv.car(29, 43.5, direction=1, pause=9.0)
+    lv.fence(46.5, with_gap=True)
+    lv.dumpster(49.6, blue=True)
+    lv.kiosk(52.0)
+    x = lv.row_block(54.7, 3, 2, [(1, 56.7, 2), (1, 63.7, 3)], mid_gutters=[(59.7, 0, 3, 1)])
+    lv.cat(60.7, 6, half_width=2.5)
+    lv.dog(62, patrol=3.0)
+    lv.food(56.7, 3)
+    lv.food(64, 3)
+    lv.food(62, 0)
+    lv.parked_car(70.5)
+    lv.food(70.5, 1.4)
+    x = lv.tower(76, 3)
+    lv.end_area(x)
+    return lv
+
+
+def level_12():
+    """Tag, 4 Stockwerke, 2 kleine + 1 grosser Hund, 3 Katzen, 2 Autos.
+    Neu: Markisentreppen - ausgefahrene Markisen fuehren von Geschoss zu Geschoss."""
+    lv = LevelBuilder(12, "Markisentreppe", 0, 4, 1.0)
+    lv.street(-8, 124)
+    lv.start_area()
+    # Block A: vom ersten Balkon ueber zwei Markisen in den zweiten Stock
+    x = lv.row_block(9, 4, 3, [(1, 12, 3), (2, 20.2, 2)], mid_gutters=[(15.6, 0, 3, -1)])
+    awning_stairs(lv, 9, 3)
+    lv.dog(14, patrol=3.0)
+    lv.cat(17, 9, half_width=3.5)
+    lv.car(8, 23.5, direction=-1, pause=8.0)
+    lv.food(11, 3)
+    lv.food(16.6, 5.2)
+    lv.food(20.2, 6)
+    # Markise als Bruecke zum Nachbarhaus
+    lv.awning(24.6, 5.4)
+    x = lv.row_block(27, 3, 4, [(2, 29, 2), (1, 36, 3), (3, 36.4, 2)],
+                     mid_gutters=[(32.4, 0, 3, 1)])
+    lv.awning(30.1, 6.78, green=True)
+    lv.awning(32.8, 7.88)
+    lv.cat(33, 12, half_width=3.0)
+    lv.food(33, 12, whole=True)
+    lv.food(36.4, 9)
+    lv.dog(35, big=True, patrol=2.5)
+    lv.awning(40.4, 2.9, green=True)
+    x = lv.row_block(42.6, 4, 3, [(1, 45.6, 3), (2, 53.8, 2)], mid_gutters=[(49.2, 0, 3, -1)])
+    awning_stairs(lv, 42.6, 3, green=True)
+    lv.cat(50.6, 9, half_width=3.5)
+    lv.dog(50.6, patrol=3.0)
+    lv.car(41, 58, direction=1, pause=9.0)
+    lv.food(45.6, 3)
+    lv.food(53.8, 6)
+    lv.parked_car(62)
+    lv.food(62, 1.4)
+    x = lv.tower(68, 4)
+    lv.end_area(x)
+    return lv
+
+
+def level_13():
+    """Daemmerung, 5 Stockwerke, 2 kleine + 1 grosser Hund, 3 Katzen, 3 Autos.
+    Neu: die lange Leitung - vier Spannfelder am Stueck."""
+    lv = LevelBuilder(13, "Der lange Draht", 1, 5, 0.6, sun=DUSK_SUN)
+    lv.street(-8, 136)
+    lv.start_area()
+    x = lv.row_block(9, 3, 3, [(1, 11, 2), (1, 18, 3), (2, 15, 2)],
+                     mid_gutters=[(14, 0, 3, 1), (12.6, 3, 6, 1)])
+    lv.cat(15, 9, half_width=3.0)
+    lv.dog(17, patrol=3.0)
+    lv.car(8, 20, direction=-1, pause=8.0)
+    lv.food(15, 6)
+    lv.lamp(20, light=True)
+    lv.wire(22, 4)
+    lv.dog(30, big=True, patrol=2.5)
+    lv.dog(44, patrol=3.0)
+    lv.food(26, 4.35)
+    lv.food(42, 4.35, whole=True)
+    lv.lamp(38.8, light=True)
+    x = lv.row_block(55, 3, 4, [(1, 57, 2), (1, 64, 3), (2, 61, 2), (3, 57, 2)],
+                     mid_gutters=[(60, 0, 3, 1), (58.6, 3, 6, 1), (59.6, 6, 9, -1)])
+    lv.ledge(55, 3, -1)
+    lv.cat(61, 12, half_width=3.0)
+    lv.food(57, 9)
+    lv.car(56, 74, direction=-1, pause=8.5)
+    x = lv.row_block(70, 3, 3, [(1, 72, 2), (1, 79, 3), (2, 76, 2)],
+                     mid_gutters=[(75, 0, 3, 1), (73.6, 3, 6, 1)])
+    lv.cat(76, 9, half_width=2.8)
+    lv.food(79, 3)
+    lv.lamp(83.5, light=True)
+    lv.parked_car(86)
+    lv.car(90, 106, direction=1, pause=9.0)
+    x = lv.tower(92, 5)
+    lv.end_area(x)
+    return lv
+
+
+def level_14():
+    """Nacht, 5 Stockwerke, 2 kleine + 2 grosse Hunde, 3 Katzen, 3 Autos.
+    Neu: Dachmarathon - vier Daecher in Folge, die Luecken werden breiter."""
+    lv = LevelBuilder(14, "Über den Dächern", 2, 5, 0.6, view_radius=0.42, sun=NIGHT_SUN)
+    lv.street(-8, 120)
+    lv.start_area()
+    starts = [9.0, 23.4, 38.2, 53.2]     # Dachluecken 2,4 m, 2,8 m und 3 m
+    for x0 in starts:
+        lv.row_block(x0, 3, 3, [(1, x0 + 2, 2), (1, x0 + 9, 3), (2, x0 + 6, 2)],
+                     mid_gutters=[(x0 + 5, 0, 3, 1), (x0 + 3.6, 3, 6, 1)])
+    lv.cat(29.4, 9, half_width=3.0)
+    lv.cat(44.2, 9, half_width=2.5)
+    lv.cat(59.2, 9, half_width=3.0)
+    lv.dog(16, patrol=3.0)
+    lv.dog(30, big=True, patrol=2.5)
+    lv.dog(45, patrol=3.0)
+    lv.dog(59, big=True, patrol=2.5)
+    lv.car(8, 21, direction=-1, pause=8.0)
+    lv.car(24, 50, direction=1, pause=9.0)
+    lv.car(52, 65.5, direction=-1, pause=8.5)
+    lv.food(15, 9)
+    lv.food(44.2, 9, whole=True)
+    lv.food(59.2, 6)
+    lv.food(32.4, 3)
+    lv.lamp(22.2, light=True)
+    lv.lamp(37, light=True)
+    lv.lamp(51.6, light=True)
+    lv.lamp(67, light=True)
+    lv.parked_car(70)
+    x = lv.tower(74, 5)
+    lv.end_area(x)
+    lv.deco("TANKSTELLE", 22, z=-10)
+    return lv
+
+
+def level_15():
+    """Nacht, 6 Stockwerke, 2 kleine + 2 grosse Hunde, 4 Katzen, 3 Autos.
+    Grosses Finale: alles zusammen, das Ziel mit Blick auf die Akropolis."""
+    lv = LevelBuilder(15, "Akropolis bei Nacht", 2, 6, 0.6, view_radius=0.45, sun=NIGHT_SUN)
+    lv.street(-8, 132)
+    lv.start_area()
+    # Markisentreppe
+    x = lv.row_block(9, 4, 3, [(1, 12, 3), (2, 20.2, 2)], mid_gutters=[(15.6, 0, 3, -1)])
+    awning_stairs(lv, 9, 3)
+    lv.cat(17, 9, half_width=3.5)
+    lv.dog(14, patrol=3.0)
+    lv.car(8, 23, direction=-1, pause=8.0)
+    lv.food(16.6, 5.2)
+    lv.lamp(24.4, light=True)
+    # Kiosk
+    lv.dumpster(27.0)
+    lv.kiosk(29.4)
+    x = lv.row_block(32.1, 3, 4, [(1, 34.1, 2), (1, 41.1, 3), (2, 38.1, 2), (3, 34.1, 2)],
+                     mid_gutters=[(37.1, 0, 3, 1), (35.7, 3, 6, 1), (36.7, 6, 9, -1)])
+    lv.cat(38, 12, half_width=3.0)
+    lv.dog(39, big=True, patrol=2.5)
+    lv.car(33, 44, direction=1, pause=9.0)
+    lv.food(34.1, 9)
+    # Lange Leitung ueber zwei Hunden
+    lv.wire(46, 3)
+    lv.dog(52, patrol=3.0)
+    lv.dog(63, big=True, patrol=2.5)
+    lv.food(58, 4.35, whole=True)
+    lv.lamp(57, light=True)
+    # Zwei hohe Daecher mit breiter Luecke
+    x = lv.row_block(71, 3, 4, [(1, 73, 2), (1, 80, 3), (2, 77, 2), (3, 73, 2)],
+                     mid_gutters=[(76, 0, 3, 1), (74.6, 3, 6, 1), (75.6, 6, 9, -1)])
+    lv.ledge(71, 3, -1)
+    lv.cat(77, 12, half_width=2.8)
+    x = lv.row_block(86, 3, 4, [(1, 88, 2), (1, 95, 3), (2, 92, 2)],
+                     mid_gutters=[(91, 0, 3, 1), (89.6, 3, 6, 1)])
+    lv.cat(92, 12, half_width=3.0)
+    lv.food(92, 12)
+    lv.food(95, 3)
+    lv.car(72, 98, direction=-1, pause=8.5)
+    lv.lamp(99.6, light=True)
+    x = lv.tower(102, 6, food_every=3)
+    lv.end_area(x)
+    # Die angestrahlte Akropolis ueber den Daechern - der Blick vom Ziel
+    lv.add_piece("Zierde", "Akropolis", "AKROPOLIS", 132, 4, -46, solid=False)
+    return lv
+
+
 LEVELS = [level_01, level_02, level_03, level_04, level_05, level_06, level_07, level_08,
-          level_09, level_10]
+          level_09, level_10, level_11, level_12, level_13, level_14, level_15]
 
 
 def write_catalog(count):

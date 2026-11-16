@@ -40,6 +40,14 @@ func _ready() -> void:
 		await _capture_menus()
 		get_tree().quit()
 		return
+	if OS.get_cmdline_user_args().has("ansicht"):
+		await _capture_view()
+		get_tree().quit()
+		return
+	if OS.get_cmdline_user_args().has("figuren"):
+		await _capture_figures()
+		get_tree().quit()
+		return
 	if OS.get_cmdline_user_args().has("levels"):
 		await _capture_levels()
 		get_tree().quit()
@@ -122,6 +130,51 @@ func _capture_levels() -> void:
 		await _save_frame("level_%02d_b_uebersicht" % number)
 		level.free()
 		await get_tree().process_frame
+
+## Spielansicht an einer bestimmten Stelle, mit Gegnern:
+## "-- ansicht <Level> <x> <y> [Sekunden]", mehrere Vierergruppen moeglich.
+func _capture_view() -> void:
+	var values: Array[float] = []
+	for arg in OS.get_cmdline_user_args():
+		if arg.is_valid_float():
+			values.append(float(arg))
+	var index := 0
+	while index + 3 < values.size() + 1 and index + 2 < values.size():
+		var number := int(values[index])
+		var spot := Vector3(values[index + 1], values[index + 2], 0.0)
+		var seconds := values[index + 3] if index + 3 < values.size() else 1.0
+		index += 4
+		var level: Node = load("res://scenes/levels/level_%02d.tscn" % number).instantiate()
+		get_tree().root.add_child(level)
+		await get_tree().physics_frame
+		var player: Node3D = level.get_node("Player")
+		player.global_position = spot
+		for i in int(seconds * 60.0):
+			await get_tree().physics_frame
+		await _save_frame("ansicht_%02d_%d_%d" % [number, int(spot.x), int(spot.y)])
+		level.free()
+		await get_tree().process_frame
+
+## Alle Figuren in allen Animationen, zu zwei Zeitpunkten und je Reihe gross.
+func _capture_figures() -> void:
+	var showcase: Node3D = load("res://tools/figuren_schau.tscn").instantiate()
+	get_tree().root.add_child(showcase)
+	for i in 30:
+		await get_tree().process_frame
+	showcase.trigger_overlays()
+	for i in 6:
+		await get_tree().process_frame
+	await _save_frame("figuren_0_alle")
+	var camera: Camera3D = showcase.get_node("Camera3D")
+	for row in showcase.row_nodes.size():
+		showcase.trigger_overlays()
+		camera.size = 2.6
+		for half in 2:
+			camera.position = Vector3(2.0 + float(half) * 4.6, -float(row) * showcase.ROW_SPACING - 0.15, 12)
+			if half == 1 and showcase.ROWS[row]["animations"].size() <= 4:
+				continue
+			await _save_frame("figuren_%d_%s" % [row + 1, "ab"[half]])
+	showcase.free()
 
 ## Startbild und Hauptmenue aufnehmen (GDD Abschnitt 12).
 func _capture_menus() -> void:

@@ -46,6 +46,7 @@ func _ready() -> void:
 	collision_mask = 2     # Spieler
 	monitoring = true
 	_player = get_tree().get_first_node_in_group("player") as Player
+	_build_body()
 	_engine = Sfx.make_loop_player(&"motor")
 	_engine.name = "Motor"
 	add_child(_engine)
@@ -108,11 +109,19 @@ func _place_ahead_of_player() -> void:
 	position.x = reference_x - float(drive_direction) * spawn_distance
 	if _has_street_limits():
 		position.x = clampf(position.x, street_min_x, street_max_x)
-	# Scheinwerfer zeigen in Fahrtrichtung.
-	if headlight != null:
-		headlight.position.x = absf(headlight.position.x) * float(drive_direction)
+	# Das ganze Auto dreht sich in Fahrtrichtung, die Scheinwerfer mit ihm.
 	if visual != null:
 		visual.rotation.y = 0.0 if drive_direction > 0 else PI
+
+## Karosserie aus dem Asset-Kit: ein gelbes Athener Taxi.
+func _build_body() -> void:
+	if visual == null or visual.has_node("Karosserie"):
+		return
+	var body := MeshInstance3D.new()
+	body.name = "Karosserie"
+	body.mesh = AssetKit.get_mesh(AssetKit.Kind.FAHRENDES_AUTO)
+	body.material_override = AssetKit.get_material()
+	visual.add_child(body)
 
 func _set_visible(value: bool) -> void:
 	if visual != null:

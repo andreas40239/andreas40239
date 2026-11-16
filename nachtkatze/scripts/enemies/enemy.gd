@@ -20,6 +20,8 @@ const MAX_FALL_SPEED := 20.0
 @export var hit_recovery_time: float = 1.5
 
 var home_position := Vector3.ZERO
+## Die sichtbare Figur mit ihren Animationen (GDD Abschnitt 10).
+var rig: CreatureRig = null
 
 var _player: Player = null
 var _warning_pulse := 0.0
@@ -39,6 +41,17 @@ func _ready() -> void:
 
 func _find_player() -> void:
 	_player = get_tree().get_first_node_in_group("player") as Player
+
+## Haengt die animierte Figur unter den Visual-Knoten.
+func _build_rig(preset: CreatureRig.Preset) -> void:
+	if visual == null:
+		return
+	if rig == null:
+		rig = CreatureRig.new()
+		rig.name = "Figur"
+		visual.add_child(rig)
+		visual.move_child(rig, 0)
+	rig.setup(preset)
 
 ## Von den abgeleiteten Skripten jeden Physikschritt aufrufen.
 func _tick_common(delta: float) -> void:

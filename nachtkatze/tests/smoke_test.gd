@@ -88,6 +88,12 @@ func _run_all() -> void:
 	await _test_car_street_section()
 	await _test_night_view()
 	await _test_test_mode()
+	await _test_creature_rigs()
+	await _test_player_animations()
+	await _test_enemy_animations()
+	await _test_athens_kit()
+	await _test_awning_stairs()
+	await _test_cat_recordings()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -519,7 +525,7 @@ func _test_car_is_jumpable() -> void:
 ## GDD Abschnitt 12: Levels werden nacheinander freigeschaltet.
 func _test_level_catalog() -> void:
 	_check(Game.catalog != null, "Levelkatalog ist geladen")
-	_check(Game.level_count() == 11, "Katalog kennt Tutorial und Level 1-10 (%d)" % Game.level_count())
+	_check(Game.level_count() == 16, "Katalog kennt Tutorial und Level 1-15 (%d)" % Game.level_count())
 	var all_present := true
 	for index in Game.level_count():
 		var data := Game.catalog.get_level(index)
@@ -708,7 +714,9 @@ func _test_asset_kit() -> void:
 		var box := mesh.get_aabb()
 		if faces < 4:
 			without_faces.append(AssetKit.kind_name(kind))
-		if box.size.length() < 0.08 or box.size.length() > 40.0:
+		# Die Akropolis ist als Landmarke absichtlich riesig.
+		var limit := 60.0 if kind == AssetKit.Kind.AKROPOLIS else 40.0
+		if box.size.length() < 0.08 or box.size.length() > limit:
 			odd_size.append("%s (%.2f m)" % [AssetKit.kind_name(kind), box.size.length()])
 		var ratio := _outward_normal_ratio(mesh)
 		worst_ratio = minf(worst_ratio, ratio)
@@ -1047,6 +1055,8 @@ func _test_balancieren() -> void:
 	await _wait(0.8)
 	_check(player.state == Player.State.BALANCE,
 		"Katze landet auf der Leitung und balanciert (Zustand %d)" % player.state)
+	await _wait(0.2)
+	_check(player.rig.animation == &"balance", "Balancier-Animation laeuft (%s)" % player.rig.animation)
 	var feet := player.global_position.y - 0.275
 	_check(absf(feet - wire.height_at(player.global_position.x)) < 0.05,
 		"Pfoten auf der Leitung (%.2f / %.2f)" % [feet, wire.height_at(player.global_position.x)])
@@ -1150,6 +1160,272 @@ func _test_test_mode() -> void:
 	_check(SaveGame.all_unlocked, "Testmodus uebersteht das Neuladen")
 	SaveGame.set_all_unlocked(false)
 	_check(not SaveGame.is_unlocked(5), "Und laesst sich wieder abschalten")
+
+# --- Figuren und Animationen (GDD Abschnitt 10) -------------------------------
+
+## Jede Figur laesst sich bauen und jede Animation rechnet saubere Posen.
+func _test_creature_rigs() -> void:
+	var animations := [&"idle", &"walk", &"retreat", &"run", &"chase", &"jump", &"attack",
+		&"climb", &"hang", &"mantle", &"balance", &"hurt", &"victory", &"sit", &"dead",
+		&"warn", &"sleep", &"rest", &"bark_up"]
+	var broken: Array[String] = []
+	var floating: Array[String] = []
+	for preset in CreatureRig.Preset.values():
+		var holder := Node3D.new()
+		get_tree().root.add_child(holder)
+		var rig := CreatureRig.new()
+		holder.add_child(rig)
+		rig.setup(preset)
+		var spec: Dictionary = CreatureRig.SPECS[preset]
+		# Im Stand muessen die Pfoten auf Hoehe der Kapselunterkante stehen.
+		rig.play(&"idle", true)
+		for i in 30:
+			rig.advance(1.0 / 60.0)
+		for leg in CreatureRig.LEGS:
+			var lower: Node3D = rig._lower[leg]
+			var paw_y: float = lower.global_position.y - float(spec["lower"])
+			if absf(paw_y - float(spec["feet"])) > 0.03:
+				floating.append("%s %s (%.3f)" % [CreatureRig.Preset.keys()[preset], leg, paw_y])
+		for animation in animations:
+			rig.play(animation, true)
+			rig.move_speed = 1.0
+			rig.climb_speed = 1.0
+			rig.vertical_speed = 3.0
+			rig.trigger(&"eat")
+			rig.trigger(&"land")
+			for i in 45:
+				rig.advance(1.0 / 60.0)
+			for joint in CreatureRig.NEUTRAL:
+				var value := rig.get_pose_value(joint)
+				if is_nan(value) or is_inf(value) or absf(value) > 4.0:
+					broken.append("%s/%s/%s" % [CreatureRig.Preset.keys()[preset], animation, joint])
+		holder.free()
+	_check(broken.is_empty(), "Alle Figuren rechnen alle 19 Animationen sauber %s" % str(broken))
+	_check(floating.is_empty(), "Im Stand stehen die Pfoten auf dem Boden %s" % str(floating))
+
+	# Katzenbuckel: bei der Warnung kruemmt sich der Ruecken, die Ohren liegen an.
+	var cat_holder := Node3D.new()
+	get_tree().root.add_child(cat_holder)
+	var cat_rig := CreatureRig.new()
+	cat_holder.add_child(cat_rig)
+	cat_rig.setup(CreatureRig.Preset.REVIERKATZE)
+	cat_rig.play(&"warn")
+	for i in 30:
+		cat_rig.advance(1.0 / 60.0)
+	_check(cat_rig.get_pose_value(&"arch") > 0.4 and cat_rig.get_pose_value(&"ears") > 0.9,
+		"Warnung der Revierkatze: Buckel und angelegte Ohren")
+	# Klettern: die Katze dreht der Kamera den Ruecken zu.
+	cat_rig.play(&"climb")
+	for i in 30:
+		cat_rig.advance(1.0 / 60.0)
+	var back := (cat_rig.get_node("Rumpf") as Node3D).global_transform.basis.y.normalized()
+	_check(back.z > 0.9, "Beim Klettern zeigt der Ruecken zur Kamera (z = %.2f)" % back.z)
+	cat_holder.free()
+
+## Die Spielerkatze spielt je Zustand die passende Animation.
+func _test_player_animations() -> void:
+	var level := await _spawn_level()
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	_check(player.rig != null and player.rig.get_parent() == player.visual,
+		"Die Spielerkatze hat eine Figur mit Gliedern")
+	player.global_position = Vector3(16.0, 0.4, 0.0)
+	await _wait(0.4)
+	_check(player.rig.animation == &"idle", "Stehen (%s)" % player.rig.animation)
+	PlayerInput.set_touch_move(Vector2.RIGHT)
+	await _wait(0.5)
+	_check(player.rig.animation == &"run", "Laufen (%s)" % player.rig.animation)
+	PlayerInput.press_jump()
+	await _wait(0.2)
+	PlayerInput.release_jump()
+	_check(player.rig.animation == &"jump" and player.rig.vertical_speed > 0.0,
+		"Springen (%s)" % player.rig.animation)
+	await _wait(0.9)
+	_check(player.rig.is_overlay_active(&"land") or player.rig.animation == &"run",
+		"Landen federt kurz in die Knie")
+	PlayerInput.set_touch_move(Vector2.ZERO)
+
+	var zone: ClimbZone = level.get_node("Kletterzonen/Regenrinne1")
+	player.global_position = Vector3(zone.global_position.x, 0.4, 0.0)
+	await _wait(0.2)
+	PlayerInput.set_touch_move(Vector2(0.0, 1.0))
+	await _wait(0.6)
+	_check(player.rig.animation == &"climb" and player.rig.get_pose_value(&"turn") > 0.9,
+		"Klettern mit dem Ruecken zur Kamera (%s)" % player.rig.animation)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+
+	var food: Node3D = level.get_node("Futter/Graete1")
+	player.global_position = food.global_position
+	await _wait(0.15)
+	_check(player.rig.is_overlay_active(&"eat"), "Fressen senkt kurz den Kopf")
+
+	player.global_position = Vector3(16.0, 0.4, 0.0)
+	await _wait(0.3)
+	player.is_invulnerable = false
+	player.take_damage(1, Vector3(18.0, 0.4, 0.0))
+	await _wait(0.1)
+	_check(player.rig.animation == &"hurt", "Treffer (%s)" % player.rig.animation)
+	await _wait(1.2)
+	player.win(player.global_position.x - 1.0)
+	await _wait(0.1)
+	_check(player.rig.animation == &"victory" and player.facing < 0.0,
+		"Sieg: sitzt zum Napf gewandt (%s)" % player.rig.animation)
+	await _despawn(level)
+
+	var level2 := await _spawn_level()
+	var player2: Player = level2.get_node("Player")
+	level2.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	for i in player2.max_health:
+		player2.is_invulnerable = false
+		player2.take_damage(1, Vector3(player2.global_position.x + 2.0, 0.0, 0.0))
+		await _wait(0.1)
+	_check(player2.rig.animation == &"dead", "Game Over: liegt am Boden (%s)" % player2.rig.animation)
+	await _despawn(level2)
+
+## Hunde und Revierkatze: Animation je Zustand.
+func _test_enemy_animations() -> void:
+	var tutorial := await _spawn_level(TUTORIAL_PATH, true)
+	var sleeper: Dog = tutorial.get_node("Gegner/SchlafenderHund")
+	await _wait(0.3)
+	_check(sleeper.rig != null and sleeper.rig.animation == &"sleep",
+		"Der schlafende Hund liegt und schlaeft")
+	await _despawn(tutorial)
+
+	var level := await _spawn_level(LEVEL_PATH, true)
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var small_dog: Dog = level.get_node("Gegner/KleinerHund")
+	var big_dog: Dog = level.get_node("Gegner/GrosserHund")
+	var cat: TerritoryCat = level.get_node("Gegner/Revierkatze")
+	_check(small_dog.rig.preset == CreatureRig.Preset.KLEINER_HUND
+			and big_dog.rig.preset == CreatureRig.Preset.GROSSER_HUND
+			and cat.rig.preset == CreatureRig.Preset.REVIERKATZE,
+		"Jeder Gegner hat seine eigene Figur")
+	small_dog._enter(Dog.State.WARNUNG, 5.0)
+	big_dog._enter(Dog.State.BELLEN_NACH_OBEN, 5.0)
+	# Die Revierkatze warnt nur, solange ein Eindringling im Revier steht.
+	var player: Player = level.get_node("Player")
+	player.global_position = cat.home_position + Vector3(1.2, 0.1, 0.0)
+	cat.warning_time = 5.0
+	await _wait(0.3)
+	_check(small_dog.rig.animation == &"warn", "Kleiner Hund klaefft (%s)" % small_dog.rig.animation)
+	_check(big_dog.rig.animation == &"bark_up", "Grosser Hund bellt nach oben (%s)" % big_dog.rig.animation)
+	_check(cat.rig.animation == &"warn", "Revierkatze macht einen Buckel (%s)" % cat.rig.animation)
+	small_dog._enter(Dog.State.PATROUILLE, 5.0)
+	await _wait(0.4)
+	_check(small_dog.rig.animation == &"walk", "Patrouille im Schritt (%s)" % small_dog.rig.animation)
+	await _despawn(level)
+
+# --- Athen-Kit und neue Wege (Level 11-15) --------------------------------------
+
+func _pieces_of(level: Node, kind: AssetKit.Kind) -> Array[AssetPiece]:
+	var found: Array[AssetPiece] = []
+	for part in level.get_node("Welt").get_children():
+		if part is AssetPiece and part.kind == kind:
+			found.append(part)
+	found.sort_custom(func(a, b): return a.global_position.x < b.global_position.x)
+	return found
+
+## Laeuft in eine Richtung, springt und haelt an, sobald die Katze wieder
+## steht. Liefert die Hoehe der Pfoten nach der Landung.
+func _hop(player: Player, direction: float) -> float:
+	PlayerInput.set_touch_move(Vector2(direction, 0.0))
+	PlayerInput.press_jump()
+	for i in int(1.8 * PHYSICS_FPS):
+		await get_tree().physics_frame
+		if i == 8:
+			PlayerInput.release_jump()
+		if i > 12 and player.is_on_floor():
+			break
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	await _wait(0.3)
+	return player.global_position.y - 0.275
+
+## Kit: Fassadenvarianten, Farbtoene und die Stufen Muellcontainer und Kiosk.
+func _test_athens_kit() -> void:
+	_check(AssetKit.Kind.size() >= 46, "Asset-Kit mit Athener Bauteilen (%d Teile)" % AssetKit.Kind.size())
+	var tinted := AssetKit.get_tinted_material(2)
+	_check(tinted != AssetKit.get_material() and AssetKit.get_tinted_material(2) == tinted
+			and AssetKit.get_tinted_material(0) == AssetKit.get_material(),
+		"Haeuser bekommen eigene Putzfarben ueber wenige gemeinsame Materialien")
+	var kiosk_boxes := AssetKit.get_collision_boxes(AssetKit.Kind.PERIPTERO)
+	var kiosk_top := 0.0
+	for box in kiosk_boxes:
+		kiosk_top = maxf(kiosk_top, box.end.y)
+	var bin_top: float = AssetKit.get_collision_boxes(AssetKit.Kind.MUELLCONTAINER)[0].end.y
+	_check(kiosk_top - bin_top < Player.JUMP_HEIGHT - 0.2 and bin_top < Player.JUMP_HEIGHT - 0.2
+			and kiosk_top > Player.JUMP_HEIGHT,
+		"Kiosk nur ueber den Muellcontainer erreichbar (%.2f m / %.2f m)" % [bin_top, kiosk_top])
+
+	var level := await _spawn_level("res://scenes/levels/level_11.tscn")
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var bins := _pieces_of(level, AssetKit.Kind.MUELLCONTAINER)
+	var kiosks := _pieces_of(level, AssetKit.Kind.PERIPTERO)
+	_check(bins.size() >= 1 and kiosks.size() >= 2, "Level 11 hat Muellcontainer und Kioske")
+	var kiosk := kiosks[0]
+	# Von der Strasse aus sperrt der Kiosk den Weg ...
+	player.global_position = Vector3(kiosk.global_position.x - 2.6, 0.4, 0.0)
+	await _wait(0.3)
+	await _hop(player, 1.0)
+	PlayerInput.set_touch_move(Vector2.RIGHT)
+	await _wait(0.8)
+	PlayerInput.set_touch_move(Vector2.ZERO)
+	_check(player.global_position.x < kiosk.global_position.x - 0.7 and player.global_position.y < 1.6,
+		"Von der Strasse aus sperrt der Kiosk den Weg (x = %.1f)" % player.global_position.x)
+	# ... vom Muellcontainer aus geht es auf sein Dach und weiter auf den Balkon.
+	player.global_position = Vector3(bins[0].global_position.x, bin_top + 0.4, 0.0)
+	player.velocity = Vector3.ZERO
+	await _wait(0.4)
+	var feet := await _hop(player, 1.0)
+	_check(absf(feet - kiosk_top) < 0.1,
+		"Sprung vom Muellcontainer aufs Kioskdach (Pfoten auf %.2f m)" % feet)
+	feet = await _hop(player, 1.0)
+	_check(absf(feet - 3.0) < 0.1, "Vom Kioskdach auf den ersten Balkon (%.2f m)" % feet)
+	await _despawn(level)
+
+## Level 12: ausgefahrene Markisen fuehren als Treppe ins naechste Geschoss.
+func _test_awning_stairs() -> void:
+	var level := await _spawn_level("res://scenes/levels/level_12.tscn")
+	var player: Player = level.get_node("Player")
+	level.get_node("HUD").queue_free()
+	await get_tree().process_frame
+	var awnings := _pieces_of(level, AssetKit.Kind.MARKISE_OFFEN)
+	awnings.append_array(_pieces_of(level, AssetKit.Kind.MARKISE_OFFEN_GRUEN))
+	awnings.sort_custom(func(a, b): return a.global_position.x < b.global_position.x)
+	_check(awnings.size() >= 6, "Level 12 hat Markisen als Stufen (%d)" % awnings.size())
+	var first := awnings[0]
+	# Start auf dem ersten Balkon, knapp links der ersten Markise.
+	player.global_position = Vector3(first.global_position.x - 2.0, 3.4, 0.0)
+	player.velocity = Vector3.ZERO
+	await _wait(0.4)
+	_check(absf(player.global_position.y - 3.275) < 0.05, "Start auf dem Balkon im ersten Stock")
+	var feet := await _hop(player, 1.0)
+	_check(absf(feet - (first.global_position.y + 0.32)) < 0.1,
+		"Erste Markise traegt die Katze (%.2f m)" % feet)
+	feet = await _hop(player, 1.0)
+	_check(absf(feet - (awnings[1].global_position.y + 0.32)) < 0.1,
+		"Zweite Markise erreicht (%.2f m)" % feet)
+	feet = await _hop(player, 1.0)
+	_check(absf(feet - 6.0) < 0.1, "Von der Markisentreppe in den zweiten Stock (%.2f m)" % feet)
+	await _despawn(level)
+
+## Echte Katzenaufnahmen: mehrere Miau-Varianten, Quellen dokumentiert.
+func _test_cat_recordings() -> void:
+	var variants: Array = Sfx.SOUNDS[&"miau"]
+	var loaded := 0
+	for file in variants:
+		if load(Sfx.SFX_DIR + file + ".wav") is AudioStreamWAV:
+			loaded += 1
+	_check(variants.size() >= 3 and loaded == variants.size(),
+		"Miauen in %d Varianten aus echten Aufnahmen" % variants.size())
+	var purr := load(Sfx.SFX_DIR + "schnurren.wav") as AudioStreamWAV
+	_check(purr != null and purr.get_length() > 2.5, "Schnurren ist eine laengere Aufnahme")
+	_check(FileAccess.file_exists("res://assets/sfx/QUELLEN.md"),
+		"Quellen und Lizenzen der Aufnahmen sind dokumentiert")
 
 # --- Hilfen -----------------------------------------------------------------
 

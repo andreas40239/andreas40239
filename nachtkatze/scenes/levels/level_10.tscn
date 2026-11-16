@@ -49,21 +49,66 @@ kind = 5
 [node name="Mauer" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 0)
 kind = 28
-[node name="Fassade0" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0, -1)
-kind = 0
-tiles = 4
+[node name="Fassade0_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, -1)
+kind = 32
 solid = false
-[node name="Fassade1" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 3, -1)
-kind = 0
-tiles = 4
+farbton = 5
+[node name="Fassade0_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -1)
+kind = 32
 solid = false
-[node name="Fassade2" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 6, -1)
-kind = 0
-tiles = 4
+farbton = 5
+[node name="Fassade0_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0, -1)
+kind = 32
 solid = false
+farbton = 5
+[node name="Fassade0_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, 0, -1)
+kind = 33
+solid = false
+farbton = 5
+[node name="Fassade1_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 3, -1)
+kind = 30
+solid = false
+farbton = 5
+[node name="Fassade1_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 3, -1)
+kind = 30
+solid = false
+farbton = 5
+[node name="Fassade1_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 3, -1)
+kind = 30
+solid = false
+farbton = 5
+[node name="Fassade1_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, 3, -1)
+kind = 30
+solid = false
+farbton = 5
+[node name="Fassade2_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 6, -1)
+kind = 0
+solid = false
+farbton = 5
+[node name="Fassade2_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 6, -1)
+kind = 0
+solid = false
+farbton = 5
+[node name="Fassade2_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 6, -1)
+kind = 30
+solid = false
+farbton = 5
+[node name="Fassade2_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, 6, -1)
+kind = 31
+solid = false
+farbton = 5
 [node name="Dach" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 9, 0)
 kind = 4
@@ -93,26 +138,66 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.4, 0, -0.55)
 kind = 29
 tiles = 3
 solid = false
-[node name="Fassade02" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, -1)
-kind = 0
-tiles = 3
+[node name="Fassade0_5" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0, -1)
+kind = 31
 solid = false
-[node name="Fassade12" parent="Welt" instance=ExtResource("piece")]
+farbton = 1
+[node name="Fassade0_6" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, -1)
+kind = 33
+solid = false
+farbton = 1
+[node name="Fassade0_7" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Fassade1_5" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 3, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Fassade1_6" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 3, -1)
 kind = 0
-tiles = 3
 solid = false
-[node name="Fassade22" parent="Welt" instance=ExtResource("piece")]
+farbton = 1
+[node name="Fassade1_7" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 3, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Fassade2_5" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 6, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Fassade2_6" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 6, -1)
-kind = 0
-tiles = 3
+kind = 30
 solid = false
-[node name="Fassade3" parent="Welt" instance=ExtResource("piece")]
+farbton = 1
+[node name="Fassade2_7" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 6, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Fassade3_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 9, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Fassade3_2" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 9, -1)
 kind = 0
-tiles = 3
 solid = false
+farbton = 1
+[node name="Fassade3_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 9, -1)
+kind = 31
+solid = false
+farbton = 1
 [node name="Dach2" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 12, 0)
 kind = 4
@@ -150,26 +235,66 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.4, 0, -0.55)
 kind = 29
 tiles = 4
 solid = false
-[node name="Fassade03" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, -1)
-kind = 0
-tiles = 3
+[node name="Fassade0_8" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 0, -1)
+kind = 31
 solid = false
-[node name="Fassade13" parent="Welt" instance=ExtResource("piece")]
+farbton = 4
+[node name="Fassade0_9" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, -1)
+kind = 33
+solid = false
+farbton = 4
+[node name="Fassade0_10" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70, 0, -1)
+kind = 32
+solid = false
+farbton = 4
+[node name="Fassade1_8" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 3, -1)
+kind = 31
+solid = false
+farbton = 4
+[node name="Fassade1_9" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 3, -1)
 kind = 0
-tiles = 3
 solid = false
-[node name="Fassade23" parent="Welt" instance=ExtResource("piece")]
+farbton = 4
+[node name="Fassade1_10" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70, 3, -1)
+kind = 30
+solid = false
+farbton = 4
+[node name="Fassade2_8" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 6, -1)
+kind = 31
+solid = false
+farbton = 4
+[node name="Fassade2_9" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 6, -1)
-kind = 0
-tiles = 3
+kind = 31
 solid = false
-[node name="Fassade32" parent="Welt" instance=ExtResource("piece")]
+farbton = 4
+[node name="Fassade2_10" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70, 6, -1)
+kind = 30
+solid = false
+farbton = 4
+[node name="Fassade3_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 9, -1)
+kind = 30
+solid = false
+farbton = 4
+[node name="Fassade3_5" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 9, -1)
-kind = 0
-tiles = 3
+kind = 31
 solid = false
+farbton = 4
+[node name="Fassade3_6" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70, 9, -1)
+kind = 30
+solid = false
+farbton = 4
 [node name="Dach3" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 12, 0)
 kind = 4
@@ -202,31 +327,106 @@ solid = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64.6, 6, -0.55)
 kind = 29
 solid = false
-[node name="Zielhaus0" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 0, -1)
-kind = 0
-tiles = 4
+[node name="Zielhaus0_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 0, -1)
+kind = 32
 solid = false
-[node name="Zielhaus1" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 3, -1)
-kind = 0
-tiles = 4
+farbton = 1
+[node name="Zielhaus0_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 0, -1)
+kind = 32
 solid = false
-[node name="Zielhaus2" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 6, -1)
-kind = 0
-tiles = 4
+farbton = 1
+[node name="Zielhaus0_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 0, -1)
+kind = 33
 solid = false
-[node name="Zielhaus3" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 9, -1)
-kind = 0
-tiles = 4
+farbton = 1
+[node name="Zielhaus0_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 0, -1)
+kind = 32
 solid = false
-[node name="Zielhaus4" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 12, -1)
-kind = 0
-tiles = 4
+farbton = 1
+[node name="Zielhaus1_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 3, -1)
+kind = 30
 solid = false
+farbton = 1
+[node name="Zielhaus1_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 3, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus1_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 3, -1)
+kind = 0
+solid = false
+farbton = 1
+[node name="Zielhaus1_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 3, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus2_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 6, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus2_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 6, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus2_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 6, -1)
+kind = 0
+solid = false
+farbton = 1
+[node name="Zielhaus2_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 6, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Zielhaus3_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 9, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus3_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 9, -1)
+kind = 0
+solid = false
+farbton = 1
+[node name="Zielhaus3_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 9, -1)
+kind = 0
+solid = false
+farbton = 1
+[node name="Zielhaus3_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 9, -1)
+kind = 0
+solid = false
+farbton = 1
+[node name="Zielhaus4_" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 12, -1)
+kind = 31
+solid = false
+farbton = 1
+[node name="Zielhaus4_2" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 12, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus4_3" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 12, -1)
+kind = 30
+solid = false
+farbton = 1
+[node name="Zielhaus4_4" parent="Welt" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 12, -1)
+kind = 30
+solid = false
+farbton = 1
 [node name="ZielhausDach" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 81, 15, 0)
 kind = 4
@@ -285,10 +485,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -2.3)
 kind = 21
 solid = false
 yaw_degrees = 40
-[node name="Laterne" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0, -2.2)
-kind = 10
+[node name="Orange" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, -2.4)
+kind = 39
 solid = false
+yaw_degrees = 25
 [node name="Solarkollektor" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.2, 9, -0.7)
 kind = 6
@@ -297,17 +498,21 @@ solid = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.8, 9, -0.9)
 kind = 9
 solid = false
-[node name="Antenne" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.8, 9, -0.7)
-kind = 8
+[node name="Pergola" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.8, 9, -0.55)
+kind = 38
+solid = false
+[node name="Sonnenmarkise" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 5.15, -1.28)
+kind = 34
 solid = false
 [node name="Markise" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 8.2, -0.8)
 kind = 3
 solid = false
-[node name="Laterne2" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -2.2)
-kind = 10
+[node name="Balkonpflanzen" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 6, -0.92)
+kind = 35
 solid = false
 [node name="Strommast" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.5, 0, 0)
@@ -337,17 +542,41 @@ solid = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.6, 12, -0.9)
 kind = 9
 solid = false
-[node name="Antenne2" parent="Zierde" instance=ExtResource("piece")]
+[node name="Antenne" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 53.6, 12, -0.7)
 kind = 8
+solid = false
+[node name="Balkonpflanzen2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47, 3, -0.92)
+kind = 35
+solid = false
+[node name="Waesche" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, 3, -0.95)
+kind = 36
+solid = false
+[node name="Sonnenmarkise2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51, 5.15, -1.28)
+kind = 2
+solid = false
+[node name="Balkonpflanzen3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49, 6, -0.92)
+kind = 35
+solid = false
+[node name="Waesche2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51, 6, -0.95)
+kind = 36
+solid = false
+[node name="Sonnenmarkise3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51, 8.15, -1.28)
+kind = 34
 solid = false
 [node name="Markise2" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 11.2, -0.8)
 kind = 3
 solid = false
-[node name="Laterne3" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 0, -2.2)
-kind = 10
+[node name="Balkonpflanzen4" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 9, -0.92)
+kind = 35
 solid = false
 [node name="Solarkollektor3" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.4, 12, -0.7)
@@ -357,13 +586,41 @@ solid = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66.6, 12, -0.9)
 kind = 9
 solid = false
-[node name="Antenne3" parent="Zierde" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69.6, 12, -0.7)
-kind = 8
+[node name="Pergola2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69.6, 12, -0.55)
+kind = 38
+solid = false
+[node name="Balkonpflanzen5" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65, 6, -0.92)
+kind = 35
+solid = false
+[node name="Sonnenmarkise4" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 67, 8.15, -1.28)
+kind = 2
 solid = false
 [node name="Markise3" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 11.2, -0.8)
 kind = 3
+solid = false
+[node name="Balkonpflanzen6" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 63, 9, -0.92)
+kind = 35
+solid = false
+[node name="Balkonpflanzen7" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 83.5, 6, -0.92)
+kind = 35
+solid = false
+[node name="Balkonpflanzen8" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 9, -0.92)
+kind = 35
+solid = false
+[node name="Waesche3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 9, -0.95)
+kind = 36
+solid = false
+[node name="Waesche4" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 85.5, 12, -0.95)
+kind = 36
 solid = false
 [node name="ZielLaterne" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87.4, 15, -0.9)
@@ -388,6 +645,49 @@ solid = false
 [node name="Tankstelle" parent="Zierde" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0, -10)
 kind = 23
+solid = false
+[node name="Laterne" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.2, 0, -2.2)
+kind = 10
+solid = false
+[node name="Laterne2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -0.72)
+kind = 10
+solid = false
+[node name="Laterne3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 0, -0.72)
+kind = 10
+solid = false
+[node name="Moped" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.913, 0, -0.62)
+kind = 43
+solid = false
+[node name="Orangenbaum" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.655, 0, -2.3)
+kind = 39
+solid = false
+yaw_degrees = 351.29
+[node name="Container" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.105, 0, -2.2)
+kind = 42
+solid = false
+[node name="Moped2" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.933, 0, -0.62)
+kind = 43
+solid = false
+yaw_degrees = 180
+[node name="Moped3" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66.513, 0, -0.62)
+kind = 43
+solid = false
+yaw_degrees = 180
+[node name="Moped4" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84.133, 0, -0.62)
+kind = 43
+solid = false
+[node name="Moped5" parent="Zierde" instance=ExtResource("piece")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 89.226, 0, -0.62)
+kind = 43
 solid = false
 
 [node name="Kletterzonen" type="Node3D" parent="."]
@@ -576,21 +876,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84.5, 12.6, 0)
 kind = 0
 
 [node name="Lichter" type="Node3D" parent="."]
-[node name="Laternenlicht" type="OmniLight3D" parent="Lichter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.82, 2.85, -1.3)
-light_color = Color(1, 0.6, 0.28, 1)
-light_energy = 2.2
-omni_range = 7.5
-[node name="Laternenlicht2" type="OmniLight3D" parent="Lichter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.62, 2.85, -1.3)
-light_color = Color(1, 0.6, 0.28, 1)
-light_energy = 2.2
-omni_range = 7.5
-[node name="Laternenlicht3" type="OmniLight3D" parent="Lichter"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.62, 2.85, -1.3)
-light_color = Color(1, 0.6, 0.28, 1)
-light_energy = 2.2
-omni_range = 7.5
 [node name="Ziellicht" type="OmniLight3D" parent="Lichter"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 89.5, 16.8, 1.2)
 light_color = Color(1, 0.82, 0.5, 1)
@@ -601,6 +886,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 98.5, 12, -10)
 light_color = Color(1, 0.8, 0.52, 1)
 light_energy = 4.0
 omni_range = 10.0
+[node name="Laternenlicht" type="OmniLight3D" parent="Lichter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.82, 2.85, -1.3)
+light_color = Color(1, 0.6, 0.28, 1)
+light_energy = 2.2
+omni_range = 7.5
+[node name="Laternenlicht2" type="OmniLight3D" parent="Lichter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.62, 2.85, 0.18)
+light_color = Color(1, 0.6, 0.28, 1)
+light_energy = 2.2
+omni_range = 7.5
+[node name="Laternenlicht3" type="OmniLight3D" parent="Lichter"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.62, 2.85, 0.18)
+light_color = Color(1, 0.6, 0.28, 1)
+light_energy = 2.2
+omni_range = 7.5
 [node name="Futternapf" parent="." instance=ExtResource("bowl")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 89.5, 15, 0)
 

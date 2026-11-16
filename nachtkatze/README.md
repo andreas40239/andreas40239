@@ -1,12 +1,12 @@
 # Nachtkatze - Godot-Projekt
 
 Stilisierter 2.5D-Plattformer nach dem Game Design Dokument 0.1.
-Dieser Stand deckt **Meilenstein 1 bis 4 und 6 bis 8** ab (Bewegungsprototyp,
-Kernsysteme, Gegner, Tutorial, Startbild, Menues und Speichern, Sound,
-Level 1 bis 10) und aus **Meilenstein 5** Asset-Kit, Toon-Shader und
-Parallax-Hintergrund - alle Levels sind daraus gebaut. Die gezeichneten
-Grafik-Assets fuer Meilenstein 5 stehen noch aus; die Levels lassen sich
-trotzdem schon durchspielen und testen.
+Dieser Stand deckt **Meilenstein 1 bis 8** ab: Bewegungsprototyp,
+Kernsysteme, Gegner, Tutorial, Grafik (Asset-Kit nach Athener Vorbild,
+Figuren mit Animationen, Toon-Shader, Parallax-Hintergrund), Startbild,
+Menues und Speichern, Sound und Level 1 bis 10 - dazu als Zugabe die
+Level 11 bis 15. Alle Grafik entsteht prozedural im Projekt, ohne
+Modelldateien und ohne Texturen.
 
 | | |
 |---|---|
@@ -131,10 +131,14 @@ auf, sobald die Katze den jeweiligen Bereich betritt.
 
 **Meilenstein 7 - Sound**
 
-Alle Geraeusche sind synthetisiert (`tools/sfx_erzeugen.py`, reines Python
-ohne Zusatzpakete) und dienen als Platzhalter: laut GDD Abschnitt 15 koennen
-sie spaeter durch lizenzfreie Aufnahmen ersetzt werden - gleiche Dateinamen
-in `assets/sfx/` bzw. `assets/ambient/` genuegen.
+Die Stimme der Katzen besteht aus echten Aufnahmen unter CC0: Miauen (drei
+Varianten), Schnurren und Fauchen; das Kampfgeraeusch ist aus Fauchen und
+Miauen gemischt. Quellen, Urheber und Lizenz stehen in
+`assets/sfx/QUELLEN.md`, aufbereitet werden sie mit
+`tools/katzensounds_aufbereiten.py`. Alle uebrigen Geraeusche sind
+synthetisiert (`tools/sfx_erzeugen.py`, reines Python ohne Zusatzpakete);
+laut GDD Abschnitt 15 koennen auch sie durch lizenzfreie Aufnahmen ersetzt
+werden - gleiche Dateinamen in `assets/sfx/` bzw. `assets/ambient/` genuegen.
 
 | Quelle | Geraeusche |
 |---|---|
@@ -228,6 +232,77 @@ Neu im Spiel:
 ![Level 5 - Leitungen ueber der Hundestrasse](../docs/bilder/level_05_b_uebersicht.png)
 ![Level 7 - Nacht mit eingeschraenkter Sicht](../docs/bilder/level_07_a_start.png)
 ![Level 10 - Ziel mit Kirchturm](../docs/bilder/level_10_c_ziel.png)
+
+**Meilenstein 5 - Grafik: Figuren, Animationen und Athen**
+
+Alles, was im Spiel zu sehen ist, entsteht aus Code (GDD Abschnitt 15:
+"prozedural erzeugt") - Vertex-Farben statt Texturen, ein gemeinsamer
+Toon-Shader.
+
+*Figuren.* `CreatureRig` (`scripts/characters/creature_rig.gd`) baut
+Spielerkatze, Revierkatze, kleinen und grossen Hund aus Gliedern: Rumpf in
+zwei Haelften, Hals, Kopf mit Ohren, Augen und Kiefer, Schwanz in Gliedern
+und vier zweigliedrige Beine. Die Spielerkatze ist rotgetigert - die Farbe
+kommt sonst nirgends vor -, die Revierkatzen sind dunkelgrau mit leuchtenden
+Augen (GDD Abschnitt 9). Figuren leuchten leicht aus sich selbst, damit sie
+auch nachts lesbar bleiben.
+
+*Animationen.* Jede Animation ist eine Funktion, die aus der Zeit eine Pose
+berechnet; beim Wechsel wird 0,12 s ueberblendet. Umgesetzt ist die ganze
+Liste aus GDD Abschnitt 10:
+
+| Figur | Animationen |
+|---|---|
+| Spielerkatze | Stehen, Laufen (Galopp im Takt der Geschwindigkeit), Springen (steigend gestreckt, fallend Pfoten voraus), Landen, Klettern (Ruecken zur Kamera, Beine greifen abwechselnd), an der Kante haengen, Hochziehen, Balancieren (geduckt, der Schwanz gleicht aus), Fressen, Treffer, Sieg (sitzt am Napf, frisst und schnurrt), Game Over |
+| Hunde | Schlafen, Ruhen (hecheln, wedeln), Patrouille, Warnung (der kleine klaefft huepfend, der grosse knurrt mit gesenktem Kopf), Jagen, Bellen nach oben, Rueckkehr |
+| Revierkatzen | Sitzen, Revier-Patrouille, Warnung (Buckel, angelegte Ohren, gestraeubter Schwanz, Fauchen), Angriffssprung, Rueckzug |
+
+![Figuren in allen Animationen](../docs/bilder/figuren_0_alle.png)
+![Spielerkatze](../docs/bilder/figuren_1_a.png)
+
+*Athen.* Die Kulisse folgt Referenzfotos aus Wikimedia Commons (Kypseli,
+Blick vom Lykabettus auf die Akropolis, Periptero in Ampelokipoi; die Fotos
+dienten nur als Vorlage und liegen nicht im Projekt):
+
+- Wohnblocks (Polykatoikia) mit durchlaufenden Balkonen und weissen
+  Gelaendern, je Haus eine eigene Putzfarbe, wechselnd Fenster, Rolllaeden
+  und Balkontueren, Klimageraete an der Wand
+- im Erdgeschoss Laeden mit gestreifter Markise und der Hauseingang mit
+  Marmorstufen
+- auf den Balkonen Topfpflanzen, Waescheleinen und ausgefahrene Markisen, auf
+  den Daechern Solarboiler, Antennen und Pergolen
+- auf der Strasse Bitterorangenbaeume, Mopeds, gruene und blaue
+  Muellcontainer, der Kiosk (Periptero) und gelbe Taxis als fahrende Autos
+- im Hintergrund das helle Haeusermeer mit Akropolis samt Parthenon,
+  Lykabettus mit Kapelle und dem Kirchturm; nachts ist der Parthenon
+  angestrahlt
+
+![Level 11 - Athener Strasse](../docs/bilder/level_11_b_uebersicht.png)
+![Spielszene mit Hund, Muellcontainer und Kiosk](../docs/bilder/ansicht_11_21_0.png)
+![Nacht vor den Laeden](../docs/bilder/ansicht_14_30_0.png)
+
+**Zugabe - Level 11 bis 15**
+
+Fuenf weitere Level ueber die zehn des GDD hinaus, mit eigenen Werten:
+
+| Level | Name | Tageszeit | Stockwerke | Hunde (klein/gross) | Katzen | Autos | Futter | Neu |
+|---|---|---|---|---|---|---|---|---|
+| 11 | Am Periptero | Tag | 3 | 2 / 1 | 2 | 2 | mittel | Kiosk und Muellcontainer als Stufen |
+| 12 | Markisentreppe | Tag | 4 | 2 / 1 | 3 | 2 | mittel | ausgefahrene Markisen als Treppe und Bruecke |
+| 13 | Der lange Draht | Daemmerung | 5 | 2 / 1 | 3 | 3 | wenig | vier Leitungsfelder am Stueck |
+| 14 | Ueber den Daechern | Nacht | 5 | 2 / 2 | 3 | 3 | wenig | vier Daecher in Folge, Luecken bis 3 m |
+| 15 | Akropolis bei Nacht | Nacht | 6 | 2 / 2 | 4 | 3 | wenig | alles zusammen, Ziel mit Blick auf die Akropolis |
+
+- **Kiosk:** sperrt die Strasse - auch fuer die Katze. Vom Muellcontainer
+  (1,15 m) geht es auf sein Dach (2,6 m) und von dort auf den ersten Balkon.
+  Hunde kommen nicht vorbei.
+- **Markisentreppe:** zwei ausgefahrene Markisen fuehren in Stufen von 1,1 m
+  von einem Geschoss ins naechste, eine weitere dient als Bruecke zum
+  Nachbarhaus.
+
+![Level 12 - Markisentreppe](../docs/bilder/ansicht_12_12_3.png)
+![Level 13 - auf der langen Leitung](../docs/bilder/ansicht_13_27_5.png)
+![Level 15 - Ziel mit Blick auf die Akropolis](../docs/bilder/level_15_c_ziel.png)
 
 ## Parallax-Hintergrund (GDD Abschnitt 8)
 
@@ -352,10 +427,14 @@ die Menues, das Asset-Kit (darunter, ob die Normalen nach aussen zeigen),
 die Regenrinnen an den Kletterzonen, den Parallax-Hintergrund und die drei
 Musikstuecke, alle Soundeffekte samt Ausloesern und das Ambient je
 Tageszeit, das Balancieren, die Nachtsicht, die Autoabschnitte und den
-Testmodus. Der Level-Test misst jedes Level 1-10 gegen die Tabelle aus GDD
-Abschnitt 6 (Tageszeit, Hunde, Katzen, Autos, Futterdichte, Zielhoehe), zaehlt
-die Lichtquellen, klettert jede Kletterzone hinauf und beendet das Level am
-Napf. Exit-Code 0 heisst alles gruen (aktuell 166 und 174 Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
+Testmodus, dazu alle Figuren in allen Animationen (saubere Posen, Pfoten auf
+dem Boden, passende Animation je Zustand), die Athener Bauteile und die neuen
+Wege: der Sprung vom Muellcontainer aufs Kioskdach und die Markisentreppe
+werden mit echter Physik nachgespielt. Der Level-Test misst jedes Level 1-15
+gegen seine Tabelle (Tageszeit, Hunde, Katzen, Autos, Futterdichte, Zielhoehe),
+zaehlt die Lichtquellen, klettert jede Kletterzone hinauf und beendet das
+Level am Napf. Exit-Code 0 heisst alles gruen (aktuell 202 und 260
+Pruefungen). Die Meldung `Parameter "m" is null` im kopflosen
 Betrieb kommt vom Dummy-Renderer und betrifft das Spiel nicht.
 
 ## Android-APK bauen
@@ -368,10 +447,10 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 `export_presets.cfg` im Projekt.
 
 ```
-godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-m8-debug.apk
+godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-0.9.0-debug.apk
 ```
 
-Ergebnis: rund 26 MB, `org.nachtkatze.prototyp` in Version 0.8.0,
+Ergebnis: rund 27 MB, `org.nachtkatze.prototyp` in Version 0.9.0,
 minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
@@ -393,6 +472,10 @@ xvfb-run godot --rendering-driver vulkan --rendering-method mobile \
   --path nachtkatze --resolution 1280x720 res://tools/screenshot.tscn -- levels 4 7
 ```
 
+Weitere Aufnahmen: `-- figuren` zeigt alle Figuren in allen Animationen,
+`-- kit` das Asset-Kit reihenweise, `-- ansicht <Level> <x> <y> [Sekunden]`
+eine Spielszene mit Gegnern an einer bestimmten Stelle.
+
 Levels neu erzeugen (nach Aenderungen am Generator):
 
 ```
@@ -401,26 +484,25 @@ python3 nachtkatze/tools/level_erzeugen.py
 
 ## Bewusste Vereinfachungen
 
-- Katze und Gegner sind noch einfache Formen ohne Animationen; die
-  Zustandsautomaten und Warnzeiten stimmen aber schon. Modelle und
-  Animationen kommen mit den Grafik-Assets aus Meilenstein 5. Das
-  Balancieren zeigt sich bis dahin nur durch leichtes Schwanken.
-- Soundeffekte und Ambient sind synthetische Platzhalter (siehe
-  Meilenstein 7).
+- Figuren und Animationen sind bewusst kantig und einfach (Low-Poly aus
+  Kisten und Zylindern, Posen aus Formeln statt handgesetzter Keyframes).
+- Ausser der Stimme der Katzen sind Soundeffekte und Ambient synthetisch
+  (siehe Meilenstein 7).
 - Die Levelwerte sind Startwerte aus dem GDD. Laengen, Gegnerpositionen und
   Futter werden nach dem Spieltest im Generator angepasst.
 - Die Levels rendern ohne Schlagschatten. Je nach Renderer beschattete sich
   die Katze selbst und wurde fast schwarz. Der Toon-Shader stuft stattdessen
   das Sonnenlicht; echte Schatten und LightmapGI sind spaeter dran.
-- Spielerkatze und Gegner nutzen noch Standardmaterialien statt des
-  Toon-Shaders - sie sollen sich klar von der Kulisse abheben.
+- Figuren und Futter nutzen eine eigene Kopie des Toon-Materials mit
+  helleren Schatten und festem Eigenleuchten - sie sollen sich zu jeder
+  Tageszeit von der Kulisse abheben.
 - Ein Sturz aus grosser Hoehe kostet nichts - das GDD kennt keinen Fallschaden.
   Nur wer unter das Level faellt, verliert einen Lebenspunkt und setzt an der
   letzten sicheren Stelle wieder auf.
 
 ## Asset-Kit (GDD Abschnitt 8)
 
-30 Bauteile, alle prozedural erzeugt - wie es GDD Abschnitt 15 vorsieht.
+46 Bauteile, alle prozedural erzeugt - wie es GDD Abschnitt 15 vorsieht.
 Es gibt keine Modelldateien und keine Texturen: `AssetKit` baut die Meshes
 aus Kisten, Zylindern, Kegeln, Kuppeln und Prismen zusammen, jede Flaeche
 mit eigener Normale, damit die Kanten hart bleiben.
@@ -435,10 +517,19 @@ mit eigener Normale, damit die Kanten hart bleiben.
 | Landmarken | Kirchturm mit Kuppel, Tankstelle mit gruenem Leuchtband |
 | Interaktiv | Fischgraete, ganzer Fisch, Futternapf |
 | Untergrund | Strassen-Segment, Mauerstueck, Regenrinne |
+| Athen - Fassaden | Geschoss mit Balkontuer, Geschoss mit Fenstern, Ladenzeile, Hauseingang |
+| Athen - Balkon und Dach | gruene Markise, Balkonpflanzen, Waescheleine, Blumentopf, Pergola |
+| Athen - Strasse | Bitterorangenbaum, Kiosk (Periptero), Muellcontainer gruen und blau, Moped, silbernes Auto |
+| Athen - Landmarke | Akropolis mit Parthenon |
+
+Ganze Haeuser bekommen ueber `farbton` am Bauteil eine von sechs Putzfarben;
+dahinter stehen nur sechs gemeinsame Materialien.
 
 ![Asset-Kit: Wohnblock](../docs/bilder/kit_0_wohnblock.png)
 ![Asset-Kit: Strasse](../docs/bilder/kit_2_strasse.png)
 ![Asset-Kit: Vegetation](../docs/bilder/kit_3_vegetation.png)
+![Asset-Kit: Athener Fassaden](../docs/bilder/kit_5_athen_-_fassaden.png)
+![Asset-Kit: Athener Strasse](../docs/bilder/kit_7_athen_-_strasse.png)
 
 ### Farben und Shader
 
@@ -475,6 +566,7 @@ xvfb-run godot --rendering-driver opengl3 --path nachtkatze \
 
 ## Naechste Schritte
 
-Spieltest der Level 1 bis 10 und Balancing im Generator, danach die
-Grafik-Assets aus Meilenstein 5 und Meilenstein 9 (Performancetest auf dem
-Zielgeraet, Feinschliff).
+Spieltest der Level 1 bis 15 und Balancing im Generator, danach
+Meilenstein 9 (Performancetest auf dem Zielgeraet, Feinschliff). Mit den
+gegliederten Figuren und den feiner aufgeteilten Fassaden ist die Zahl der
+Zeichenaufrufe gestiegen - auf dem Zielgeraet zu pruefen.

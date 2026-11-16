@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Erzeugt Soundeffekte und Ambient-Schleifen fuer Nachtkatze (GDD Abschnitt 11).
 
-Alles synthetisiert, keine Samples. Die Klaenge sind bewusst einfach und
-dienen als Platzhalter: laut GDD Abschnitt 15 koennen sie spaeter durch
-lizenzfreie Aufnahmen ersetzt werden - gleiche Dateinamen genuegen.
+Alles synthetisiert, keine Samples. Die Klaenge sind bewusst einfach; laut
+GDD Abschnitt 15 koennen sie durch lizenzfreie Aufnahmen ersetzt werden -
+gleiche Dateinamen genuegen. Fuer die Katze ist das schon geschehen: Miauen,
+Schnurren, Fauchen und Kampf sind echte Aufnahmen (siehe
+katzensounds_aufbereiten.py) und werden hier nicht mehr ueberschrieben.
 
 Aufruf:  python3 nachtkatze/tools/sfx_erzeugen.py
 Ergebnis: nachtkatze/assets/sfx/*.wav und nachtkatze/assets/ambient/*.wav
@@ -527,13 +529,17 @@ def main():
         write("sfx", "kratzen_%d.wav" % (i + 1), scratch(21 + i), peak=0.55)
     write("sfx", "landung.wav", landing(), peak=0.75)
     write("sfx", "knuspern.wav", crunch(), peak=0.75)
-    write("sfx", "miau.wav", meow(), peak=0.85)
-    write("sfx", "schnurren.wav", purr(), peak=0.8)
+    # Miauen, Schnurren, Fauchen und Kampf sind inzwischen echte Aufnahmen
+    # (tools/katzensounds_aufbereiten.py). Die synthetischen Fassungen gibt es
+    # nur noch auf Wunsch: python3 sfx_erzeugen.py --katze-synthetisch
+    if "--katze-synthetisch" in sys.argv:
+        write("sfx", "miau_1.wav", meow(), peak=0.85)
+        write("sfx", "schnurren.wav", purr(), peak=0.8)
+        write("sfx", "fauchen.wav", hiss(), peak=0.7)
+        write("sfx", "kampf.wav", fight(), peak=0.8)
     write("sfx", "klaeffen.wav", yap(), peak=0.8)
     write("sfx", "knurren.wav", growl(), peak=0.85)
     write("sfx", "bellen.wav", woof(), peak=0.85)
-    write("sfx", "fauchen.wav", hiss(), peak=0.7)
-    write("sfx", "kampf.wav", fight(), peak=0.8)
     write("sfx", "motor.wav", engine_loop(), peak=0.7, loop=True)
     write("sfx", "hupe.wav", horn(), peak=0.7)
     write("sfx", "klick.wav", click(), peak=0.6)

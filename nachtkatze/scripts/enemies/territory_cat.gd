@@ -25,6 +25,7 @@ var _timer := 0.0
 
 func _ready() -> void:
 	super()
+	_build_rig(CreatureRig.Preset.REVIERKATZE)
 	_build_territory_markers()
 	_enter(State.SITZEN, randf_range(1.5, 3.0))
 
@@ -47,6 +48,7 @@ func _physics_process(delta: float) -> void:
 
 	_lock_z_axis()
 	move_and_slide()
+	_update_animation()
 
 # --- Zustaende --------------------------------------------------------------
 
@@ -76,8 +78,6 @@ func _process_warning() -> void:
 	velocity.x = 0.0
 	_face(signf(_player_delta().x))
 	_set_warning_visible(true)
-	if visual != null:
-		visual.scale = Vector3(1.0, 1.25, 1.0)
 	if not _intruder_present():
 		_enter(State.RUECKZUG, 0.0)
 		return
@@ -136,24 +136,36 @@ func _enter(new_state: State, duration: float) -> void:
 		Sfx.play_at(&"kampf", global_position)
 	if new_state != State.WARNUNG:
 		_set_warning_visible(false)
-		if visual != null:
-			visual.scale = Vector3.ONE
+
+## Animation je Zustand (GDD Abschnitt 10): Sitzen, Revier-Patrouille,
+## Warnung mit Buckel und Fauchen, Angriffssprung, Rueckzug.
+func _update_animation() -> void:
+	if rig == null:
+		return
+	rig.vertical_speed = velocity.y
+	rig.move_speed = absf(velocity.x) / patrol_speed
+	match state:
+		State.SITZEN:
+			rig.play(&"sit")
+		State.PATROUILLE:
+			rig.play(&"walk")
+		State.WARNUNG:
+			rig.play(&"warn")
+		State.ANGRIFF:
+			rig.play(&"attack")
+		State.RUECKZUG:
+			rig.play(&"retreat")
 
 ## Blumentoepfe an den Revierraendern: das Gebiet muss sichtbar sein.
 ## Sie haengen nicht am bewegten Koerper, sondern stehen fest in der Welt.
 func _build_territory_markers() -> void:
 	for side in [-1.0, 1.0]:
 		var pot := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.35, 0.35, 0.35)
-		pot.mesh = mesh
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.45, 0.26, 0.18)
-		material.roughness = 0.95
-		pot.set_surface_override_material(0, material)
+		pot.mesh = AssetKit.get_mesh(AssetKit.Kind.BLUMENTOPF)
+		pot.material_override = AssetKit.get_material()
 		add_child(pot)
 		pot.top_level = true
-		pot.global_position = home_position + Vector3(side * territory_half_width, 0.1, 0.0)
+		pot.global_position = home_position + Vector3(side * territory_half_width, -0.28, -0.75)
 
 	var strip := MeshInstance3D.new()
 	var strip_mesh := BoxMesh.new()

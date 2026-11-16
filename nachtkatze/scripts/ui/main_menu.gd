@@ -67,8 +67,8 @@ func _build_level_list() -> void:
 	for index in Game.level_count():
 		var data := Game.catalog.get_level(index)
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(330, 60)
-		button.add_theme_font_size_override("font_size", 20)
+		button.custom_minimum_size = Vector2(286, 60)
+		button.add_theme_font_size_override("font_size", 18)
 		button.clip_text = true
 		var unlocked := SaveGame.is_unlocked(index)
 		var mark := " ✓" if SaveGame.is_completed(index) else ""

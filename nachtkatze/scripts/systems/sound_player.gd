@@ -6,8 +6,11 @@ extends Node
 ## Geraeusche der Katze und der Oberflaeche sind nicht raeumlich, Gegner und
 ## Autos klingen von ihrer Position aus (leiser, wenn sie weiter weg sind).
 ##
-## Die Klaenge erzeugt tools/sfx_erzeugen.py. Wer sie durch Aufnahmen ersetzen
-## will, legt Dateien mit gleichem Namen ab.
+## Miauen, Schnurren, Fauchen und Kampf sind echte Katzenaufnahmen unter CC0
+## (Quellen: assets/sfx/QUELLEN.md, aufbereitet mit
+## tools/katzensounds_aufbereiten.py). Alle uebrigen Klaenge erzeugt
+## tools/sfx_erzeugen.py; wer sie durch Aufnahmen ersetzen will, legt Dateien
+## mit gleichem Namen ab.
 
 signal sound_played(sound_name: StringName)
 
@@ -20,7 +23,7 @@ const SOUNDS := {
 	&"kratzen": ["kratzen_1", "kratzen_2"],
 	&"landung": ["landung"],
 	&"knuspern": ["knuspern"],
-	&"miau": ["miau"],
+	&"miau": ["miau_1", "miau_2", "miau_3"],
 	&"schnurren": ["schnurren"],
 	&"klaeffen": ["klaeffen"],
 	&"knurren": ["knurren"],
@@ -37,8 +40,8 @@ const SOUNDS := {
 ## Grundlautstaerke je Geraeusch in dB - hier wird abgemischt.
 const VOLUMES := {
 	&"pfote": -14.0, &"kratzen": -12.0, &"landung": -8.0, &"knuspern": -4.0,
-	&"miau": -3.0, &"schnurren": -2.0, &"klaeffen": -3.0, &"knurren": -1.0,
-	&"bellen": -3.0, &"fauchen": -5.0, &"kampf": -3.0, &"motor": -6.0,
+	&"miau": -2.0, &"schnurren": 0.0, &"klaeffen": -3.0, &"knurren": -1.0,
+	&"bellen": -3.0, &"fauchen": -2.0, &"kampf": -2.0, &"motor": -6.0,
 	&"hupe": -6.0, &"klick": -8.0, &"geschafft": 0.0, &"game_over": 0.0,
 }
 
