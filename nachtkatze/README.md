@@ -447,10 +447,10 @@ Editor-Einstellungen (`export/android/android_sdk_path`,
 `export_presets.cfg` im Projekt.
 
 ```
-godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-0.9.0-debug.apk
+godot --headless --path nachtkatze --export-debug "Android" ../build/nachtkatze-0.9.1-debug.apk
 ```
 
-Ergebnis: rund 27 MB, `org.nachtkatze.prototyp` in Version 0.9.0,
+Ergebnis: rund 27 MB, `org.nachtkatze.prototyp` in Version 0.9.1,
 minSdk 21, targetSdk 34,
 Querformat, Architektur arm64-v8a, signiert mit den Schemata v1, v2 und v3.
 `armeabi-v7a` laesst sich im Preset zuschalten, kostet aber rund 22 MB. Das Spiel nutzt den Mobile-Renderer und braucht
@@ -481,6 +481,16 @@ Levels neu erzeugen (nach Aenderungen am Generator):
 ```
 python3 nachtkatze/tools/level_erzeugen.py
 ```
+
+## Diagnose auf dem Geraet
+
+Debug-Versionen zeigen auf Android oben eine kleine Statuszeile (Autoload
+`Diagnose`, `scripts/systems/diagnose.gd`): Version, Bildzaehler, Bilder je
+Sekunde, aktuelle Szene, die letzte erkannte Eingabe und die juengsten
+Fehlermeldungen aus `user://logs/godot.log`. So laesst sich ohne Kabel sagen,
+ob das Spiel haengt, ob Beruehrungen ankommen und ob das Geraet Fehler
+meldet. Am Rechner erscheint sie mit `-- diagnose`; in einer Release-Version
+entfernt sie sich selbst.
 
 ## Bewusste Vereinfachungen
 

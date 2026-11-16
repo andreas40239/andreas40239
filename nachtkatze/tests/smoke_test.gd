@@ -94,6 +94,7 @@ func _run_all() -> void:
 	await _test_athens_kit()
 	await _test_awning_stairs()
 	await _test_cat_recordings()
+	await _test_title_tap()
 	await _test_tutorial_level()
 	await _test_hud_paws()
 	await _test_goal()
@@ -1412,6 +1413,34 @@ func _test_awning_stairs() -> void:
 	feet = await _hop(player, 1.0)
 	_check(absf(feet - 6.0) < 0.1, "Von der Markisentreppe in den zweiten Stock (%.2f m)" % feet)
 	await _despawn(level)
+
+## Das Startbild wechselt auf eine Beruehrung hin ins Menue - auch wenn das
+## Handy dafuer zwei Ereignisse schickt (Touch und nachgebildeten Mausklick).
+func _test_title_tap() -> void:
+	var title: Node = load("res://scenes/ui/title_screen.tscn").instantiate()
+	get_tree().root.add_child(title)
+	get_tree().current_scene = title
+	await _wait(0.2)
+	var touch := InputEventScreenTouch.new()
+	touch.index = 0
+	touch.position = Vector2(640, 400)
+	touch.pressed = true
+	Input.parse_input_event(touch)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.position = Vector2(640, 400)
+	click.pressed = true
+	Input.parse_input_event(click)
+	await _wait(0.3)
+	var current := get_tree().current_scene
+	_check(current != null and current.name == "MainMenu",
+		"Antippen des Startbilds fuehrt ins Hauptmenue (%s)" % (current.name if current != null else "keine Szene"))
+	_check(not is_instance_valid(title) or not title.is_inside_tree(),
+		"Das Startbild ist danach verschwunden")
+	if current != null and current != self:
+		current.queue_free()
+	await get_tree().process_frame
+	get_tree().current_scene = self
 
 ## Echte Katzenaufnahmen: mehrere Miau-Varianten, Quellen dokumentiert.
 func _test_cat_recordings() -> void:

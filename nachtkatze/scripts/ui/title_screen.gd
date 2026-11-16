@@ -6,6 +6,7 @@ extends Node3D
 @onready var _hint: Control = %TippHinweis
 
 var _time := 0.0
+var _leaving := false
 
 func _ready() -> void:
 	# Im Menue nur Musik, das Ambient gehoert zu den Levels.
@@ -18,10 +19,15 @@ func _process(delta: float) -> void:
 	if _hint != null:
 		_hint.modulate.a = 0.45 + sin(_time * 3.0) * 0.35
 
-func _unhandled_input(event: InputEvent) -> void:
+## Bewusst _input statt _unhandled_input: das Antippen soll ankommen, egal was
+## sonst im Bild liegt. Auf dem Handy erzeugt eine Beruehrung zwei Ereignisse
+## (Touch und nachgebildeter Mausklick) - gewechselt wird nur einmal.
+func _input(event: InputEvent) -> void:
+	if _leaving:
+		return
 	var tapped := (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) \
 		or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) \
 		or event.is_action_pressed("ui_accept")
 	if tapped:
-		get_viewport().set_input_as_handled()
+		_leaving = true
 		Game.open_menu()

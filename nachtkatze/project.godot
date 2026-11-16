@@ -8,6 +8,7 @@ config_version=5
 config/name="Nachtkatze"
 config/description="Stilisierter 2.5D-Plattformer mit einer Streunerkatze (Meilenstein 1-8, dazu Level 11-15)."
 run/main_scene="res://scenes/ui/title_screen.tscn"
+config/version="0.9.1"
 config/features=PackedStringArray("4.3", "Mobile")
 config/icon="res://icon.svg"
 
@@ -18,10 +19,16 @@ Game="*res://scripts/systems/game.gd"
 PlayerInput="*res://scripts/systems/player_input.gd"
 Music="*res://scripts/systems/music_player.gd"
 Sfx="*res://scripts/systems/sound_player.gd"
+Diagnose="*res://scripts/systems/diagnose.gd"
 
 [audio]
 
 buses/default_bus_layout="res://default_bus_layout.tres"
+
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/max_log_files=3
 
 [display]
 

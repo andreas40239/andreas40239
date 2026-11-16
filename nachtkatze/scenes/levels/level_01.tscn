@@ -40,9 +40,9 @@ light_energy = 1.0
 
 [node name="Welt" type="Node3D" parent="."]
 [node name="Strasse" parent="Welt" instance=ExtResource("piece")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0, 0)
 kind = 27
-tiles = 27
+tiles = 29
 [node name="Randhaus" parent="Welt" instance=ExtResource("piece")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 0, 0)
 kind = 5

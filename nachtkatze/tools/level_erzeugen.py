@@ -412,6 +412,9 @@ class LevelBuilder:
     # --- Bauteile -------------------------------------------------------------
 
     def street(self, x0, x1):
+        # Zwei Module mehr nach links: breite Handybildschirme (20:9) sehen am
+        # Start sonst ueber das Strassenende hinaus.
+        x0 -= 8.0
         tiles = int(math.ceil((x1 - x0) / 4.0))
         self.add_piece("Welt", "Strasse", "STRASSE", x0 + tiles * 2.0, 0, 0, tiles=tiles)
         self.platform("Strasse", x0, x0 + tiles * 4.0, 0.0, "strasse")
