@@ -19,7 +19,7 @@ enum Mode { OFF, HOST, CLIENT }
 
 const PORT := 24642
 const DISC_PORT := 24643
-const PROTO := 1
+const PROTO := 2
 const MAX_PLAYERS := 6
 const MAGIC := "ZIA"
 const JOIN_TIMEOUT := 6.0
@@ -27,6 +27,8 @@ const JOIN_TIMEOUT := 6.0
 var mode: int = Mode.OFF
 var my_name := "Spieler"
 var players := {}            # Peer-ID -> Name (Gastgeber hat die ID 1)
+var looks := {}              # Gastgeber: Peer-ID -> [Farbe, Frisur, Haarfarbe, Hut]
+var player_zombie := true    # ein zufälliger Spieler startet als Zombie (sonst der Computer)
 var found_hosts := {}        # IP -> {name, count, t}
 var match_id := 0
 var in_game := false
@@ -75,6 +77,7 @@ func host_game() -> String:
 	multiplayer.multiplayer_peer = peer
 	mode = Mode.HOST
 	players = {1: _clean_name(my_name)}
+	looks = {1: GameState.look_array()}
 	in_game = false
 	_udp_send = PacketPeerUDP.new()
 	_udp_send.set_broadcast_enabled(true)
@@ -106,6 +109,7 @@ func leave() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	mode = Mode.OFF
 	players.clear()
+	looks.clear()
 	ready_peers.clear()
 	in_game = false
 	_joined = false
@@ -132,7 +136,7 @@ func _clean_name(n: String) -> String:
 
 
 func _on_connected() -> void:
-	_srv_hello.rpc_id(1, my_name, PROTO)
+	_srv_hello.rpc_id(1, my_name, PROTO, GameState.look_array())
 
 
 ## Abgerissene Verbindungen (WLAN weg, App geschlossen) nach wenigen Sekunden erkennen.
@@ -172,6 +176,7 @@ func _on_peer_disconnected(id: int) -> void:
 	if not is_host():
 		return
 	players.erase(id)
+	looks.erase(id)
 	ready_peers.erase(id)
 	# erst senden, wenn alle gleichzeitigen Abmeldungen verarbeitet sind
 	_send_lobby.call_deferred()
@@ -189,7 +194,7 @@ func _send_lobby() -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _srv_hello(pname: String, proto: int) -> void:
+func _srv_hello(pname: String, proto: int, look: Array = []) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
@@ -204,6 +209,10 @@ func _srv_hello(pname: String, proto: int) -> void:
 		_cl_reject.rpc_id(id, why)
 		return
 	players[id] = _clean_name(pname)
+	var lk := [0, 0, 0, 0]
+	for i in mini(4, look.size()):
+		lk[i] = int(look[i])
+	looks[id] = lk
 	_send_lobby()
 	lobby_changed.emit()
 
@@ -233,21 +242,22 @@ func start_match() -> void:
 	ready_peers.clear()
 	multiplayer.multiplayer_peer.refuse_new_connections = true
 	var mid := randi() % 1000000 + 1
-	var s: int = int(GameState.level.get("seed", 0)) if GameState.keep_seed else 0
+	var s: int = int(GameState.cli.get("seed", 0))
 	if s == 0:
 		s = randi() % 1000000 + 1
-	_cl_start.rpc(mid, s)
-	_do_start(mid, s)
+	_cl_start.rpc(mid, s, GameState.level_index)
+	_do_start(mid, s, GameState.level_index)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _cl_start(mid: int, level_seed: int) -> void:
-	_do_start(mid, level_seed)
+func _cl_start(mid: int, level_seed: int, level_index: int) -> void:
+	_do_start(mid, level_seed, level_index)
 
 
-func _do_start(mid: int, level_seed: int) -> void:
+func _do_start(mid: int, level_seed: int, level_index: int) -> void:
 	match_id = mid
 	in_game = true
+	GameState.set_level(level_index)
 	GameState.level["seed"] = level_seed
 	get_tree().paused = false
 	get_tree().change_scene_to_file("res://scenes/game.tscn")

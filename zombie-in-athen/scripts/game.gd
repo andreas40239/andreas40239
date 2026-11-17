@@ -58,7 +58,11 @@ var _bot_t := 0.0              # Test-Bot auf einem Client
 var _bot_dir := Vector3.ZERO
 var _bot_flags := 0
 
-const NF := 26                 # Zahlen je Figur im Schnappschuss
+var _ai_zombies := 1            # Computer-Zombies, die nach der Vorbereitungszeit kommen
+var _puddles: Array[Dictionary] = []   # Ölpfützen: {id, pos, t, uses, node}
+var _next_puddle_id := 1
+
+const NF := 28                 # Zahlen je Figur im Schnappschuss
 const POSES := ["inside", "lie", "crouch", "enter"]
 
 
@@ -107,6 +111,10 @@ func _ready() -> void:
 		var tt := Node.new()
 		tt.set_script(load("res://tests/touch_test.gd"))
 		add_child(tt)
+	if GameState.items_test:
+		var it := Node.new()
+		it.set_script(load("res://tests/items_test.gd"))
+		add_child(it)
 	if is_host and Net.players.size() > 1:
 		_waiting = true
 		paused_logic = true
@@ -126,7 +134,21 @@ func _begin() -> void:
 	_begun = true
 	if is_host:
 		Net.send_begin(_roster())
-	hud.announce("VERSTECK DICH!", "Die Zombies kommen in %d Sekunden" % int(prep_left), 3.5)
+	_intro()
+
+
+## Ansage zum Rundenstart – je nachdem, ob man selbst der Zombie ist.
+func _intro() -> void:
+	var zname := ""
+	for c in chars:
+		if c.started_as_zombie and c.owner_peer != 0:
+			zname = c.cname
+	if player.started_as_zombie and not GameState.as_zombie:
+		hud.announce("DU BIST DER ZOMBIE!", "In %d Sekunden brichst du ein. Wähle dein Fenster." % int(prep_left), 4.5)
+	elif zname != "":
+		hud.announce("VERSTECK DICH!", "%s ist der Zombie und kommt in %d Sekunden" % [zname, int(prep_left)], 4.5)
+	else:
+		hud.announce("VERSTECK DICH!", "Die Zombies kommen in %d Sekunden" % int(prep_left), 3.5)
 
 
 ## Kamera, Ohr und HUD an die Figur dieses Geräts hängen.
@@ -179,63 +201,87 @@ func _setup_environment() -> void:
 
 func _spawn_characters() -> void:
 	# menschliche Spieler: allein "Du", im Netzwerk alle aus der Lobby (Gastgeber zuerst)
-	var entries: Array = []
+	var entries: Array = []      # [Name, Peer, Aussehen [Farbe, Frisur, Haarfarbe, Hut]]
 	if net:
 		var ids: Array = Net.players.keys()
 		ids.sort()
 		for id in ids:
-			entries.append([Net.players[id], id])
+			entries.append([Net.players[id], id, Net.looks.get(id, [0, 0, 0, 0])])
 	else:
-		entries.append(["Du", 0])
-	var total := maxi(1 + int(_level.get("ai_humans", 3)), entries.size())
+		entries.append(["Du", 0, GameState.look_array()])
+	# Start-Zombie: im Mehrspieler ein zufällig ausgeloster Spieler statt eines Computer-Zombies
+	var zi := -1
+	if net and Net.player_zombie and entries.size() >= 2:
+		zi = rng.randi_range(0, entries.size() - 1)
+	_ai_zombies = maxi(0, int(_level.get("zombies", 1)) - (1 if zi >= 0 else 0))
+	var n_players_human := entries.size() - (1 if zi >= 0 else 0)
+	var n_bots := maxi(0, 1 + int(_level.get("ai_humans", 3)) - n_players_human)
 	var bed_room := 0
 	for r in apt.rooms:
 		if r.type == ApartmentGen.RoomType.BEDROOM:
 			bed_room = r.id
 			break
 	var used: Array[Vector2i] = []
-	var bot_i := 0
-	for i in total:
-		var c: Character
-		var color: Color = Cfg.SHIRT_COLORS[i % Cfg.SHIRT_COLORS.size()]
-		if i < entries.size():
-			var owner: int = entries[i][1]
-			var local: bool = (not net) or owner == Net.my_id()
-			var zombie: bool = local and GameState.as_zombie
-			c = _make_char(entries[i][0], color, i, zombie)
-			c.owner_peer = owner
-			if local:
-				player = c
-				c.player_controlled = not GameState.autoplay
-				if GameState.autoplay:
-					c.brain = (ZombieAI.new(c, self) if zombie else HumanAI.new(c, self))
-			else:
-				c.player_controlled = true
+	var used_colors := {}
+	var zombie_char: Character = null
+	for i in entries.size():
+		var lk: Array = entries[i][2]
+		var ci := clampi(int(lk[0]), 0, Cfg.SHIRT_COLORS.size() - 1)
+		used_colors[ci] = true
+		var owner: int = entries[i][1]
+		var local: bool = (not net) or owner == Net.my_id()
+		var zombie: bool = i == zi or (local and GameState.as_zombie)
+		var c := _make_char(entries[i][0], Cfg.SHIRT_COLORS[ci], i, zombie, [int(lk[1]), int(lk[2]), int(lk[3])])
+		c.owner_peer = owner
+		if local:
+			player = c
+			c.player_controlled = not GameState.autoplay
+			if GameState.autoplay:
+				c.brain = (ZombieAI.new(c, self) if zombie else HumanAI.new(c, self))
 		else:
-			c = _make_char(Cfg.BOT_NAMES[bot_i % Cfg.BOT_NAMES.size()], color, i, false)
-			c.brain = HumanAI.new(c, self)
-			bot_i += 1
-		# Startplätze: der erste im Schlafzimmer, alle mit Abstand zueinander
-		var cell := nav.random_free_in_room(bed_room) if i == 0 else nav.random_free()
-		if i > 0:
-			for tries in 30:
-				cell = nav.random_free()
-				var ok := true
-				for u in used:
-					if Vector2(u - cell).length() < 4.0:
-						ok = false
-				if ok:
-					break
-		used.append(cell)
-		c.global_position = Nav.center(cell)
-		if i > 0:
-			c.facing = rng.randf() * TAU
+			c.player_controlled = true
+		if i == zi:
+			zombie_char = c
+		else:
+			_place_start(c, used, bed_room)
+	var next_color := 0
+	for b in n_bots:
+		while used_colors.has(next_color) and next_color < Cfg.SHIRT_COLORS.size() - 1:
+			next_color += 1
+		used_colors[next_color] = true
+		# Computerspieler bekommen zufällige Frisuren und manchmal einen Hut
+		var look := [rng.randi_range(0, Cfg.HAIR_NAMES.size() - 1), rng.randi_range(0, 4),
+			rng.randi_range(1, Cfg.HAT_NAMES.size() - 1) if rng.randf() < 0.4 else 0]
+		var c := _make_char(Cfg.BOT_NAMES[b % Cfg.BOT_NAMES.size()], Cfg.SHIRT_COLORS[next_color], chars.size(), false, look)
+		c.brain = HumanAI.new(c, self)
+		_place_start(c, used, bed_room)
+	if zombie_char != null:
+		# der Spieler-Zombie wartet von Anfang an draußen vor einem Fenster
+		var wins := _free_openings()
+		_wait_outside(zombie_char, wins[rng.randi_range(0, mini(3, wins.size() - 1))])
 
 
-func _make_char(cname: String, shirt: Color, variant: int, zombie: bool) -> Character:
+## Startplatz: der erste im Schlafzimmer, alle mit Abstand zueinander.
+func _place_start(c: Character, used: Array[Vector2i], bed_room: int) -> void:
+	var cell := nav.random_free_in_room(bed_room) if used.is_empty() else nav.random_free()
+	if not used.is_empty():
+		for tries in 30:
+			cell = nav.random_free()
+			var ok := true
+			for u in used:
+				if Vector2(u - cell).length() < 4.0:
+					ok = false
+			if ok:
+				break
+		c.facing = rng.randf() * TAU
+	used.append(cell)
+	c.global_position = Nav.center(cell)
+
+
+func _make_char(cname: String, shirt: Color, variant: int, zombie: bool, look: Array = [-1, -1, 0]) -> Character:
 	var c := Character.new()
 	add_child(c)
-	c.setup(self, cname, shirt, variant, zombie)
+	c.setup(self, cname, shirt, variant, zombie, look)
 	chars.append(c)
 	return c
 
@@ -405,6 +451,7 @@ func _physics_process(delta: float) -> void:
 
 	_apply_player_input()
 	_update_pickups(delta)
+	_update_puddles(delta)
 	_update_audio_levels()
 	for p in _noise_pings:
 		p.t -= delta
@@ -500,6 +547,10 @@ func _save_shot(fname: String) -> void:
 
 func _update_camera(delta: float) -> void:
 	var target := player.global_position
+	if GameState.overview > 0.0:
+		cam.size = GameState.overview
+		cam.global_position = _cam_pos_for(Vector3(apt.w * 0.5, 0, apt.h * 0.5))
+		return
 	if GameState.follow != "":
 		for c in chars:
 			if c.cname.begins_with(GameState.follow):
@@ -594,27 +645,69 @@ func _update_audio_levels() -> void:
 
 func _spawn_zombies_outside() -> void:
 	_spawned_outside = true
-	var n := int(_level.get("zombies", 1))
-	var wins: Array = builder.windows.filter(func(w): return not w.opening.is_empty())
-	# nicht direkt neben dem Spieler einsteigen
+	var wins := _free_openings()
+	for i in _ai_zombies:
+		if wins.is_empty():
+			break
+		var win: Dictionary = wins[rng.randi_range(0, mini(2, wins.size() - 1))]
+		wins.erase(win)
+		var z := _make_char("Zombie " + Cfg.ZOMBIE_NAMES[i % Cfg.ZOMBIE_NAMES.size()], Color(0.45, 0.4, 0.3), 5 + i, true)
+		z.brain = ZombieAI.new(z, self)
+		_wait_outside(z, win)
+		Net.send_event("spawn", [_roster_entry(z)])
+
+
+## Fenster und Türen, vor denen noch kein Zombie wartet – die von Menschen entferntesten zuerst.
+func _free_openings() -> Array:
+	var wins: Array = builder.windows.filter(func(w):
+		if w.opening.is_empty():
+			return false
+		for e in _pending:
+			if e.win == w:
+				return false
+		return true)
 	var scores := {}
 	for w in wins:
 		scores[w] = _opening_score(w)
 	wins.sort_custom(func(a, b): return scores[a] > scores[b])
-	for i in n:
-		var win: Dictionary = wins[mini(i + (rng.randi_range(0, mini(2, wins.size() - 1 - i)) if i == 0 else 0), wins.size() - 1)]
-		wins.erase(win)
-		var z := _make_char("Zombie " + Cfg.ZOMBIE_NAMES[i % Cfg.ZOMBIE_NAMES.size()], Color(0.45, 0.4, 0.3), 5 + i, true)
-		z.brain = ZombieAI.new(z, self)
-		z.busy = true
-		z.busy_pose = "enter"
-		var o: Dictionary = win.opening
-		var inside := Nav.center(o.inside)
-		var out_dir := Vector3(o.out.x, 0, o.out.y)
-		z.global_position = inside + out_dir * 1.35
-		z.face_towards(inside)
-		_pending.append({"z": z, "win": win, "inside": inside, "out": out_dir})
-		Net.send_event("spawn", [_roster_entry(z)])
+	return wins
+
+
+func _wait_outside(z: Character, win: Dictionary) -> void:
+	z.busy = true
+	z.busy_pose = "enter"
+	var entry := {"z": z, "win": win, "inside": Vector3.ZERO, "out": Vector3.ZERO}
+	for e in _pending:
+		if e.z == z:
+			entry = e
+	if not _pending.has(entry):
+		_pending.append(entry)
+	var o: Dictionary = win.opening
+	entry.win = win
+	entry.inside = Nav.center(o.inside)
+	entry.out = Vector3(o.out.x, 0, o.out.y)
+	z.global_position = entry.inside + entry.out * 1.35
+	z.face_towards(entry.inside)
+
+
+## Spieler-Zombie wählt während der Vorbereitungszeit ein anderes Fenster.
+func _act_window(c: Character) -> void:
+	if phase != Phase.PREP or not c.busy:
+		return
+	for e in _pending:
+		if e.z != c:
+			continue
+		var all: Array = builder.windows.filter(func(w): return not w.opening.is_empty())
+		var idx := all.find(e.win)
+		for k in range(1, all.size()):
+			var cand: Dictionary = all[(idx + k) % all.size()]
+			var taken := false
+			for o in _pending:
+				if o != e and o.win == cand:
+					taken = true
+			if not taken:
+				_wait_outside(c, cand)
+				return
 
 
 func _opening_score(win: Dictionary) -> float:
@@ -767,6 +860,14 @@ func player_sprint() -> void:
 	_request("sprint")
 
 
+func player_window() -> void:
+	_request("window")
+
+
+func player_oil() -> void:
+	_request("oil")
+
+
 
 
 
@@ -788,6 +889,10 @@ func _do_action(c: Character, kind: String, arg: Vector3) -> void:
 		"sprint":
 			if c.is_zombie and c.heard_t > 0.0 and c.can_act():
 				c.try_sprint()
+		"window":
+			_act_window(c)
+		"oil":
+			drop_oil(c)
 		"throw":
 			if c.has_melon and c.is_active_human() and c.hidden_in == null:
 				var d := Vector3(arg.x, 0, arg.z)
@@ -984,7 +1089,7 @@ func _update_pickups(delta: float) -> void:
 
 func _spawn_pickup(kind := "", at := Vector3.INF) -> Pickup:
 	if kind == "":
-		kind = ["garlic", "souvlaki", "melon"][rng.randi_range(0, 2)]
+		kind = Cfg.PICKUP_KINDS[rng.randi_range(0, Cfg.PICKUP_KINDS.size() - 1)]
 	var pos := at
 	if pos == Vector3.INF:
 		for tries in 40:
@@ -1023,11 +1128,69 @@ func _collect(h: Character, p: Pickup) -> void:
 			h.souvlaki_t = Cfg.SOUVLAKI_TIME
 			Sfx.play_at("souvlaki", h.global_position, 0.0)
 			_announce_to(h, "SOUVLAKI!", "20 Sekunden schneller als jeder Zombie.", 2.5)
+		"oil":
+			h.has_oil = true
+			_announce_to(h, "OLIVENÖL!", "Öl-Button: Pfütze legen – Zombies rutschen darauf aus.", 3.0)
+		"frappe":
+			h.frappe_t = Cfg.FRAPPE_TIME
+			h.freeze_left = Cfg.FREEZE_MAX
+			h.freeze_lock = 0.0
+			Sfx.play_at("frappe", h.global_position, 0.0)
+			_announce_to(h, "FRAPPÉ!", "20 Sekunden leise UND schnell. Stillstehen ist aufgefüllt.", 3.0)
 		_:
 			h.has_melon = true
 			_announce_to(h, "WASSERMELONE!", "Melonen-Button halten, Richtung wählen, loslassen.", 3.0)
 	_toast_others("%s: %s" % [h.cname, Props.kind_name(p.kind)], [h])
 	p.queue_free()
+
+
+# --- Olivenöl
+
+## Legt eine Ölpfütze hinter die Figur (Spieler-Button oder KI).
+func drop_oil(c: Character) -> void:
+	if is_client or not c.has_oil or not c.is_active_human() or c.hidden_in != null:
+		return
+	c.has_oil = false
+	var pos := c.global_position - c.facing_dir() * 0.3
+	pos.y = 0.0
+	var id := _next_puddle_id
+	_next_puddle_id += 1
+	_add_puddle(id, pos)
+	Net.send_event("oil", [id, pos])
+	Sfx.play_at("oil", pos, 2.0)
+	_toast_to(c, "Ölpfütze gelegt – Zombies rutschen darauf aus.")
+	_toast_others("%s legt eine Ölpfütze" % c.cname, [c])
+
+
+func _add_puddle(id: int, pos: Vector3) -> void:
+	var node := Props.oil_puddle()
+	add_child(node)
+	node.global_position = pos
+	_puddles.append({"id": id, "pos": pos, "t": Cfg.OIL_TIME, "uses": Cfg.OIL_USES, "node": node})
+
+
+func _remove_puddle(id: int) -> void:
+	for p in _puddles:
+		if p.id == id:
+			p.node.queue_free()
+			_puddles.erase(p)
+			return
+
+
+func _update_puddles(delta: float) -> void:
+	for p in _puddles.duplicate():
+		p.t -= delta
+		for z in chars:
+			if not z.is_zombie or z.busy or z.slip_t > 0.0 or z.slip_cd > 0.0 or not z.moving:
+				continue
+			if z.global_position.distance_to(p.pos) < Cfg.OIL_RADIUS:
+				z.slip()
+				p.uses -= 1
+				_announce_to(z, "AUSGERUTSCHT!", "", 1.5)
+				_toast_others("%s rutscht auf dem Öl aus!" % z.cname, [z])
+		if p.t <= 0.0 or p.uses <= 0:
+			Net.send_event("oil_gone", [p.id])
+			_remove_puddle(p.id)
 
 
 func set_aiming(on: bool) -> void:
@@ -1134,6 +1297,8 @@ func _finish(sunrise: bool, top: Character) -> void:
 		headline = "VERLOREN"
 		if hs.size() >= 1:
 			sub = "%s hat als Mensch überlebt." % ", ".join(hs.map(func(h): return h.cname))
+		else:
+			sub = "Kein Mensch hat überlebt."
 		if top != null:
 			sub += "  Bester Zombie: %s (%d Bisse)." % [top.cname, top.bites]
 	results = {"sunrise": sunrise, "humans": hs, "top_zombie": top, "player_wins": player_wins,
@@ -1186,7 +1351,7 @@ func _reset_engine() -> void:
 # Client: baut daraus die Anzeige; eigene Logik läuft dort nicht.
 
 func _roster_entry(c: Character) -> Array:
-	return [c.cname, c.shirt, c.variant, c.started_as_zombie, c.owner_peer]
+	return [c.cname, c.shirt, c.variant, c.started_as_zombie, c.owner_peer, c.look]
 
 
 func _roster() -> Array:
@@ -1218,6 +1383,7 @@ func _make_snapshot() -> Array:
 		if c.listening: flags |= 16
 		if c.busy: flags |= 32
 		if c.has_melon: flags |= 64
+		if c.has_oil: flags |= 128
 		var pose := c.busy_pose if c.busy else c.hide_pose
 		var chase := -1
 		if c.brain is ZombieAI and c.brain.state == ZombieAI.S.CHASE and c.brain.target != null:
@@ -1248,6 +1414,8 @@ func _make_snapshot() -> Array:
 		cf[o + 23] = maxi(0, POSES.find(pose))
 		cf[o + 24] = c.motion
 		cf[o + 25] = chase
+		cf[o + 26] = c.frappe_t
+		cf[o + 27] = c.slip_t
 	var sniff := PackedInt32Array()
 	for i in spots.size():
 		if spots[i].sniffed_by != null:
@@ -1255,7 +1423,7 @@ func _make_snapshot() -> Array:
 	var pk := PackedFloat32Array()
 	for p in pickups:
 		pk.append(p.net_id)
-		pk.append(["garlic", "souvlaki", "melon"].find(p.kind))
+		pk.append(Cfg.PICKUP_KINDS.find(p.kind))
 		pk.append(p.global_position.x)
 		pk.append(p.global_position.z)
 	return [phase, prep_left, match_left, time, cf, sniff, pk]
@@ -1302,7 +1470,7 @@ func net_peer_left(peer: int) -> void:
 # --- Client
 
 func _add_roster_char(e: Array) -> void:
-	var c := _make_char(e[0], e[1], e[2], e[3])
+	var c := _make_char(e[0], e[1], e[2], e[3], e[5])
 	c.owner_peer = e[4]
 	c.puppet = true
 	c.player_controlled = c.owner_peer != 0
@@ -1321,7 +1489,7 @@ func net_begin(roster: Array) -> void:
 	_attach_player()
 	_begun = true
 	paused_logic = false
-	hud.announce("VERSTECK DICH!", "Die Zombies kommen in %d Sekunden" % int(prep_left), 3.5)
+	_intro()
 
 
 func net_snapshot(a: Array) -> void:
@@ -1354,6 +1522,9 @@ func net_snapshot(a: Array) -> void:
 		c.listening = (flags & 16) != 0
 		c.busy = (flags & 32) != 0
 		c.has_melon = (flags & 64) != 0
+		c.has_oil = (flags & 128) != 0
+		c.frappe_t = cf[o + 26]
+		c.slip_t = cf[o + 27]
 		c.lives = int(cf[o + 7])
 		c.bites = int(cf[o + 8])
 		c.bites_taken = int(cf[o + 9])
@@ -1396,7 +1567,7 @@ func net_snapshot(a: Array) -> void:
 		if not _net_pickups.has(id):
 			var p := Pickup.new()
 			add_child(p)
-			p.setup(["garlic", "souvlaki", "melon"][clampi(int(pk[i * 4 + 1]), 0, 2)])
+			p.setup(Cfg.PICKUP_KINDS[clampi(int(pk[i * 4 + 1]), 0, Cfg.PICKUP_KINDS.size() - 1)])
 			p.net_id = id
 			p.global_position = Vector3(pk[i * 4 + 2], 0, pk[i * 4 + 3])
 			_net_pickups[id] = p
@@ -1434,6 +1605,10 @@ func net_event(kind: String, args: Array) -> void:
 			_break_fx(args[0])
 		"melon":
 			_melon_fx(args[0], args[1], args[2])
+		"oil":
+			_add_puddle(args[0], args[1])
+		"oil_gone":
+			_remove_puddle(args[0])
 		"end":
 			if phase == Phase.END:
 				return
@@ -1495,3 +1670,7 @@ func _bot_input() -> void:
 		Net.send_action("sprint", Vector3.ZERO)
 	elif r < 0.7:
 		Net.send_action("throw", _bot_dir)
+	elif r < 0.8:
+		Net.send_action("oil", Vector3.ZERO)
+	elif r < 0.9:
+		Net.send_action("window", Vector3.ZERO)

@@ -108,12 +108,73 @@ static func souvlaki() -> Node3D:
 	return n
 
 
+## Flasche Olivenöl.
+static func oil_bottle() -> Node3D:
+	var n := Node3D.new()
+	var glass := _mat(Color(0.12, 0.32, 0.12), 0.15)
+	var body := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.09
+	cm.bottom_radius = 0.1
+	cm.height = 0.34
+	cm.radial_segments = 10
+	body.mesh = cm
+	body.material_override = glass
+	body.position.y = 0.17
+	n.add_child(body)
+	var neck := MeshInstance3D.new()
+	var nm := CylinderMesh.new()
+	nm.top_radius = 0.035
+	nm.bottom_radius = 0.07
+	nm.height = 0.16
+	nm.radial_segments = 8
+	neck.mesh = nm
+	neck.material_override = glass
+	neck.position.y = 0.42
+	n.add_child(neck)
+	_box(n, _mat(Color(0.75, 0.6, 0.35)), Vector3(0, 0.53, 0), Vector3(0.06, 0.07, 0.06))
+	_box(n, _mat(Color(0.93, 0.88, 0.7)), Vector3(0, 0.18, 0.085), Vector3(0.13, 0.14, 0.04))
+	_box(n, _mat(Color(0.3, 0.45, 0.15)), Vector3(0, 0.18, 0.108), Vector3(0.06, 0.05, 0.01))
+	return n
+
+
+## Glas Frappé mit Schaum und Strohhalm.
+static func frappe() -> Node3D:
+	var n := Node3D.new()
+	var coffee := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.1
+	cm.bottom_radius = 0.085
+	cm.height = 0.3
+	cm.radial_segments = 10
+	coffee.mesh = cm
+	coffee.material_override = _mat(Color(0.42, 0.26, 0.14), 0.2)
+	coffee.position.y = 0.15
+	n.add_child(coffee)
+	var foam := MeshInstance3D.new()
+	var fm := CylinderMesh.new()
+	fm.top_radius = 0.105
+	fm.bottom_radius = 0.102
+	fm.height = 0.1
+	fm.radial_segments = 10
+	foam.mesh = fm
+	foam.material_override = _mat(Color(0.93, 0.86, 0.72), 0.6)
+	foam.position.y = 0.35
+	n.add_child(foam)
+	_box(n, _mat(Color(0.2, 0.5, 0.9)), Vector3(0.03, 0.42, 0), Vector3(0.025, 0.36, 0.025), Vector3(0, 0, -0.25))
+	return n
+
+
 static func pickup_model(kind: String) -> Node3D:
 	match kind:
 		"garlic":
 			return garlic()
 		"souvlaki":
 			return souvlaki()
+		"oil":
+			return oil_bottle()
+		"frappe":
+			return frappe()
 		_:
 			var n := Node3D.new()
 			var m := melon_mesh(0.2)
@@ -126,6 +187,8 @@ static func kind_color(kind: String) -> Color:
 	match kind:
 		"garlic": return Color(0.8, 1.0, 0.6)
 		"souvlaki": return Color(1.0, 0.65, 0.2)
+		"oil": return Color(0.55, 0.85, 0.3)
+		"frappe": return Color(0.75, 0.55, 0.4)
 		_: return Color(1.0, 0.35, 0.4)
 
 
@@ -133,7 +196,35 @@ static func kind_name(kind: String) -> String:
 	match kind:
 		"garlic": return "Knoblauch"
 		"souvlaki": return "Souvlaki"
+		"oil": return "Olivenöl"
+		"frappe": return "Frappé"
 		_: return "Wassermelone"
+
+
+## Ölpfütze am Boden. Bewusst dunkel-oliv: kräftiges Gelb ist in der Zombie-Sicht
+## für erkannte Menschen reserviert.
+static func oil_puddle() -> Node3D:
+	var n := Node3D.new()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.36, 0.42, 0.1, 0.85)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.roughness = 0.05
+	m.metallic_specular = 0.9
+	for i in 5:
+		var disc := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		var r := Cfg.OIL_RADIUS if i == 0 else randf_range(0.25, 0.45)
+		cm.top_radius = r
+		cm.bottom_radius = r
+		cm.height = 0.012
+		cm.radial_segments = 14
+		disc.mesh = cm
+		disc.material_override = m
+		var a := randf() * TAU
+		disc.position = Vector3.ZERO if i == 0 else Vector3(cos(a), 0, sin(a)) * randf_range(0.5, 0.8)
+		disc.position.y = 0.012 + i * 0.001
+		n.add_child(disc)
+	return n
 
 
 ## Zerplatzte Melone am Boden.

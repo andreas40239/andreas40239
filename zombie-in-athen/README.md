@@ -1,6 +1,7 @@
 # Zombie in Athen
 
-Isometrisches Zombie-Versteckspiel in einer zufällig erzeugten Athener Wohnung.
+Isometrisches Zombie-Versteckspiel in zufällig erzeugten Orten in Athen: Wohnung, große
+Wohnung, Taverne und Schule.
 Godot 4.5 (GDScript, Compatibility-Renderer / OpenGL ES 3), Zielplattform **Android arm64**,
 Querformat, Touch-Steuerung. Zielgruppe ab ca. 16 Jahren.
 
@@ -26,6 +27,10 @@ Zimmer). Nach **30 Sekunden** brechen Zombies durch ein Fenster oder die Wohnung
 * **Knoblauch** – 20 s stinken, Zombies halten Abstand.
 * **Souvlaki** – 20 s schneller als jeder Zombie.
 * **Wassermelone** – Button halten, Richtung ziehen, loslassen: alle Zombies rennen zur Melone.
+* **Olivenöl** – Öl-Button legt eine Pfütze hinter dich. Zombies, die darüberlaufen, rutschen
+  aus und liegen 2,5 s am Boden. Eine Pfütze hält 45 s oder drei Ausrutscher.
+* **Frappé** – 20 s lang ist „Leise“ schneller als ein verfolgender Zombie, und die
+  Stillsteh-Zeit ist wieder voll.
 
 ### Als Zombie
 
@@ -33,6 +38,25 @@ Alles erscheint in Rot-Tönen. Menschen sind nur sichtbar, wenn sie sich in Sich
 (gelb pulsierend) oder Lärm machen (gelbes pulsierendes Oval im Spielfeld und auf der Karte).
 Buttons: **Beißen**, **Rennen** (3 s, sobald ein Mensch Lärm gemacht hat) und **Horchen**
 (still stehen, alle Menschen erscheinen als gelbes Oval).
+
+## Orte
+
+| Ort | Größe | Besonderheit | Zombies |
+|---|---|---|---|
+| Wohnung | 22 × 16 m, 6 Zimmer | das ursprüngliche Testlevel | 1 |
+| Große Wohnung | 30 × 22 m, 11 Zimmer | zwei Flure mit Rundweg | 2 |
+| Taverne | 28 × 18 m | großer Gastraum mit vielen Tischen, Küche, Vorrat | 2 |
+| Schule | 34 × 24 m, 14 Räume | Klassenzimmer mit Pulten und Tafel, Spinde im Flur | 2 |
+
+Allein wählst du den Ort nach „Allein spielen“, im Mehrspieler wählt ihn der Gastgeber in
+der Lobby. Die Einstellungen stehen in `Cfg.LEVELS` ([`scripts/cfg.gd`](scripts/cfg.gd)).
+
+## Meine Figur
+
+Im Hauptmenü unter **Meine Figur**: Farbe (10), Frisur (7), Haarfarbe (8) und Hut (ohne,
+Kappe, Strohhut, Fischermütze, Mütze, Spartaner-Helm, Lorbeerkranz, Krone, Kochmütze).
+Die Auswahl wird gespeichert und im Mehrspieler an alle übertragen. Computerspieler bekommen
+zufällige Frisuren und manchmal einen Hut. Als Zombie behält man Frisur und Hut.
 
 ## Mehrspieler im WLAN (ohne Server)
 
@@ -43,8 +67,14 @@ anderen wählen sich dort ein. Internet wird nicht gebraucht.
 2. Einer tippt **Spiel eröffnen** (Gastgeber). Sein Bildschirm zeigt die Adresse an.
 3. Die anderen tippen **Spiel suchen** und wählen das gefundene Spiel. Erscheint es nicht
    (manche Netze blocken die Suche), die Adresse des Gastgebers eintippen.
-4. Der Gastgeber tippt **Starten**. Freie Plätze bis 4 Menschen übernehmen Computerspieler;
-   dazu kommt wie im Einzelspiel 1 Zombie.
+4. Der Gastgeber wählt Ort und Start-Zombie und tippt **Starten**. Freie Plätze übernehmen
+   Computerspieler.
+
+**Ein Spieler startet als Zombie:** Ab zwei Spielern wird einer zufällig ausgelost (in der
+Lobby auf „Computer“ umstellbar). Er wartet während der 30 Sekunden draußen, sieht schon in
+Rot, kann mit **Fenster wechseln** aussuchen, wo er einbricht, und sieht rennende Menschen
+als gelbes Oval – leise verstecken lohnt sich also. Auf Orten mit 2 Zombies kommt zusätzlich
+ein Computer-Zombie.
 
 Was man wissen sollte:
 
@@ -66,15 +96,15 @@ Was man wissen sollte:
 | Stillstehen (halten) | Leertaste |
 | Verstecken / Raus | E |
 | Melone (halten, ziehen, loslassen) | F (wirft in Blickrichtung) |
+| Öl legen | – |
 | Zombie: Beißen / Rennen / Horchen | Leertaste / Umschalt / Q |
 | Pause | Esc |
 
 ## Testlevel
 
-`Allein spielen` im Hauptmenü: **1 menschlicher Spieler, 3 Computerspieler, 1 Zombie**,
-Wohnung 22 × 16 m mit 6 Räumen, jedes Mal neu erzeugt. Einstellungen in
-[`scripts/game_state.gd`](scripts/game_state.gd) (`TEST_LEVEL`), Balancing-Werte in
-[`scripts/cfg.gd`](scripts/cfg.gd).
+`Allein spielen` → **Wohnung**: **1 menschlicher Spieler, 3 Computerspieler, 1 Zombie**,
+Wohnung 22 × 16 m mit 6 Räumen, jedes Mal neu erzeugt. Level-Einstellungen (`LEVELS`) und
+Balancing-Werte stehen in [`scripts/cfg.gd`](scripts/cfg.gd).
 
 ## Festlegungen, wo die Vorgabe offen war
 
@@ -98,8 +128,9 @@ Wohnung 22 × 16 m mit 6 Räumen, jedes Mal neu erzeugt. Einstellungen in
 Startparameter für Tests (nach `--`): `--game` (Menü überspringen), `--seed=N`,
 `--autoplay` (KI steuert den Spieler), `--as-zombie`, `--fast=N` (Zeitraffer),
 `--prep=SEK`, `--match=SEK`, `--shots=ORDNER` (Screenshots), `--debug`.
+`--level=0..3` (Ort), `--look=FARBE,FRISUR,HAARFARBE,HUT`, `--overview=METER` (ganzer Ort im Bild).
 Netzwerk: `--host=N` (eröffnen, bei N Spielern starten), `--join=ADRESSE` oder `--join=auto`
-(Spielsuche), `--name=NAME`.
+(Spielsuche), `--name=NAME`, `--zombie-computer`.
 
 ## Android-APK bauen
 
@@ -118,11 +149,12 @@ xvfb-run -a -s "-screen 0 1280x720x24" tools/run_tests.sh   # Linux ohne Bildsch
 tools/run_tests.sh                                          # mit Bildschirm
 ```
 
-* `tests/gen_test.gd` – Wohnungsgenerator über 300 Seeds (Pflichträume, Erreichbarkeit, Verstecke)
+* `tests/gen_test.gd` – Generator für alle vier Orte über 120–300 Seeds (Erreichbarkeit, Verstecke)
+* `tests/items_test.gd` – Olivenöl, Frappé, Ausrutschen, Fensterwechsel des wartenden Zombies
 * komplette KI-Matches im Zeitraffer ohne Skriptfehler
 * Netzwerkrunde: Gastgeber und zwei Mitspieler als eigene Prozesse auf einem Rechner
   (einer findet das Spiel über die Suche); alle müssen dieselbe Abschlusstabelle melden
-* `tests/touch_test.gd` – simulierte Finger: Joystick, Multitouch, alle Buttons, Melonenwurf
+* `tests/touch_test.gd` – simulierte Finger: Joystick, Multitouch, Buttons der Menschen, Melonenwurf, Öl
 
 ## Aufbau
 
@@ -130,12 +162,12 @@ tools/run_tests.sh                                          # mit Bildschirm
 scripts/
   cfg.gd               Balancing-Konstanten
   game_state.gd        Autoload: Level-Konfiguration, Startparameter
-  apartment_gen.gd     Grundriss: Räume, Wände, Türen, Fenster, Möbel (nur Daten)
+  apartment_gen.gd     Grundriss: Flure, Räume je Thema, Wände, Türen, Fenster, Möbel (nur Daten)
   apartment_builder.gd 3D-Aufbau aus Quadern, Licht, Kollision, Verstecke
   mesh_batch.gd        fasst Quader je Raum zu wenigen Meshes zusammen
   nav.gd               A*-Wegfindung und Sichtlinien auf dem Zellraster
   character.gd         Spielfigur (Mensch/Zombie): Bewegung, Zustände, Schritte, Lärm
-  char_model.gd        Klötzchen-Figur mit prozeduraler Animation
+  char_model.gd        Klötzchen-Figur mit Frisuren, Hüten und prozeduraler Animation
   brain.gd, human_ai.gd, zombie_ai.gd   KI
   hiding_spot.gd, pickup.gd, props.gd   Verstecke, Upgrades, kleine 3D-Objekte
   game.gd              Spielablauf: Phasen, Bisse, Geräusche, Upgrades, Zombie-Sicht, Ende
@@ -156,7 +188,7 @@ Alle Grafiken und Sounds sind **selbst erzeugt** und frei von Fremdrechten:
 * **2D** (`assets/textures`, `assets/icons`, `assets/ui`): `tools/gen_graphics.py` (Pillow/numpy).
 * **Audio** (`assets/audio`): `tools/gen_audio.py` (numpy/scipy, rein synthetisch) –
   Schritte, schlurfende Zombie-Schritte, Glasbruch, Tür, Zombie-Stöhnen/-Schrei/-Biss,
-  Upgrades, Verstecken, Herzschlag, Verwandlung, Jingles sowie zwei nahtlos schleifende
+  Upgrades (auch Öl, Ausrutschen, Frappé), Verstecken, Herzschlag, Verwandlung, Jingles sowie zwei nahtlos schleifende
   Musikstücke in D-Hijaz mit Bouzouki-Klang (ruhig und Verfolgung).
 * **Schrift:** [Creepster](https://fonts.google.com/specimen/Creepster) von Font Diner,
   SIL Open Font License 1.1 (`assets/fonts/OFL-Creepster.txt`).
@@ -166,6 +198,8 @@ Alle Grafiken und Sounds sind **selbst erzeugt** und frei von Fremdrechten:
 * Die APK wurde gebaut und statisch geprüft (arm64-v8a, signiert), aber **noch nicht auf einem
   echten Gerät gestartet**; Performance und Lautstärke-Mix bitte dort prüfen.
 * Die Sounds wurden nur messtechnisch geprüft (Pegel, Länge, Schleifenpunkte), nicht abgehört.
+* Auf den großen Orten gibt es mehr Lichter und Möbel; wie flüssig sie auf älteren Handys
+  laufen, ist ungeprüft.
 * Der Mehrspielermodus wurde nur mit mehreren Spielinstanzen auf einem Rechner getestet,
   **nicht in einem echten WLAN zwischen Handys**. Offen sind dort vor allem: funktioniert die
   Spielsuche auf den Geräten, und wie flüssig fühlt sich die eigene Figur an (sie bewegt sich

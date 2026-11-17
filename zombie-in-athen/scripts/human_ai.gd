@@ -29,6 +29,13 @@ func _init(p_char: Character, p_game) -> void:
 
 
 func think(delta: float) -> void:
+	_think(delta)
+	# Frappé: leise ist dann schnell genug – nie rennen
+	if c.frappe_t > 0.0 and c.hidden_in == null:
+		c.want_sneak = true
+
+
+func _think(delta: float) -> void:
 	c.want_freeze = false
 	timer -= delta
 	think_t -= delta
@@ -233,6 +240,8 @@ func _flee(delta: float) -> void:
 	c.want_sneak = not run
 	if threat != null:
 		# Melone werfen, wenn es eng wird
+		if c.has_oil and threat_d < 4.0 and _is_chased():
+			game.drop_oil(c)
 		if c.has_melon and threat_d < 5.5:
 			var dir := threat.global_position - c.global_position
 			dir.y = 0

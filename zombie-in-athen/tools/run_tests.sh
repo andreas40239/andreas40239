@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Automatische Tests:
-#   0) Wohnungsgenerator über 300 Seeds
+#   0) Generator für alle vier Orte über viele Seeds; Olivenöl, Frappé, Fensterwechsel;
+#      je ein komplettes Match auf den größeren Orten
 #   1) komplette Matches im Zeitraffer, alle Figuren KI-gesteuert (headless)
 #   2) Netzwerkrunde: Gastgeber + 2 Mitspieler auf diesem Rechner, inkl. Spielsuche
 #   3) Touch-Steuerung mit simulierten Fingern (braucht ein Fenster; unter Linux
@@ -10,7 +11,18 @@ cd "$(dirname "$0")/.."
 GODOT="${GODOT:-godot}"
 fail=0
 "$GODOT" --headless --path . --import >/dev/null 2>&1
-"$GODOT" --headless --path . --script tests/gen_test.gd 2>&1 | grep -E "^GENTEST" || fail=1
+gen=$("$GODOT" --headless --path . --script tests/gen_test.gd 2>&1 | grep -E "^GENTEST")
+echo "$gen"
+[ "$(echo "$gen" | grep -c "fails=0 ")" = "4" ] || fail=1
+"$GODOT" --headless --path . -- --items-test --seed=7 2>&1 | grep -E "FAIL|ITEMSTEST"
+[ "${PIPESTATUS[0]}" = "0" ] || fail=1
+for lvl in 1 2 3; do
+	out=$("$GODOT" --headless --path . -- --autoplay --level=$lvl --seed=2 --fast=10 --quit-after=500 2>&1)
+	res=$(echo "$out" | grep -E "^RESULT" | head -1)
+	errs=$(echo "$out" | grep -c "SCRIPT ERROR")
+	echo "Ort $lvl: ${res:-KEIN ERGEBNIS}  (Skriptfehler: $errs)"
+	if [ -z "$res" ] || [ "$errs" != "0" ]; then fail=1; fi
+done
 for seed in ${SEEDS:-1 2 3}; do
 	out=$("$GODOT" --headless --path . -- --autoplay --seed="$seed" --fast=10 --quit-after=400 2>&1)
 	res=$(echo "$out" | grep -E "^RESULT" | head -1)

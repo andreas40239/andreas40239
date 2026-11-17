@@ -1174,6 +1174,146 @@ def sfx_ui_click():
     return x, dur
 
 
+def glug(r, f0, f1, dur):
+    """One air bubble gulping up a bottle neck: a soft pressure pop and brown noise
+    ringing through a cavity resonance that rises as the bubble breaks free."""
+    m = n_of(dur)
+    wob = lp1(white(r, m), 40.0)
+    f = np.geomspace(f0, f1, m) * (1.0 + 0.04 * wob / (np.std(wob) + 1e-9))
+    e = bell(m, 0.28, 1.0)
+    exc = colored(r, m, 2.0) * e
+    k = n_of(0.004)
+    exc[:k] += 4.0 * np.linspace(1.0, 0.0, k) ** 2
+    cav = svf(exc, f, 6.0, "bp")                              # bottle cavity
+    neck = svf(exc, f * 2.7, 4.0, "bp")                       # neck / second resonance
+    y = cav / np.max(np.abs(cav)) + 0.8 * neck / np.max(np.abs(neck))
+    return y + 0.4 * tone(f) * e ** 1.5
+
+
+def sfx_oil():
+    r = rng_for("oil")
+    dur = 0.8
+    n = n_of(dur)
+    x = np.zeros(n)
+    # glug-glug: the bottle gulps air, a little lower each time as it empties
+    flow = np.zeros(n)
+    m = n_of(0.4)
+    for tg, f0, a in ((0.025, 205, 0.85), (0.155, 190, 1.0), (0.28, 176, 0.9), (0.40, 163, 0.7)):
+        tg += r.uniform(-0.008, 0.008)
+        f0 *= r.uniform(0.95, 1.05)
+        place(x, glug(r, f0, f0 * r.uniform(1.65, 1.95), r.uniform(0.085, 0.11)), tg, a)
+        place(flow, ar_env(m, 0.03, 0.2), tg + 0.03, a)       # the stream surges after every gulp
+    # thick stream pattering on the floor: dark, slow, sticky
+    lump = lp1(np.abs(white(r, n)), 28.0)
+    stream = hp(lp(colored(r, n, 1.0), 1700.0), 260.0) * (0.12 + flow) * (0.5 + lump / np.max(lump))
+    stream *= env_pts(n, [(0, 0), (0.06, 0.3), (0.3, 1.0), (0.6, 0.8), (0.8, 0)])
+    x += 0.5 * stream / np.max(np.abs(stream))
+    # the last big dollop lands: soft wet splat that smears out
+    ts = 0.47
+    m = n - n_of(ts)
+    sp = svf(white(r, m), env_log(m, [(0, 3200), (0.05, 1500), (0.33, 450)]), 0.8, "lp")
+    sp *= ar_env(m, 0.008, 0.75) * (0.6 + 1.2 * lp1(np.abs(white(r, m)), 35.0))
+    sq = svf(colored(r, m, 1.0), env_log(m, [(0, 1100), (0.2, 420), (0.33, 340)]), 4.0, "bp") * ar_env(m, 0.015, 0.5)
+    thump = sweep(m, 150, 80, 0.03) * ar_env(m, 0.004, 0.09)
+    place(x, 1.0 * sp / np.max(np.abs(sp)) + 0.7 * sq / np.max(np.abs(sq)) + 0.35 * thump, ts, 1.0)
+    for _ in range(10):                                       # fat drops plopping into the puddle
+        tb = 0.30 + 0.44 * r.random()
+        f = r.uniform(480, 1300)
+        d = blip(f, f * r.uniform(0.55, 0.75), r.uniform(0.014, 0.03))
+        d += 0.7 * bp(white(r, len(d)), 700, 3200) * np.hanning(len(d))
+        place(x, d, tb, r.uniform(0.15, 0.3))
+    x = np.tanh(1.3 * x / np.max(np.abs(x)))
+    return reverb(x, 0.25, 0.08, 3500, seed=19), dur
+
+
+def sfx_slip():
+    r = rng_for("slip")
+    dur = 0.9
+    n = n_of(dur)
+    x = np.zeros(n)
+    # the foot shoots out on the oil: rising rubbery squeak plus a whoosh
+    sl = 0.37
+    ns = n_of(sl)
+    wob = lp1(white(r, ns), 25.0)
+    f = env_log(ns, [(0, 430), (0.07, 540), (0.3, 1450), (sl, 1900)]) * (1.0 + 0.03 * wob / (np.std(wob) + 1e-9))
+    saw = saw_blep(f)
+    sq = svf(saw, f * 2.0, 5.0, "bp") + 0.6 * svf(saw, f, 4.0, "bp") + 0.3 * svf(saw, f * 3.1, 6.0, "bp")
+    chat = env_log(ns, [(0, 34), (sl, 78)])                   # stick-slip chatter speeds up with the slide
+    sq *= 0.5 + 0.5 * np.abs(np.sin(np.pi * np.cumsum(chat) / SR)) ** 0.6
+    sq *= env_pts(ns, [(0, 0), (0.03, 0.55), (0.25, 1.0), (0.33, 0.75), (sl, 0)])
+    wh = svf(white(r, ns), env_log(ns, [(0, 480), (0.3, 2700), (sl, 3400)]), 2.0, "bp") * bell(ns, 0.74, 1.2)
+    place(x, sq / np.max(np.abs(sq)) + 0.55 * wh / np.max(np.abs(wh)), 0.0, 0.7)
+    # ... and the whole zombie lands flat on its back: heavy, dull, dry
+    th = 0.43
+    m = n - n_of(th)
+    thud = np.tanh(2.4 * sweep(m, 150, 56, 0.04) * decay(m, 0.3))
+    flesh = lp(white(r, m), 420.0) * decay(m, 0.09) + 0.9 * bp(white(r, m), 170, 650, 1) * ar_env(m, 0.004, 0.13)
+    body = modal(m, np.array([86, 131, 197, 289, 410]) * r.uniform(0.97, 1.03, 5), [0.2, 0.16, 0.12, 0.08, 0.05], [1, 0.9, 0.7, 0.45, 0.25])
+    place(x, 0.8 * thud + 1.5 * flesh + 0.6 * body, th, 1.0)
+    m2 = n_of(0.25)                                           # limbs flop down a moment later
+    flop = np.tanh(2.0 * sweep(m2, 160, 70, 0.03) * decay(m2, 0.14)) + 1.2 * lp(white(r, m2), 600.0) * decay(m2, 0.05)
+    place(x, flop, th + 0.105, 0.4)
+    # loose bones and teeth clattering to rest (bouncing: gaps shrink, hits fade)
+    tr, gap, a = th + 0.05, 0.075, 0.45
+    m3 = n_of(0.08)
+    for _ in range(9):
+        place(x, wood_hit(r, m3, r.uniform(750, 1700), 1.2), tr + r.uniform(-0.004, 0.004), a * r.uniform(0.7, 1.0))
+        tr += gap
+        gap *= 0.82
+        a *= 0.86
+    x = np.tanh(1.4 * x / np.max(np.abs(x)))
+    return reverb(x, 0.3, 0.10, 3500, seed=20), dur
+
+
+def ice_clink(r, m, f0, t60):
+    """Ice cube knocking against the glass: bright inharmonic ping on a short dull knock."""
+    f = f0 * np.array([1.0, 1.58, 2.41, 3.37]) * r.uniform(0.97, 1.03, 4)
+    y = modal(m, f, t60 * np.array([1.0, 0.7, 0.5, 0.35]), [1.0, 0.6, 0.4, 0.25])
+    y += 0.7 * bp(white(r, m), 900, 2600) * decay(m, 0.012)
+    k = n_of(0.0015)
+    y[:k] += 0.5 * white(r, k) * np.linspace(1.0, 0.0, k)
+    return y
+
+
+def sfx_frappe():
+    r = rng_for("frappe")
+    dur = 0.9
+    n = n_of(dur)
+    ice = np.zeros(n)
+    # shaking the frappe: every stroke throws the ice cubes against the glass
+    m = n_of(0.12)
+    shakes = ((0.012, 0.8), (0.105, 1.0), (0.195, 0.85), (0.285, 1.0))
+    for i, (t0, a) in enumerate(shakes):
+        for _ in range(6):
+            f0 = r.uniform(2300, 5200) * (1.0 if i % 2 == 0 else 1.12)       # back stroke sounds a bit higher
+            place(ice, ice_clink(r, m, f0, r.uniform(0.02, 0.06)), t0 + 0.07 * r.random() ** 1.4, a * r.uniform(0.35, 1.0))
+        ms = n_of(0.12)
+        slosh = bp(white(r, ms), 500, 3400) * ar_env(ms, 0.012, 0.1)        # coffee sloshing along
+        slosh += 0.5 * hp(white(r, ms), 5500.0) * ar_env(ms, 0.006, 0.05)    # foam / crushed ice
+        place(ice, slosh, t0, 0.28 * a)
+    ice += 0.35 * reson(ice, 2140.0, 30.0) + 0.25 * reson(ice, 3480.0, 35.0)  # the glass sings along
+    for t0, a in ((0.39, 0.3), (0.455, 0.2), (0.54, 0.14)):                  # cubes settling
+        place(ice, ice_clink(r, m, r.uniform(2600, 5000), r.uniform(0.02, 0.05)), t0 + r.uniform(-0.01, 0.01), a)
+    # caffeine kick: bouzouki leaps up in fourths and fifths into a bright chord, struck twice
+    t0, step = 0.375, 0.065
+    notes = [(0.0, "E5", step * 1.2, 0.75, dict(ring=0.06)),
+             (step, "A5", step * 1.2, 0.82, dict(ring=0.06)),
+             (2 * step, "E6", step * 1.1, 0.9, dict(ring=0.05, t60=1.4, bright=0.95))]
+    tt = 3 * step + 0.015
+    for i, (nm, vel, kw) in enumerate((("A5", 0.9, dict(octave=True, t60=2.0, bright=0.97)),
+                                       ("C#6", 0.8, dict(t60=1.8, bright=0.95)),
+                                       ("A6", 0.85, dict(t60=1.6, bright=0.96)))):
+        notes.append((tt + 0.006 * i, nm, 0.2, vel, dict(strokes=[0.0, 0.088], ring=0.22, **kw)))
+    run = bouz_line(notes, r, tail=0.5)
+    x = 0.85 * ice / np.max(np.abs(ice))
+    place(x, run / np.max(np.abs(run)), t0, 1.0)
+    # spoon-on-glass ting on the top note and fizzing foam underneath
+    tt += t0
+    place(x, ice_clink(r, n_of(0.3), N("A7"), 0.22), tt, 0.07)
+    x += 0.3 * crackles(r, n, 40, tt - 0.08, 0.86, lo=(3500, 6000), hi=(8000, 12000), dec=(0.002, 0.005), power=0.8, amp_fall=0.8)
+    return reverb(x, 0.4, 0.12, 8000, seed=21), dur
+
+
 # name -> (generator, peak dBFS, fade-in s, fade-out s)
 SFX = {}
 for _i in range(1, 5):
@@ -1207,6 +1347,9 @@ SFX.update({
     "win": (sfx_win, -1.0, 0.001, 0.3),
     "lose": (sfx_lose, -1.0, 0.001, 0.35),
     "ui_click": (sfx_ui_click, -6.0, 0.0003, 0.008),
+    "oil": (sfx_oil, -1.0, 0.003, 0.08),
+    "slip": (sfx_slip, -1.0, 0.004, 0.08),
+    "frappe": (sfx_frappe, -1.0, 0.0005, 0.1),
 })
 
 # expected duration windows in seconds for verification
@@ -1219,7 +1362,8 @@ EXPECT = {
     "melon_splat": (0.75, 0.85), "hide_in": (0.65, 0.75), "hide_out": (0.45, 0.55),
     "heartbeat": (0.90, 0.90), "transform": (1.90, 2.10), "tick": (0.07, 0.09),
     "alarm": (1.90, 2.10), "listen": (0.90, 1.10), "win": (2.40, 2.60), "lose": (2.40, 2.60),
-    "ui_click": (0.05, 0.07), "music_ambient": (60.0, 75.0), "music_chase": (24.0, 32.0),
+    "ui_click": (0.05, 0.07), "oil": (0.75, 0.85), "slip": (0.85, 0.95), "frappe": (0.85, 0.95),
+    "music_ambient": (60.0, 75.0), "music_chase": (24.0, 32.0),
 }
 
 

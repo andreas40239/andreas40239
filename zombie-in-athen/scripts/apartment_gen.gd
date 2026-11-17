@@ -7,11 +7,12 @@ extends RefCounted
 ## sind also die "hinteren" Wände (volle Höhe), Süd/Ost die vorderen (niedrig).
 
 enum Edge { NONE, WALL, DOOR, WINDOW, ENTRANCE }
-enum RoomType { HALL, BEDROOM, BATH, KITCHEN, LIVING, OFFICE }
+enum RoomType { HALL, BEDROOM, BATH, KITCHEN, LIVING, OFFICE, DINING, CLASSROOM, STORAGE }
 
 const ROOM_NAMES := {
 	RoomType.HALL: "Flur", RoomType.BEDROOM: "Schlafzimmer", RoomType.BATH: "Bad",
 	RoomType.KITCHEN: "Küche", RoomType.LIVING: "Wohnzimmer", RoomType.OFFICE: "Gästezimmer",
+	RoomType.DINING: "Gastraum", RoomType.CLASSROOM: "Klassenzimmer", RoomType.STORAGE: "Abstellraum",
 }
 
 # Möbel: l = Länge entlang der Wand, d = Tiefe, hide = Versteck-Kapazität,
@@ -32,10 +33,12 @@ const FURN := {
 	"bookshelf": {"l": 2, "d": 1, "hide": 0, "tall": true,  "block": true},
 	"plant":     {"l": 1, "d": 1, "hide": 0, "tall": false, "block": true},
 	"rug":       {"l": 3, "d": 2, "hide": 0, "tall": false, "block": false},
+	"board":     {"l": 3, "d": 1, "hide": 0, "tall": false, "block": false},   # Tafel an der Wand
 }
 
 var w := 22
 var h := 16
+var theme := "home"                    # home | taverna | school
 var rooms: Array[Dictionary] = []      # {id, type, rect: Rect2i, name}
 var cell_room := PackedInt32Array()    # Raum-ID je Zelle
 var hedge := PackedByteArray()         # (h+1)*w   Kante zwischen (x,y-1) und (x,y)
@@ -113,6 +116,8 @@ func free_cells() -> Array[Vector2i]:
 func _try_generate(cfg: Dictionary) -> bool:
 	w = int(cfg.get("width", 22))
 	h = int(cfg.get("height", 16))
+	theme = String(cfg.get("theme", "home"))
+	var layout := String(cfg.get("layout", "single"))
 	rooms.clear()
 	furniture.clear()
 	openings.clear()
@@ -129,82 +134,88 @@ func _try_generate(cfg: Dictionary) -> bool:
 	vedge.resize(h * (w + 1))
 	vedge.fill(Edge.NONE)
 
-	# --- Flur quer durch die Mitte, Zimmer darüber und darunter
-	var cy := h / 2 - 1 + rng.randi_range(-1, 0)
-	_add_room(RoomType.HALL, Rect2i(0, cy, w, 2))
-	var n_rooms := 3 + clampi(int(cfg.get("extra_rooms", 2)), 0, 3)
-	var n_top := n_rooms / 2 + (n_rooms % 2 if rng.randf() < 0.5 else 0)
-	var n_bot := n_rooms - n_top
-	if n_top == 0 or n_bot == 0:
-		n_top = maxi(1, n_top)
-		n_bot = maxi(1, n_rooms - n_top)
-	var top_w := _split(w, n_top, 4)
-	var bot_w := _split(w, n_bot, 4)
-	if top_w.is_empty() or bot_w.is_empty():
-		return false
-	var rects: Array[Rect2i] = []
-	var x0 := 0
-	for rw in top_w:
-		rects.append(Rect2i(x0, 0, rw, cy))
-		x0 += rw
-	x0 = 0
-	for rw in bot_w:
-		rects.append(Rect2i(x0, cy + 2, rw, h - cy - 2))
-		x0 += rw
+	# --- Flure und Zimmerstreifen
+	# "single": ein Flur quer durch die Mitte, Zimmer darüber und darunter.
+	# "double": zwei Flure, an beiden Enden verbunden (Rundweg), dazwischen ein dritter Streifen.
+	var strips: Array[Dictionary] = []    # {x, y, width, depth, rows: Flur-Kanten (H-Zeilen)}
+	var hall_y := 0
+	if layout == "double":
+		var base := (h - 4) / 3
+		var d1 := base + (1 if (h - 4) % 3 > 0 else 0)
+		var d3 := base + (1 if (h - 4) % 3 > 1 else 0)
+		var d2 := h - 4 - d1 - d3
+		var ya := d1
+		var yb := d1 + 2 + d2
+		hall_y = ya
+		_add_room(RoomType.HALL, Rect2i(0, ya, w, 2))
+		_add_room(RoomType.HALL, Rect2i(0, yb, w, 2))
+		_add_room(RoomType.HALL, Rect2i(0, ya + 2, 2, d2))
+		_add_room(RoomType.HALL, Rect2i(w - 2, ya + 2, 2, d2))
+		strips.append({"x": 0, "y": 0, "width": w, "depth": d1, "rows": [ya]})
+		strips.append({"x": 2, "y": ya + 2, "width": w - 4, "depth": d2, "rows": [ya + 2, yb]})
+		strips.append({"x": 0, "y": yb + 2, "width": w, "depth": d3, "rows": [yb + 2]})
+	else:
+		var cy := h / 2 - 1 + rng.randi_range(-1, 0)
+		hall_y = cy
+		_add_room(RoomType.HALL, Rect2i(0, cy, w, 2))
+		strips.append({"x": 0, "y": 0, "width": w, "depth": cy, "rows": [cy]})
+		strips.append({"x": 0, "y": cy + 2, "width": w, "depth": h - cy - 2, "rows": [cy + 2]})
 
-	# --- Raumtypen zuweisen: kleinster Raum = Bad, größter = Wohnzimmer
-	var order := range(rects.size())
-	order.sort_custom(func(a, b): return rects[a].get_area() < rects[b].get_area())
-	var types := {}
-	types[order[0]] = RoomType.BATH
-	var rest: Array = order.slice(1)
-	var pool: Array = [RoomType.BEDROOM, RoomType.KITCHEN]
-	var extras: Array = [RoomType.LIVING, RoomType.OFFICE, RoomType.BEDROOM]
-	if rest.size() > 2:
-		types[rest[rest.size() - 1]] = RoomType.LIVING
-		rest.remove_at(rest.size() - 1)
-		extras.erase(RoomType.LIVING)
-	while pool.size() < rest.size():
-		pool.append(extras.pop_front())
-	_shuffle(pool)
-	for i in rest.size():
-		types[rest[i]] = pool[i]
+	# --- Anzahl Zimmer je Streifen
+	var counts: Array = cfg.get("rooms", [])
+	if counts.size() != strips.size():
+		var n_rooms := 3 + clampi(int(cfg.get("extra_rooms", 2)), 0, 3)
+		var n_top := n_rooms / 2 + (n_rooms % 2 if rng.randf() < 0.5 else 0)
+		n_top = clampi(n_top, 1, n_rooms - 1)
+		counts = [n_top, n_rooms - n_top]
+	var rects: Array[Rect2i] = []
+	var rows_of: Array = []
+	for si in strips.size():
+		var st: Dictionary = strips[si]
+		var widths := _split(st.width, int(counts[si]), 4)
+		if widths.is_empty():
+			return false
+		var x0: int = st.x
+		for rw in widths:
+			rects.append(Rect2i(x0, st.y, rw, st.depth))
+			rows_of.append(st.rows)
+			x0 += rw
+	var types := _assign_types(rects)
+	var first_room := rooms.size()
 	for i in rects.size():
 		_add_room(types[i], rects[i])
 
-	# --- Wände auf allen Raumgrenzen
+	# --- Wände auf allen Raumgrenzen (Flurstücke gehen offen ineinander über)
 	for y in range(0, h + 1):
 		for x in w:
-			if room_at(x, y - 1) != room_at(x, y):
+			if not _same_space(room_at(x, y - 1), room_at(x, y)):
 				_set_h(x, y, Edge.WALL)
 	for y in h:
 		for x in range(0, w + 1):
-			if room_at(x - 1, y) != room_at(x, y):
+			if not _same_space(room_at(x - 1, y), room_at(x, y)):
 				_set_v(x, y, Edge.WALL)
 
-	# --- Türen zum Flur
-	for r in rooms:
-		if r.type == RoomType.HALL:
-			continue
-		var rc: Rect2i = r.rect
-		var dx := rng.randi_range(rc.position.x + 1, rc.end.x - 2)
-		if rc.position.y < cy:
-			_set_h(dx, cy, Edge.DOOR)
-			_reserve(dx, cy - 1)
-			_reserve(dx, cy)
-		else:
-			_set_h(dx, cy + 2, Edge.DOOR)
-			_reserve(dx, cy + 2)
-			_reserve(dx, cy + 1)
+	# --- Türen zum Flur (Zimmer zwischen zwei Fluren bekommen meist zwei)
+	for i in rects.size():
+		var rc: Rect2i = rects[i]
+		var rows: Array = rows_of[i]
+		for ri in rows.size():
+			if ri > 0 and rng.randf() > 0.75:
+				continue
+			var ey: int = rows[ri]
+			var dx := rng.randi_range(rc.position.x + 1, rc.end.x - 2)
+			_set_h(dx, ey, Edge.DOOR)
+			_reserve(dx, ey - 1)
+			_reserve(dx, ey)
 	# --- Verbindungstüren zwischen Nachbarzimmern (Rundwege zum Flüchten)
 	var links := 0
 	for pass_i in 2:
-		for i in range(1, rooms.size() - 1):
+		for i in range(first_room, rooms.size() - 1):
 			var a: Rect2i = rooms[i].rect
 			var b: Rect2i = rooms[i + 1].rect
 			if a.position.y != b.position.y or a.end.x != b.position.x:
 				continue
-			if get_v(b.position.x, a.position.y + 1) == Edge.DOOR or _has_door_v(b.position.x, a):
+			if _has_door_v(b.position.x, a):
 				continue
 			if rng.randf() < (0.55 if pass_i == 0 else 1.0) and (pass_i == 0 or links == 0):
 				var dy := rng.randi_range(a.position.y + 1, a.end.y - 2)
@@ -213,8 +224,8 @@ func _try_generate(cfg: Dictionary) -> bool:
 				_reserve(b.position.x, dy)
 				links += 1
 
-	# --- Wohnungstür am West-Ende des Flurs (hintere Wand, gut sichtbar)
-	var ey := cy + rng.randi_range(0, 1)
+	# --- Eingangstür am West-Ende des (oberen) Flurs (hintere Wand, gut sichtbar)
+	var ey := hall_y + rng.randi_range(0, 1)
 	_set_v(0, ey, Edge.ENTRANCE)
 	_reserve(0, ey)
 	openings.append({"kind": "entrance", "horizontal": false, "x": 0, "y": ey,
@@ -224,9 +235,10 @@ func _try_generate(cfg: Dictionary) -> bool:
 	for r in rooms:
 		var rc: Rect2i = r.rect
 		if r.type == RoomType.HALL:
-			# Fenster am Ost-Ende des Flurs
-			var wy := cy + rng.randi_range(0, 1)
-			_add_window(false, w, wy, Vector2i(w - 1, wy), Vector2i(1, 0))
+			# Fenster am Ost-Ende der Querflure
+			if rc.size.x == w:
+				var wy := rc.position.y + rng.randi_range(0, 1)
+				_add_window(false, w, wy, Vector2i(w - 1, wy), Vector2i(1, 0))
 			continue
 		var max_win := 1 if r.type == RoomType.BATH else 2
 		var count := 0
@@ -259,18 +271,70 @@ func _try_generate(cfg: Dictionary) -> bool:
 			if f.access.is_empty():
 				return false
 			hide_cap += f.hide
-	var needed := {RoomType.BEDROOM: false, RoomType.BATH: false, RoomType.KITCHEN: false}
-	for r in rooms:
-		needed[r.type] = true
-	for k in needed:
-		if not needed[k]:
-			return false
 	var kinds := {}
 	for f in furniture:
 		kinds[f.kind] = true
-	if not (kinds.has("bed") and kinds.has("table") and (kinds.has("wardrobe") or kinds.has("cabinet")) and kinds.has("shower")):
+	var has_type := {}
+	for r in rooms:
+		has_type[r.type] = true
+	if theme == "home":
+		# Pflicht: Schlafzimmer, Bad mit Dusche, Küche
+		if not (has_type.has(RoomType.BEDROOM) and has_type.has(RoomType.BATH) and has_type.has(RoomType.KITCHEN)):
+			return false
+		if not (kinds.has("bed") and kinds.has("shower")):
+			return false
+	if not (kinds.has("table") and (kinds.has("wardrobe") or kinds.has("cabinet"))):
 		return false
-	return hide_cap >= 6
+	return hide_cap >= 6 + (rects.size() - 5)
+
+
+func _same_space(a: int, b: int) -> bool:
+	if a == b:
+		return true
+	return a >= 0 and b >= 0 and rooms[a].type == RoomType.HALL and rooms[b].type == RoomType.HALL
+
+
+## Raumtypen je nach Ort: die kleinsten und größten Räume bekommen feste Rollen,
+## der Rest wird gemischt verteilt.
+func _assign_types(rects: Array[Rect2i]) -> Dictionary:
+	var small: Array = [RoomType.BATH]
+	var large: Array = [RoomType.LIVING]
+	var first: Array = [RoomType.BEDROOM, RoomType.KITCHEN]
+	var filler: Array = [RoomType.OFFICE, RoomType.BEDROOM, RoomType.BATH, RoomType.STORAGE, RoomType.LIVING, RoomType.BEDROOM, RoomType.OFFICE]
+	match theme:
+		"taverna":
+			small = [RoomType.BATH, RoomType.STORAGE]
+			large = [RoomType.DINING, RoomType.DINING]
+			first = [RoomType.KITCHEN, RoomType.OFFICE, RoomType.BEDROOM]
+			filler = [RoomType.STORAGE, RoomType.BATH, RoomType.OFFICE]
+		"school":
+			small = [RoomType.BATH, RoomType.BATH, RoomType.STORAGE]
+			large = [RoomType.DINING]
+			first = [RoomType.KITCHEN, RoomType.OFFICE]
+			filler = [RoomType.CLASSROOM]
+	var order: Array = range(rects.size())
+	order.sort_custom(func(a, b): return rects[a].get_area() < rects[b].get_area())
+	var types := {}
+	var budget: int = rects.size() - first.size()
+	while budget > 0 and (not small.is_empty() or not large.is_empty()):
+		if not small.is_empty():
+			types[order.pop_front()] = small.pop_front()
+			budget -= 1
+		if budget > 0 and not large.is_empty():
+			types[order.pop_back()] = large.pop_front()
+			budget -= 1
+	var pool: Array = []
+	var fi := 0
+	while pool.size() < order.size():
+		if pool.size() < first.size():
+			pool.append(first[pool.size()])
+		else:
+			pool.append(filler[fi % filler.size()])
+			fi += 1
+	_shuffle(pool)
+	for i in order.size():
+		types[order[i]] = pool[i]
+	return types
 
 
 func _add_room(type: int, rect: Rect2i) -> void:
@@ -351,7 +415,8 @@ func _add_window(horizontal: bool, x: int, y: int, inside: Vector2i, out_dir: Ve
 # ------------------------------------------------------------------ Möblierung
 
 func _furnish(r: Dictionary) -> void:
-	var area: int = r.rect.get_area()
+	var rc: Rect2i = r.rect
+	var area: int = rc.get_area()
 	match r.type:
 		RoomType.BEDROOM:
 			_place(r, "bed")
@@ -362,16 +427,22 @@ func _furnish(r: Dictionary) -> void:
 			_place(r, "plant")
 			_place(r, "rug", true)
 		RoomType.BATH:
-			_place(r, "shower", false, true)
+			if theme == "home":
+				_place(r, "shower", false, true)
 			_place(r, "toilet")
 			_place(r, "sink")
 			_place(r, "cabinet")
+			if theme != "home":
+				_place(r, "toilet")
+				_place(r, "sink")
 			if area >= 28:
 				_place(r, "plant")
 		RoomType.KITCHEN:
 			_place(r, "counter")
 			_place(r, "fridge")
 			_place(r, "table", true)
+			if theme != "home":
+				_place(r, "counter")
 			if area >= 30:
 				_place(r, "cabinet")
 			_place(r, "plant")
@@ -384,21 +455,65 @@ func _furnish(r: Dictionary) -> void:
 			_place(r, "plant")
 			_place(r, "rug", true)
 		RoomType.OFFICE:
-			_place(r, "bed")
+			if theme == "home":
+				_place(r, "bed")
+			else:
+				_place(r, "sofa")
 			_place(r, "table")
 			_place(r, "bookshelf")
 			_place(r, "cabinet")
 			_place(r, "plant")
-		RoomType.HALL:
+		RoomType.DINING:
+			# Gastraum / Mensa: Theke und viele Tische
+			_place(r, "counter")
+			_place(r, "fridge")
+			_place_grid(r, "table", 3, 3, 1)
 			_place(r, "cabinet")
 			_place(r, "plant")
-			if r.rect.size.x >= 20:
+			_place(r, "plant")
+		RoomType.CLASSROOM:
+			_place(r, "board", false, false, 0)
+			_place_grid(r, "table", 3, 2, 2)
+			_place(r, "cabinet")
+			_place(r, "bookshelf")
+			_place(r, "plant")
+		RoomType.STORAGE:
+			_place(r, "cabinet")
+			_place(r, "cabinet")
+			_place(r, "bookshelf")
+			_place(r, "fridge")
+			_place(r, "table")
+		RoomType.HALL:
+			var length := maxi(rc.size.x, rc.size.y)
+			var n_cab := 1 + (1 if length >= 20 else 0)
+			if theme == "school":
+				n_cab = maxi(2, length / 5)    # Spinde
+			elif length < 10:
+				n_cab = 1 if rng.randf() < 0.5 else 0
+			for i in n_cab:
 				_place(r, "cabinet")
+			_place(r, "plant")
+
+
+## Möbel in Reihen aufstellen (Tische im Gastraum / Klassenzimmer).
+func _place_grid(r: Dictionary, kind: String, step_x: int, step_y: int, top_margin: int) -> int:
+	var def: Dictionary = FURN[kind]
+	var rc: Rect2i = r.rect
+	var n := 0
+	var y := rc.position.y + top_margin
+	while y + def.d <= rc.end.y - 1:
+		var x := rc.position.x + 1
+		while x + def.l <= rc.end.x - 1:
+			if _try_put(r, kind, Rect2i(x, y, def.l, def.d), 0, true):
+				n += 1
+			x += step_x
+		y += step_y
+	return n
 
 
 ## dir: Richtung, in die das Möbel "schaut" (0 = +z/Süd, 1 = -x/West, 2 = -z/Nord, 3 = +x/Ost);
 ## die Rückseite steht an der gegenüberliegenden Wand.
-func _place(r: Dictionary, kind: String, center := false, corner := false) -> bool:
+func _place(r: Dictionary, kind: String, center := false, corner := false, only_dir := -1) -> bool:
 	var def: Dictionary = FURN[kind]
 	var rc: Rect2i = r.rect
 	var cands: Array = []
@@ -414,6 +529,8 @@ func _place(r: Dictionary, kind: String, center := false, corner := false) -> bo
 		var d: int = def.d
 		# hohe Möbel nur an die hinteren Wände (Nord/West), damit sie nichts verdecken
 		var dirs: Array = [0, 3] if def.tall else [0, 1, 2, 3]
+		if only_dir >= 0:
+			dirs = [only_dir]
 		for dir in dirs:
 			match dir:
 				0:  # an Nordwand
@@ -434,20 +551,37 @@ func _place(r: Dictionary, kind: String, center := false, corner := false) -> bo
 			var p: Vector2i = c.rect.position
 			return (p.x == rc.position.x or p.x == rc.end.x - 1) and (p.y == rc.position.y or p.y == rc.end.y - 1))
 	for c in cands:
-		var fr: Rect2i = c.rect
-		if not _rect_free(fr, def.block):
-			continue
-		if not def.block:
-			furniture.append({"kind": kind, "rect": fr, "dir": c.dir, "room": r.id, "hide": 0})
+		if _try_put(r, kind, c.rect, c.dir, center):
 			return true
-		# Die Wand hinter dem Möbel darf weder Tür noch Fenster sein
-		if not center and not _backs_solid(fr, c.dir):
-			continue
-		_mark(fr, 1, def.tall)
-		if _all_reachable() and not _access_cells(fr).is_empty():
-			furniture.append({"kind": kind, "rect": fr, "dir": c.dir, "room": r.id, "hide": def.hide})
-			return true
-		_mark(fr, 0, def.tall)
+	return false
+
+
+func _try_put(r: Dictionary, kind: String, fr: Rect2i, dir: int, center: bool) -> bool:
+	var def: Dictionary = FURN[kind]
+	if not _rect_free(fr, def.block):
+		return false
+	if not def.block:
+		if kind == "board":
+			# Tafel hängt an der Wand: keine Tür/kein Fenster dahinter, Platz davor frei halten
+			if not _backs_solid(fr, dir):
+				return false
+			for y in range(fr.position.y, fr.end.y):
+				for x in range(fr.position.x, fr.end.x):
+					if reserved[y * w + x] != 0:
+						return false
+			for y in range(fr.position.y, fr.end.y):
+				for x in range(fr.position.x, fr.end.x):
+					_reserve(x, y)
+		furniture.append({"kind": kind, "rect": fr, "dir": dir, "room": r.id, "hide": 0})
+		return true
+	# Die Wand hinter dem Möbel darf weder Tür noch Fenster sein
+	if not center and not _backs_solid(fr, dir):
+		return false
+	_mark(fr, 1, def.tall)
+	if _all_reachable() and not _access_cells(fr).is_empty():
+		furniture.append({"kind": kind, "rect": fr, "dir": dir, "room": r.id, "hide": def.hide})
+		return true
+	_mark(fr, 0, def.tall)
 	return false
 
 

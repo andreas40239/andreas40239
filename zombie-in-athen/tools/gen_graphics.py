@@ -866,6 +866,206 @@ def icon_melon():
     return c.finish()
 
 
+def icon_oil():
+    c = Cv(IC)
+    GL, GL_L, GL_D = (26, 94, 54), (60, 142, 80), (16, 66, 42)
+    OIL, OIL_L, OIL_D = (214, 200, 50), (244, 234, 120), (176, 158, 30)
+    CORK, CORK_D = (222, 174, 110), (170, 120, 66)
+    LAB, LAB_S, LAB_G = (252, 244, 222), (226, 210, 176), (206, 160, 60)
+    LEAF, LEAF_D, STEM = (132, 190, 88), (78, 138, 66), (128, 96, 56)
+    OLV, OLV_L = (70, 52, 96), (128, 104, 160)
+    bx = 60.0                                             # bottle axis
+
+    def bottle(k, inset, fill):
+        k.rect(bx - 38 + inset, 84, bx + 38 - inset, 178 - inset, fill, r=max(2, 12 - inset))
+        k.ell(bx, 98, 38 - inset, 32 - inset, fill)
+        k.rect(bx - 14 + inset, 34, bx + 14 - inset, 86, fill)
+
+    # cork, glass
+    c.rect(bx - 11, 10, bx + 11, 36, CORK, r=3)
+    c.rect(bx - 11, 26, bx + 11, 36, CORK_D)
+    c.rect(bx - 11, 10, bx - 4, 30, (240, 204, 148), r=3)
+    bottle(c, 0, GL)
+    c.rect(bx - 19, 30, bx + 19, 44, GL, r=5)             # lip ring
+    c.rect(bx - 19, 30, bx + 19, 36, GL_L, r=3)
+    # contents: empty glass above, golden-green oil below
+    m = c.sub("L")
+    bottle(m, 7, 255)
+    p = c.sub()
+    p.rect(0, 0, IC, 82, GL_L + (255,))
+    p.rect(0, 82, IC, IC, OIL + (255,))
+    p.rect(0, 82, IC, 88, OIL_L + (255,))
+    p.rect(bx + 14, 88, IC, IC, OIL_D + (255,))           # shaded right side
+    c.clip(m, p)
+    c.d = ImageDraw.Draw(c.im)
+    # glass shade (right) and highlight (left)
+    c.line([(bx + 9, 48), (bx + 9, 74)], GL_D, 4)
+    c.line([(bx - 8, 50), (bx - 8, 72)], (196, 240, 190), 4.5)
+    c.line(chaikin([(bx - 12, 82), (bx - 24, 90), (bx - 27, 104)], 2, closed=False), (255, 250, 190), 5)
+    # label with a little olive
+    c.rect(bx - 38, 108, bx + 38, 158, LAB)
+    c.rect(bx + 22, 108, bx + 38, 158, LAB_S)
+    c.rect(bx - 38, 108, bx + 38, 113, LAB_G)
+    c.rect(bx - 38, 153, bx + 38, 158, LAB_G)
+    c.rot_ell(bx - 16, 127, 12, 5, -28, LEAF_D)
+    c.rot_ell(bx + 14, 125, 12, 5, 24, LEAF_D)
+    c.ell(bx, 136, 9, 11.5, (104, 150, 56))
+    c.ell(bx - 3, 132, 2.6, 4, (190, 222, 120))
+    c.line([(bx - 6, 164), (bx - 26, 164)], OIL_L, 4)
+    # olive twig
+    stem = chaikin([(109, 178), (123, 160), (137, 134), (147, 108), (159, 90)], 3, closed=False)
+    for lx, ly, deg, col in ((121, 144, -62, LEAF), (145, 152, 14, LEAF_D), (131, 118, -74, LEAF_D),
+                             (158, 128, 8, LEAF), (143, 94, -80, LEAF), (164, 104, -6, LEAF_D)):
+        c.rot_ell(lx, ly, 15, 6.2, deg, col)
+    c.line(stem, STEM, 5)
+    c.rot_ell(163, 80, 14, 6, -52, LEAF)
+    c.line([(134, 142), (138, 160)], STEM, 3.5)
+    c.ell(139, 168, 9.5, 11.5, OLV)
+    c.ell(136, 164, 2.8, 4, OLV_L)
+    # oil drop
+    c.poly(drop_pts(130, 58, 13.5, 2.2), OIL)
+    c.ell(125, 60, 3.4, 5.5, (255, 250, 190))
+    return c.finish()
+
+
+def icon_frappe():
+    c = Cv(IC)
+    GLS, GLS_S = (226, 240, 250), (176, 204, 226)
+    COF, COF_L, COF_D = (138, 78, 40), (186, 122, 68), (100, 54, 28)
+    FOAM, FOAM_S, FOAM_L = (250, 234, 198), (228, 200, 152), (255, 250, 232)
+    ICE, ICE_L, ICE_D = (214, 176, 134), (252, 240, 220), (168, 118, 78)
+    ST, ST_W, ST_D = (48, 128, 226), (250, 250, 255), (30, 92, 180)
+    gx = 76.0                                             # glass axis
+
+    def glass(k, inset, fill, top=50.0, bot=178.0):
+        t, b = 46.0 - inset, 33.0 - inset
+        k.poly([(gx - t, top), (gx + t, top), (gx + b, bot - 8), (gx + b - 7, bot),
+                (gx - b + 7, bot), (gx - b, bot - 8)], fill)
+
+    # bendy straw (blue / white), sticking out behind the foam
+    p0, p1, p2 = (gx + 12, 96.0), (gx + 44, 30.0), (gx + 84, 20.0)
+    c.line([p0, p1, p2], ST, 13)
+    for a, b, n in ((p0, p1, 9), (p1, p2, 5)):
+        for i in range(1, n, 2):
+            t0, t1 = i / float(n), (i + 0.5) / float(n)
+            c.line([(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0),
+                    (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1)], ST_W, 13, caps=False)
+    c.circ(p2[0], p2[1], 3.6, ST_D)
+    # glass with thick clear base
+    glass(c, 0, GLS)
+    c.rect(gx - 26, 166, gx + 26, 172, GLS_S, r=3)
+    # contents
+    m = c.sub("L")
+    glass(m, 6, 255, top=40.0, bot=166.0)
+    p = c.sub()
+    p.rect(0, 0, IC, IC, COF + (255,))
+    p.rect(0, 84, IC, 104, COF_L + (255,))                # milky zone under the foam
+    p.rect(gx + 22, 84, IC, IC, COF_D + (255,))           # shaded right side
+    for ix, iy, s, deg in ((gx - 13, 123, 14.0, 20), (gx + 9, 146, 12.5, -14)):
+        cube = Cv(IC)
+        cube.rect(ix - s, iy - s, ix + s, iy + s, ICE + (255,), r=4.5)
+        cube.rect(ix - s + 3.5, iy - s + 3.5, ix + s - 9, iy - s + 9.5, ICE_L + (255,), r=2.5)
+        cube.rect(ix + s - 6.5, iy - s + 6, ix + s - 2.5, iy + s - 5, ICE_D + (255,), r=2)
+        cube.rotate(deg, center=(ix, iy))
+        p.comp(cube)
+    p.rect(0, 0, IC, 88, FOAM + (255,))
+    for fx, fr in ((gx - 30, 9), (gx - 10, 12), (gx + 14, 10), (gx + 34, 11)):
+        p.ell(fx, 88, fr, 7.5, FOAM + (255,))             # foam running down a little
+    p.rect(gx + 24, 50, IC, 86, FOAM_S + (255,))
+    c.clip(m, p)
+    c.d = ImageDraw.Draw(c.im)
+    # foam dome above the rim
+    for fx, fy, fr in ((gx - 30, 48, 15), (gx - 8, 42, 18), (gx + 16, 44, 17), (gx + 33, 50, 13)):
+        c.circ(fx, fy, fr, FOAM)
+    c.rect(gx - 42, 46, gx + 42, 60, FOAM, r=6)
+    c.line(chaikin([(gx - 34, 44), (gx - 22, 36), (gx - 8, 33)], 2, closed=False), FOAM_L, 5)
+    for fx, fy, fr in ((gx - 20, 62, 3.6), (gx + 2, 70, 2.8), (gx - 30, 76, 2.4), (gx + 14, 58, 2.4)):
+        c.circ(fx, fy, fr, FOAM_S)
+    # glass highlight
+    c.line([(gx - 33, 96), (gx - 28, 150)], (255, 255, 255), 4.5)
+    # coffee beans
+    for bxx, byy, deg in ((146, 160, -30), (163, 132, 38)):
+        c.rot_ell(bxx, byy, 14.5, 10.5, deg, COF_D)
+        ca, sa = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+        c.line(chaikin([(bxx - 10 * ca - 2 * sa, byy - 10 * sa + 2 * ca), (bxx + 2.5 * sa, byy - 2.5 * ca),
+                        (bxx + 10 * ca - 2 * sa, byy + 10 * sa + 2 * ca)], 2, closed=False), COF_L, 3)
+    return c.finish()
+
+
+def icon_window():
+    c = Cv(IC)
+    O, OL, OD = (255, 146, 36), (255, 204, 112), (222, 104, 20)
+    PANE, PANE_L, HOLE = (104, 28, 34), (160, 52, 48), (34, 8, 14)
+    CR = (255, 240, 206)
+    RED, RED_L, RED_D = (236, 48, 52), (255, 132, 112), (176, 22, 40)
+    # frame, sash, sill
+    c.rect(12, 10, 134, 156, OD, r=5)
+    c.rect(19, 17, 127, 149, O, r=3)
+    c.rect(19, 17, 127, 23, OL, r=3)
+    panes = [(28, 27, 68, 79), (78, 27, 118, 79), (28, 89, 68, 141), (78, 89, 118, 141)]
+    for x0, y0, x1, y1 in panes:
+        c.rect(x0, y0, x1, y1, PANE, r=2)
+    # glints on the intact panes
+    for x0, y0, x1, y1 in panes[1:]:
+        m = c.sub("L")
+        m.rect(x0, y0, x1, y1, 255, r=2)
+        p = c.sub()
+        p.poly([(x0 + 4, y1), (x0 + 26, y0), (x0 + 38, y0), (x0 + 16, y1)], PANE_L + (255,))
+        c.clip(m, p)
+    c.d = ImageDraw.Draw(c.im)
+    # smashed pane: jagged hole with cracks
+    x0, y0, x1, y1 = panes[0]
+    hx, hy = 47.0, 54.0
+    m = c.sub("L")
+    m.rect(x0, y0, x1, y1, 255, r=2)
+    p = c.sub()
+    for deg in (12, 62, 118, 166, 214, 262, 318):
+        a = math.radians(deg)
+        p.line([(hx, hy), (hx + 44 * math.cos(a), hy + 44 * math.sin(a))], CR + (255,), 2.6, caps=False)
+    hole = []
+    for i, r in enumerate((15, 7, 13, 6.5, 16, 7, 12, 6, 15, 7.5, 13, 6.5, 14, 7)):
+        a = math.radians(12 + i * 360.0 / 14)
+        hole.append((hx + r * math.cos(a), hy + r * math.sin(a)))
+    p.poly([(hx + (x - hx) * 1.28, hy + (y - hy) * 1.28) for x, y in hole], CR + (255,))
+    p.poly(hole, HOLE + (255,))
+    c.clip(m, p)
+    c.d = ImageDraw.Draw(c.im)
+    c.rect(8, 152, 140, 168, OL, r=5)
+    c.rect(8, 161, 140, 168, O, r=4)
+    c.outline(5)
+    # curved "next window" arrow
+    a = c.sub()
+    acx, acy, ar, aw = 126.0, 155.0, 37.0, 19.0
+
+    def band(r_in, r_out, d0, d1):
+        pts = []
+        for i in range(0, 41):
+            t = math.radians(d0 + (d1 - d0) * i / 40.0)
+            pts.append((acx + r_out * math.cos(t), acy + r_out * math.sin(t)))
+        for i in range(40, -1, -1):
+            t = math.radians(d0 + (d1 - d0) * i / 40.0)
+            pts.append((acx + r_in * math.cos(t), acy + r_in * math.sin(t)))
+        return pts
+
+    def head(r_c, hw, ln, deg):
+        t = math.radians(deg)
+        ex, ey = acx + r_c * math.cos(t), acy + r_c * math.sin(t)
+        tx, ty = -math.sin(t), math.cos(t)
+        return [(acx + (r_c - hw) * math.cos(t), acy + (r_c - hw) * math.sin(t)),
+                (acx + (r_c + hw) * math.cos(t), acy + (r_c + hw) * math.sin(t)),
+                (ex + tx * ln, ey + ty * ln)]
+
+    d0, d1 = 172.0, 338.0
+    a.poly(band(ar - aw / 2, ar + aw / 2, d0, d1), RED)
+    a.circ(acx + ar * math.cos(math.radians(d0)), acy + ar * math.sin(math.radians(d0)), aw / 2, RED)
+    a.poly(band(ar + aw / 2 - 6.5, ar + aw / 2, d0, d1), RED_L)
+    a.poly(band(ar - aw / 2, ar - aw / 2 + 4.5, d0, d1), RED_D)
+    a.poly(head(ar, 23, 34, d1), RED)
+    a.outline(5)
+    c.comp(a)
+    return c.finish(outline=0)
+
+
 def icon_heart_full():
     c = Cv(IC)
     s, cx, cy = 5.15, 96.0, 82.0
@@ -940,6 +1140,9 @@ ICONS = {
     "heart_empty.png": icon_heart_empty,
     "marker_oval.png": icon_marker_oval,
     "arrow.png": icon_arrow,
+    "item_oil.png": icon_oil,
+    "item_frappe.png": icon_frappe,
+    "btn_window.png": icon_window,
 }
 
 

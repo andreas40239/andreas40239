@@ -29,6 +29,7 @@ var m_dark: StandardMaterial3D
 var m_blood: StandardMaterial3D
 var m_tooth: StandardMaterial3D
 var _all: Array[StandardMaterial3D] = []
+var _hat_mats: Array[StandardMaterial3D] = []
 var _base_colors: Array[Color] = []
 
 var is_zombie := false
@@ -44,7 +45,14 @@ var _bite_anim := 0.0
 var _hit_anim := 0.0
 
 
-func setup(shirt: Color, variant: int, zombie: bool) -> void:
+## hair / hair_color / hat: Auswahl aus Cfg.HAIR_NAMES, Cfg.HAIR_COLORS, Cfg.HAT_NAMES
+## (-1 = aus der Variante ableiten).
+func setup(shirt: Color, variant: int, zombie: bool, hair := -1, hair_color := -1, hat := 0) -> void:
+	if hair < 0:
+		hair = variant % 2
+	var hair_col: Color = HAIR_TONES[variant % HAIR_TONES.size()]
+	if hair_color >= 0:
+		hair_col = Cfg.HAIR_COLORS[hair_color % Cfg.HAIR_COLORS.size()]
 	_seed = variant * 1.37
 	_skin = SKIN_TONES[variant % SKIN_TONES.size()]
 	_shirt = shirt
@@ -52,7 +60,7 @@ func setup(shirt: Color, variant: int, zombie: bool) -> void:
 	m_skin = _mk(_skin)
 	m_shirt = _mk(shirt)
 	m_pants = _mk(_pants)
-	m_hair = _mk(HAIR_TONES[variant % HAIR_TONES.size()])
+	m_hair = _mk(hair_col)
 	m_eye = _mk(Color(0.05, 0.05, 0.08))
 	m_dark = _mk(Color(0.1, 0.02, 0.02))
 	m_blood = _mk(Color(0.5, 0.03, 0.03))
@@ -70,11 +78,8 @@ func setup(shirt: Color, variant: int, zombie: bool) -> void:
 	head.position.y = 0.62
 	torso.add_child(head)
 	_box(head, m_skin, Vector3(0, 0.18, 0), Vector3(0.36, 0.36, 0.34))
-	hair_node = _box(head, m_hair, Vector3(0, 0.34, -0.03), Vector3(0.39, 0.12, 0.37))
-	human_parts.append(_box(head, m_hair, Vector3(0, 0.22, -0.16), Vector3(0.39, 0.3, 0.06)))
-	if variant % 2 == 1:
-		# lange Haare
-		human_parts.append(_box(head, m_hair, Vector3(0, 0.02, -0.15), Vector3(0.4, 0.3, 0.08)))
+	_build_hair(hair, hat)
+	_build_hat(hat)
 	# Augen
 	_box(head, m_eye, Vector3(-0.09, 0.2, 0.171), Vector3(0.07, 0.07, 0.02))
 	_box(head, m_eye, Vector3(0.09, 0.2, 0.171), Vector3(0.07, 0.07, 0.02))
@@ -105,6 +110,109 @@ func setup(shirt: Color, variant: int, zombie: bool) -> void:
 	for m in _all:
 		_base_colors.append(m.albedo_color)
 	set_zombie(zombie, true)
+
+
+## Frisur aus Quadern. Unter Hüten, die den Kopf bedecken, fallen hohe Frisuren flach aus.
+func _build_hair(style: int, hat: int) -> void:
+	var covered := hat in [1, 3, 4, 5, 8]
+	var cap := func() -> void:
+		_box(head, m_hair, Vector3(0, 0.34, -0.03), Vector3(0.39, 0.12, 0.37))
+		_box(head, m_hair, Vector3(0, 0.22, -0.16), Vector3(0.39, 0.3, 0.06))
+	match style:
+		0:  # kurz
+			cap.call()
+		1:  # lang
+			cap.call()
+			_box(head, m_hair, Vector3(0, 0.02, -0.15), Vector3(0.4, 0.3, 0.08))
+			for sx in [-0.195, 0.195]:
+				_box(head, m_hair, Vector3(sx, 0.12, -0.05), Vector3(0.04, 0.4, 0.2))
+		2:  # Glatze
+			pass
+		3:  # Irokese
+			if not covered:
+				_box(head, m_hair, Vector3(0, 0.44, -0.02), Vector3(0.09, 0.18, 0.36))
+		4:  # Pferdeschwanz
+			cap.call()
+			_box(head, m_hair, Vector3(0, 0.25, -0.22), Vector3(0.1, 0.1, 0.1))
+			_box(head, m_hair, Vector3(0, 0.08, -0.27), Vector3(0.08, 0.3, 0.08))
+		5:  # Locken
+			if covered:
+				cap.call()
+			else:
+				_box(head, m_hair, Vector3(0, 0.39, -0.02), Vector3(0.5, 0.24, 0.48))
+			_box(head, m_hair, Vector3(0, 0.2, -0.2), Vector3(0.46, 0.3, 0.1))
+			for sx in [-0.21, 0.21]:
+				_box(head, m_hair, Vector3(sx, 0.22, -0.04), Vector3(0.08, 0.26, 0.3))
+		_:  # Zöpfe
+			cap.call()
+			for sx in [-0.22, 0.22]:
+				_box(head, m_hair, Vector3(sx, 0.06, -0.02), Vector3(0.08, 0.4, 0.08))
+				_box(head, m_shirt, Vector3(sx, -0.1, -0.02), Vector3(0.09, 0.05, 0.09))
+
+
+func _hat_mat(c: Color, metal := false) -> StandardMaterial3D:
+	var m := _mk(c)
+	if metal:
+		m.metallic = 0.7
+		m.roughness = 0.35
+	_hat_mats.append(m)
+	return m
+
+
+func _build_hat(hat: int) -> void:
+	match hat:
+		1:  # Kappe in der Farbe des Shirts
+			var m := _hat_mat(_shirt.darkened(0.2))
+			_box(head, m, Vector3(0, 0.445, -0.02), Vector3(0.41, 0.13, 0.39))
+			_box(head, m, Vector3(0, 0.395, 0.25), Vector3(0.34, 0.03, 0.18))
+			_box(head, _hat_mat(Color(0.9, 0.9, 0.9)), Vector3(0, 0.52, -0.02), Vector3(0.06, 0.03, 0.06))
+		2:  # Strohhut
+			var m := _hat_mat(Color(0.8, 0.66, 0.4))
+			_box(head, m, Vector3(0, 0.415, 0), Vector3(0.66, 0.03, 0.64))
+			_box(head, m, Vector3(0, 0.48, 0), Vector3(0.4, 0.12, 0.38))
+			_box(head, _hat_mat(Color(0.7, 0.15, 0.12)), Vector3(0, 0.445, 0), Vector3(0.41, 0.04, 0.39))
+		3:  # griechische Fischermütze
+			var m := _hat_mat(Color(0.1, 0.13, 0.28))
+			_box(head, m, Vector3(0, 0.44, -0.01), Vector3(0.41, 0.1, 0.39))
+			_box(head, m, Vector3(0, 0.5, -0.03), Vector3(0.37, 0.04, 0.34))
+			_box(head, _hat_mat(Color(0.04, 0.04, 0.06)), Vector3(0, 0.395, 0.22), Vector3(0.3, 0.03, 0.1))
+			_box(head, _hat_mat(Color(0.75, 0.6, 0.2)), Vector3(0, 0.43, 0.19), Vector3(0.2, 0.025, 0.012))
+		4:  # Wollmütze mit Bommel
+			_box(head, _hat_mat(Color(0.75, 0.2, 0.2)), Vector3(0, 0.47, -0.01), Vector3(0.42, 0.16, 0.4))
+			var m := _hat_mat(Color(0.92, 0.92, 0.9))
+			_box(head, m, Vector3(0, 0.39, -0.01), Vector3(0.43, 0.06, 0.41))
+			_box(head, m, Vector3(0, 0.6, -0.01), Vector3(0.11, 0.11, 0.11))
+		5:  # Spartaner-Helm
+			var m := _hat_mat(Color(0.8, 0.6, 0.25), true)
+			_box(head, m, Vector3(0, 0.43, -0.02), Vector3(0.42, 0.16, 0.4))
+			_box(head, m, Vector3(0, 0.2, -0.195), Vector3(0.42, 0.32, 0.04))
+			for sx in [-0.2, 0.2]:
+				_box(head, m, Vector3(sx, 0.17, 0.06), Vector3(0.03, 0.34, 0.22))
+			_box(head, m, Vector3(0, 0.25, 0.185), Vector3(0.04, 0.2, 0.02))
+			_box(head, m, Vector3(0, 0.345, 0.18), Vector3(0.36, 0.04, 0.03))
+			_box(head, m, Vector3(0, 0.53, -0.04), Vector3(0.05, 0.05, 0.4))
+			_box(head, _hat_mat(Color(0.75, 0.1, 0.1)), Vector3(0, 0.63, -0.05), Vector3(0.07, 0.17, 0.46))
+		6:  # Lorbeerkranz (vorn offen)
+			var m := _hat_mat(Color(0.3, 0.55, 0.2))
+			for i in 9:
+				var a := deg_to_rad(40.0 + i * 35.0)
+				var p := Vector3(sin(a) * 0.2, 0.34 + 0.02 * (i % 2), cos(a) * 0.19)
+				var leaf := _box(head, m, p, Vector3(0.07, 0.06, 0.11))
+				leaf.rotation.y = a + PI * 0.5
+		7:  # Krone
+			var m := _hat_mat(Color(0.9, 0.72, 0.15), true)
+			_box(head, m, Vector3(0, 0.41, 0), Vector3(0.4, 0.08, 0.38))
+			for sx in [-0.16, 0.0, 0.16]:
+				for sz in [-0.17, 0.17]:
+					_box(head, m, Vector3(sx, 0.5, sz), Vector3(0.07, 0.1, 0.04))
+			for sz in [-0.1, 0.1]:
+				for sx in [-0.18, 0.18]:
+					_box(head, m, Vector3(sx, 0.5, sz), Vector3(0.04, 0.1, 0.07))
+			_box(head, _hat_mat(Color(0.8, 0.1, 0.15)), Vector3(0, 0.42, 0.195), Vector3(0.07, 0.05, 0.02))
+		8:  # Kochmütze
+			var m := _hat_mat(Color(0.95, 0.95, 0.95))
+			_box(head, m, Vector3(0, 0.43, 0), Vector3(0.4, 0.1, 0.38))
+			_box(head, m, Vector3(0, 0.58, 0), Vector3(0.48, 0.2, 0.46))
 
 
 func _mk(c: Color) -> StandardMaterial3D:
@@ -169,6 +277,10 @@ func _apply_look() -> void:
 	m_skin.albedo_color = _skin.lerp(ZOMBIE_SKIN, zb)
 	m_shirt.albedo_color = _shirt.lerp(_shirt.darkened(0.45).lerp(Color(0.25, 0.28, 0.22), 0.35), zb)
 	m_pants.albedo_color = _pants.lerp(_pants.darkened(0.4), zb)
+	# Hüte werden als Zombie schmutzig-dunkel (Gold würde in der Zombie-Sicht sonst gelb leuchten)
+	for m in _hat_mats:
+		m.albedo_color = m.albedo_color.lerp(m.albedo_color.darkened(0.55), zb)
+	m_hair.albedo_color = m_hair.albedo_color.lerp(m_hair.albedo_color.darkened(0.4), zb)
 	# glühende Augen
 	m_eye.albedo_color = Color(0.05, 0.05, 0.08).lerp(Color(1.0, 0.95, 0.4), zb)
 	m_eye.emission_enabled = zb > 0.5
@@ -310,6 +422,15 @@ func animate(delta: float, speed: float, pose: String) -> void:
 			ll = 0.0
 			lr = 0.0
 			body_y = -0.1
+		"zslip":
+			# auf dem Rücken, zappelt
+			body_rx = -PI * 0.5
+			body_y = 0.25
+			al = -1.6 + sin(_t * 17.0) * 0.9
+			ar = -1.6 + cos(_t * 15.0) * 0.9
+			ll = -0.8 + sin(_t * 13.0) * 0.8
+			lr = -0.8 + cos(_t * 14.0) * 0.8
+			head_rx = 0.3
 		"enter":
 			torso_rx = 0.8
 			al = -2.2

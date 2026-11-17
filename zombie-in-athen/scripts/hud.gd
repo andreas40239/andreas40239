@@ -47,7 +47,8 @@ func setup(p_game) -> void:
 	if ResourceLoader.exists("res://assets/fonts/Creepster-Regular.ttf"):
 		_title_font = load("res://assets/fonts/Creepster-Regular.ttf")
 	for n in ["btn_freeze", "btn_sneak", "btn_hide", "btn_unhide", "btn_bite", "btn_sprint", "btn_listen",
-			"item_garlic", "item_souvlaki", "item_melon", "heart_full", "heart_empty"]:
+			"item_garlic", "item_souvlaki", "item_melon", "item_oil", "item_frappe", "btn_window",
+			"heart_full", "heart_empty"]:
 		_load_tex(n, "res://assets/icons/%s.png" % n)
 	for n in ["button", "joystick_base", "joystick_knob", "vignette"]:
 		_load_tex(n, "res://assets/ui/%s.png" % n)
@@ -74,11 +75,13 @@ func set_zombie_mode(z: bool) -> void:
 		_buttons.append({"id": "bite", "off": Vector2(125, 125), "r": 78.0, "icon": "btn_bite", "label": "Beißen"})
 		_buttons.append({"id": "sprint", "off": Vector2(300, 95), "r": 60.0, "icon": "btn_sprint", "label": "Rennen"})
 		_buttons.append({"id": "listen", "off": Vector2(105, 300), "r": 60.0, "icon": "btn_listen", "label": "Horchen"})
+		_buttons.append({"id": "window", "off": Vector2(285, 265), "r": 64.0, "icon": "btn_window", "label": "Fenster wechseln"})
 	else:
 		_buttons.append({"id": "hide", "off": Vector2(125, 125), "r": 78.0, "icon": "btn_hide", "label": "Verstecken"})
 		_buttons.append({"id": "sneak", "off": Vector2(300, 95), "r": 60.0, "icon": "btn_sneak", "label": "Leise"})
 		_buttons.append({"id": "freeze", "off": Vector2(105, 300), "r": 60.0, "icon": "btn_freeze", "label": "Stillstehen"})
 		_buttons.append({"id": "melon", "off": Vector2(275, 262), "r": 56.0, "icon": "item_melon", "label": "Werfen"})
+		_buttons.append({"id": "oil", "off": Vector2(455, 92), "r": 56.0, "icon": "item_oil", "label": "Öl legen"})
 	for b in _buttons:
 		b["touch"] = -1
 	_buttons.append({"id": "pause", "off": Vector2(-1, -1), "r": 28.0, "icon": "", "label": "II", "touch": -1})
@@ -111,6 +114,11 @@ func _btn_center(b: Dictionary) -> Vector2:
 func _btn_visible(b: Dictionary) -> bool:
 	if b.id == "melon":
 		return game.player.has_melon
+	if b.id == "oil":
+		return game.player.has_oil
+	if b.id == "window":
+		# nur der Spieler-Zombie, solange er draußen wartet
+		return game.phase == game.Phase.PREP and game.player.busy
 	return true
 
 
@@ -210,6 +218,12 @@ func _press(b: Dictionary) -> void:
 		"melon":
 			aim_vector = Vector2.ZERO
 			game.set_aiming(true)
+		"oil":
+			Sfx.play("ui_click", -8.0)
+			game.player_oil()
+		"window":
+			Sfx.play("ui_click", -8.0)
+			game.player_window()
 		"bite":
 			game.player_bite()
 		"sprint":
@@ -334,6 +348,10 @@ func _draw_status(p: Character) -> void:
 		_icon("item_souvlaki", Vector2(ex + 22, y + 24), 44)
 		_txt(Vector2(ex + 46, y + 32), "%ds" % int(ceil(p.souvlaki_t)), 20, Color(1.0, 0.75, 0.3))
 		ex += 100
+	if p.frappe_t > 0.0:
+		_icon("item_frappe", Vector2(ex + 22, y + 24), 44)
+		_txt(Vector2(ex + 46, y + 32), "%ds" % int(ceil(p.frappe_t)), 20, Color(0.95, 0.8, 0.6))
+		ex += 100
 	if ex > x:
 		y += 50
 	# Mitspieler-Liste
@@ -415,7 +433,7 @@ func _draw_buttons(p: Character) -> void:
 				active = p.frozen
 				ring = p.freeze_left / Cfg.FREEZE_MAX
 				ring_col = Color(0.55, 0.85, 1.0, 0.9)
-			"melon":
+			"melon", "oil":
 				enabled = p.hidden_in == null
 			"bite":
 				enabled = p.can_act()
@@ -485,11 +503,20 @@ func _draw_messages(sz: Vector2, p: Character) -> void:
 			elif p.invuln_t > 0.0 and game.phase == game.Phase.HUNT:
 				hint = "LAUF! (%.1f s)" % p.invuln_t
 				hint_col = Color(1.0, 0.5, 0.3)
+			elif p.frappe_t > 0.0 and p.moving and p.sneaking:
+				hint = "Frappé: leise und schnell (%d s)" % int(ceil(p.frappe_t))
+				hint_col = Color(0.95, 0.8, 0.6)
 			elif p.moving and not p.sneaking and game.phase == game.Phase.HUNT:
 				hint = "Du rennst – Zombies hören dich!"
 				hint_col = Color(1.0, 0.8, 0.3, 0.9)
 		else:
-			if p.listening and not p.listen_active():
+			if p.busy and game.phase == game.Phase.PREP:
+				hint = "Du wartest draußen – wähle dein Fenster."
+				hint_col = Color(1.0, 0.8, 0.5)
+			elif p.slip_t > 0.0:
+				hint = "Auf dem Öl ausgerutscht!"
+				hint_col = Color(0.8, 1.0, 0.4)
+			elif p.listening and not p.listen_active():
 				hint = "Horchen ..."
 			elif p.listen_active():
 				hint = "Du hörst alle Menschen (gelbe Ovale)"

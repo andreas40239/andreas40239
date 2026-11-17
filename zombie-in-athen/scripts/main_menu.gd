@@ -13,7 +13,12 @@ var _ip_edit: LineEdit
 var _hosts_box: VBoxContainer
 var _players_label: Label
 var _start_btn: Button
-var _last_ip := ""
+var _zombie_btn: Button
+var _level_btn: Button
+# Figuren-Editor
+var _fig_model: CharModel
+var _fig_holder: Node3D
+var _fig_labels := {}
 var _test_started := false
 var _test_retry := 0.0
 
@@ -21,7 +26,6 @@ var _test_retry := 0.0
 func _ready() -> void:
 	Engine.time_scale = 1.0
 	get_tree().paused = false
-	_load_settings()
 	Net.lobby_changed.connect(_on_lobby_changed)
 	Net.hosts_changed.connect(_refresh_hosts)
 	Net.join_ok.connect(_on_join_ok)
@@ -90,9 +94,13 @@ func _ready() -> void:
 	box.offset_top = 90
 	box.offset_bottom = 320
 	add_child(box)
-	_button(box, "Allein spielen", _start, 32, Vector2(400, 78))
-	_button(box, "Mehrspieler (WLAN)", func(): _show_mp("choose"), 30, Vector2(400, 70))
-	_button(box, "So wird gespielt", _show_help, 24, Vector2(400, 54))
+	_button(box, "Allein spielen", func(): _show_mp("levels"), 32, Vector2(400, 76))
+	_button(box, "Mehrspieler (WLAN)", func(): _show_mp("choose"), 30, Vector2(400, 68))
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 10)
+	box.add_child(row2)
+	_button(row2, "Meine Figur", func(): _show_mp("figure"), 23, Vector2(195, 56))
+	_button(row2, "Anleitung", _show_help, 23, Vector2(195, 56))
 	var mus := Button.new()
 	mus.custom_minimum_size = Vector2(170, 50)
 	mus.add_theme_font_size_override("font_size", 20)
@@ -108,7 +116,7 @@ func _ready() -> void:
 		mus.text = "Musik: an" if GameState.music_on else "Musik: aus")
 
 	var info := Label.new()
-	info.text = "Testlevel · allein mit 3 Computerspielern oder zu 2–6 im WLAN · 1 Zombie      v0.2"
+	info.text = "Allein mit Computerspielern oder zu 2–6 im WLAN · 4 Orte      v0.3"
 	info.add_theme_font_size_override("font_size", 16)
 	info.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 	info.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -121,6 +129,10 @@ func _ready() -> void:
 		_mp_status = Net.last_message
 		Net.last_message = ""
 		_show_mp("choose")
+	if GameState.shots_dir.ends_with("figure"):
+		_show_mp("figure")
+	if GameState.shots_dir.ends_with("levels"):
+		_show_mp("levels")
 	if GameState.shots_dir.ends_with("lobby"):
 		# nur für automatische Tests: Lobby-Screenshot
 		Net.my_name = "Andi"
@@ -149,6 +161,9 @@ func _button(box: Container, text: String, cb: Callable, fsize: int, minsize: Ve
 
 
 func _process(delta: float) -> void:
+	if _fig_model != null and is_instance_valid(_fig_model):
+		_fig_model.rotation.y += delta * 0.9
+		_fig_model.animate(delta, 0.0, "stand")
 	# automatische Netzwerk-Tests: starten, sobald genug Spieler da sind / Beitritt wiederholen
 	if GameState.net_host > 0 and not _test_started and Net.players.size() >= GameState.net_host:
 		_test_started = true
@@ -166,9 +181,9 @@ func _process(delta: float) -> void:
 				Net.join_game(ip)
 
 
-func _start() -> void:
+func _start(level_idx: int) -> void:
 	Net.leave()
-	GameState.level = GameState.TEST_LEVEL.duplicate()
+	GameState.set_level(level_idx)
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 
@@ -230,22 +245,6 @@ Freie Plätze übernehmen Computerspieler. Verlässt der Gastgeber das Spiel, en
 
 # ------------------------------------------------------------------ Mehrspieler-Lobby
 
-func _load_settings() -> void:
-	var cf := ConfigFile.new()
-	if cf.load("user://settings.cfg") == OK:
-		Net.my_name = cf.get_value("net", "name", Net.my_name)
-		_last_ip = cf.get_value("net", "last_ip", "")
-	elif Net.my_name == "Spieler":
-		Net.my_name = "Spieler %d" % randi_range(10, 99)
-
-
-func _save_settings() -> void:
-	var cf := ConfigFile.new()
-	cf.set_value("net", "name", Net.my_name)
-	cf.set_value("net", "last_ip", _last_ip)
-	cf.save("user://settings.cfg")
-
-
 func _show_mp(screen: String) -> void:
 	if _mp == null:
 		_mp = Control.new()
@@ -267,6 +266,11 @@ func _show_mp(screen: String) -> void:
 		c.queue_free()
 	_mp_screen = screen
 	_name_edit = null
+	_zombie_btn = null
+	_level_btn = null
+	_fig_model = null
+	_fig_holder = null
+	_fig_labels.clear()
 	_ip_edit = null
 	_hosts_box = null
 	_players_label = null
@@ -288,9 +292,27 @@ func _show_mp(screen: String) -> void:
 			_mp_text("Adresse: %s" % (ips[0] if not ips.is_empty() else "kein WLAN gefunden"), 34, Color(0.72, 0.95, 0.3))
 			_mp_text("Die anderen tippen auf »Spiel suchen«. Erscheint dein Spiel dort nicht, geben sie diese Adresse ein.", 18, Color(0.8, 0.8, 0.8))
 			_players_label = _mp_text("", 24, Color.WHITE)
-			_start_btn = _button(_mp_box, "Starten", _mp_start, 30, Vector2(0, 76))
-			_button(_mp_box, "Abbrechen", _mp_leave, 22, Vector2(0, 52))
+			var orow := _mp_row()
+			_level_btn = _button(orow, "", func():
+				GameState.set_level((GameState.level_index + 1) % Cfg.LEVELS.size())
+				_on_lobby_changed(), 22, Vector2(0, 58))
+			_level_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_zombie_btn = _button(orow, "", func():
+				Net.player_zombie = not Net.player_zombie
+				_on_lobby_changed(), 22, Vector2(0, 58))
+			_zombie_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_start_btn = _button(_mp_box, "Starten", _mp_start, 30, Vector2(0, 72))
+			_button(_mp_box, "Abbrechen", _mp_leave, 22, Vector2(0, 50))
 			_on_lobby_changed()
+		"levels":
+			_mp_title("WO SPIELEN WIR?")
+			for i in Cfg.LEVELS.size():
+				var lv: Dictionary = Cfg.LEVELS[i]
+				var idx := i
+				_button(_mp_box, "%s   –   %s" % [lv.name, lv.info], func(): _start(idx), 26, Vector2(0, 72))
+			_button(_mp_box, "Zurück", _close_mp, 22, Vector2(0, 52))
+		"figure":
+			_build_figure_screen()
 		"search":
 			_mp_title("SPIEL SUCHEN")
 			_mp_text("Gefundene Spiele im WLAN:", 22, Color.WHITE)
@@ -300,7 +322,7 @@ func _show_mp(screen: String) -> void:
 			_refresh_hosts()
 			_mp_text("Oder die Adresse des Gastgebers eingeben:", 19, Color(0.85, 0.85, 0.85))
 			var row := _mp_row()
-			_ip_edit = _mp_edit(row, _last_ip, "192.168.…", 15)
+			_ip_edit = _mp_edit(row, GameState.last_ip, "192.168.…", 15)
 			_ip_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
 			var cb := _button(row, "Verbinden", func(): _mp_join(_ip_edit.text), 24, Vector2(200, 60))
 			cb.size_flags_horizontal = Control.SIZE_SHRINK_END
@@ -373,7 +395,7 @@ func _take_name() -> void:
 		var n := _name_edit.text.strip_edges()
 		if n != "":
 			Net.my_name = n
-		_save_settings()
+		GameState.save_settings()
 
 
 func _mp_host() -> void:
@@ -399,8 +421,8 @@ func _mp_join(ip: String) -> void:
 		_mp_status = err
 		_show_mp("search")
 		return
-	_last_ip = ip
-	_save_settings()
+	GameState.last_ip = ip
+	GameState.save_settings()
 	_mp_status = "Verbinde mit %s …" % ip
 	_show_mp("search")
 
@@ -412,7 +434,6 @@ func _mp_leave() -> void:
 
 
 func _mp_start() -> void:
-	GameState.level = GameState.TEST_LEVEL.duplicate()
 	Net.start_match()
 
 
@@ -443,8 +464,17 @@ func _on_lobby_changed() -> void:
 		_players_label.text = "Spieler (%d/%d): %s" % [names.size(), Net.MAX_PLAYERS, ", ".join(names)]
 	if _start_btn != null:
 		var n := Net.players.size()
-		var bots := maxi(0, 1 + int(GameState.TEST_LEVEL["ai_humans"]) - n)
+		var lv: Dictionary = Cfg.LEVELS[GameState.level_index]
+		var pz := Net.player_zombie and n >= 2
+		var bots := maxi(0, 1 + int(lv.ai_humans) - (n - (1 if pz else 0)))
 		_start_btn.text = "Starten (%d Spieler%s)" % [n, (" + %d Computer" % bots) if bots > 0 else ""]
+		_level_btn.text = "Ort: %s  ▸" % lv.name
+		if n < 2:
+			_zombie_btn.text = "Start-Zombie: Computer"
+			_zombie_btn.disabled = true
+		else:
+			_zombie_btn.disabled = false
+			_zombie_btn.text = "Start-Zombie: %s  ▸" % ("ausgeloster Spieler" if Net.player_zombie else "Computer")
 
 
 func _refresh_hosts() -> void:
@@ -465,3 +495,100 @@ func _refresh_hosts() -> void:
 		var h: Dictionary = Net.found_hosts[ip]
 		var addr: String = ip
 		_button(_hosts_box, "%s  ·  %d Spieler  ·  %s" % [h.name, h.count, addr], func(): _mp_join(addr), 24, Vector2(0, 64))
+
+
+# ------------------------------------------------------------------ Meine Figur
+
+func _build_figure_screen() -> void:
+	_mp_title("MEINE FIGUR")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 30)
+	_mp_box.add_child(row)
+	# Vorschau: eigenes kleines 3D-Fenster mit der Figur
+	var svc := SubViewportContainer.new()
+	svc.custom_minimum_size = Vector2(280, 380)
+	svc.stretch = true
+	row.add_child(svc)
+	var sv := SubViewport.new()
+	sv.own_world_3d = true
+	sv.transparent_bg = true
+	sv.msaa_3d = Viewport.MSAA_2X
+	svc.add_child(sv)
+	var we := WorldEnvironment.new()
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.06, 0.08, 0.14)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.7, 0.75, 0.9)
+	env.ambient_light_energy = 0.9
+	we.environment = env
+	sv.add_child(we)
+	var cam := Camera3D.new()
+	cam.fov = 30.0
+	sv.add_child(cam)
+	cam.look_at_from_position(Vector3(0, 1.35, 4.6), Vector3(0, 0.98, 0))
+	var sun := DirectionalLight3D.new()
+	sun.light_energy = 1.1
+	sv.add_child(sun)
+	sun.look_at_from_position(Vector3(2, 4, 4), Vector3.ZERO)
+	_fig_holder = Node3D.new()
+	sv.add_child(_fig_holder)
+	# Auswahl rechts
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(col)
+	_fig_row(col, "Farbe", "color", Cfg.SHIRT_COLORS.size())
+	_fig_row(col, "Frisur", "hair", Cfg.HAIR_NAMES.size())
+	_fig_row(col, "Haarfarbe", "hair_color", Cfg.HAIR_COLORS.size())
+	_fig_row(col, "Hut", "hat", Cfg.HAT_NAMES.size())
+	_button(_mp_box, "Fertig", func():
+		GameState.save_settings()
+		_close_mp(), 26, Vector2(0, 62))
+	_refresh_figure()
+
+
+func _fig_row(parent: Container, title: String, key: String, count: int) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	var name_l := Label.new()
+	name_l.text = title
+	name_l.custom_minimum_size = Vector2(120, 0)
+	name_l.add_theme_font_size_override("font_size", 22)
+	row.add_child(name_l)
+	_button(row, "◀", func(): _fig_step(key, -1, count), 26, Vector2(64, 62))
+	var val := Label.new()
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	val.add_theme_font_size_override("font_size", 22)
+	row.add_child(val)
+	_fig_labels[key] = val
+	_button(row, "▶", func(): _fig_step(key, 1, count), 26, Vector2(64, 62))
+
+
+func _fig_step(key: String, d: int, count: int) -> void:
+	GameState.look[key] = posmod(int(GameState.look[key]) + d, count)
+	_refresh_figure()
+
+
+func _refresh_figure() -> void:
+	if _fig_holder == null:
+		return
+	var lk: Dictionary = GameState.look
+	var yaw := 0.4
+	if _fig_model != null:
+		yaw = _fig_model.rotation.y
+		_fig_model.queue_free()
+	_fig_model = CharModel.new()
+	_fig_holder.add_child(_fig_model)
+	_fig_model.setup(Cfg.SHIRT_COLORS[lk.color], 0, false, lk.hair, lk.hair_color, lk.hat)
+	_fig_model.rotation.y = yaw
+	var cl: Label = _fig_labels["color"]
+	cl.text = "■■■■"
+	cl.add_theme_color_override("font_color", Cfg.SHIRT_COLORS[lk.color])
+	var hl: Label = _fig_labels["hair_color"]
+	hl.text = "■■■■"
+	hl.add_theme_color_override("font_color", Cfg.HAIR_COLORS[lk.hair_color])
+	(_fig_labels["hair"] as Label).text = Cfg.HAIR_NAMES[lk.hair]
+	(_fig_labels["hat"] as Label).text = Cfg.HAT_NAMES[lk.hat]

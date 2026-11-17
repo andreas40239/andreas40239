@@ -92,6 +92,8 @@ func _floor_mat(type: int) -> StandardMaterial3D:
 		ApartmentGen.RoomType.BATH: return mat("fl_bath", Color(0.95, 0.98, 1.0), "floor_bath", 0.5)
 		ApartmentGen.RoomType.KITCHEN: return mat("fl_kitchen", Color(1, 1, 1), "floor_kitchen", 0.6)
 		ApartmentGen.RoomType.HALL: return mat("fl_hall", Color(1, 1, 1), "floor_hall", 0.6)
+		ApartmentGen.RoomType.CLASSROOM: return mat("fl_class", Color(0.72, 0.86, 0.74), "floor_hall", 0.6)
+		ApartmentGen.RoomType.STORAGE: return mat("fl_store", Color(0.6, 0.6, 0.64), "floor_hall", 0.7)
 		_: return mat("fl_wood", Color(1, 1, 1), "floor_wood", 0.8)
 
 
@@ -102,6 +104,9 @@ func _wall_mat(type: int) -> StandardMaterial3D:
 		ApartmentGen.RoomType.BEDROOM: return mat("w_bed", Color(0.8, 0.66, 0.66), "wall_plaster")
 		ApartmentGen.RoomType.LIVING: return mat("w_living", Color(0.66, 0.76, 0.64), "wall_plaster")
 		ApartmentGen.RoomType.OFFICE: return mat("w_office", Color(0.66, 0.7, 0.82), "wall_plaster")
+		ApartmentGen.RoomType.DINING: return mat("w_dining", Color(0.78, 0.86, 0.95), "wall_plaster")
+		ApartmentGen.RoomType.CLASSROOM: return mat("w_class", Color(0.92, 0.86, 0.6), "wall_plaster")
+		ApartmentGen.RoomType.STORAGE: return mat("w_store", Color(0.62, 0.62, 0.64), "wall_plaster")
 		_: return mat("w_hall", Color(0.88, 0.84, 0.74), "wall_plaster")
 
 
@@ -301,9 +306,21 @@ func _build_room_lights() -> void:
 				_add_light(c, Color(1.0, 0.8, 0.55), 0.8, rad)
 			ApartmentGen.RoomType.OFFICE:
 				_add_light(c, Color(0.75, 0.8, 1.0), 0.7, rad)
+			ApartmentGen.RoomType.DINING:
+				_add_light(c, Color(1.0, 0.85, 0.6), 1.0, rad)
+			ApartmentGen.RoomType.CLASSROOM:
+				_add_light(c, Color(0.9, 0.97, 1.0), 1.0, rad, "fluoro")
+			ApartmentGen.RoomType.STORAGE:
+				_add_light(c, Color(1.0, 0.8, 0.5), 0.55, rad, "flicker")
 			ApartmentGen.RoomType.HALL:
-				_add_light(Vector3(rc.size.x * 0.25, 2.3, c.z), Color(1.0, 0.75, 0.45), 0.9, 7.5)
-				_add_light(Vector3(rc.size.x * 0.75, 2.3, c.z), Color(1.0, 0.75, 0.45), 0.9, 7.5, "flicker")
+				# Lampen entlang der langen Achse, etwa alle 9 m
+				var horiz := rc.size.x >= rc.size.y
+				var n := maxi(1, roundi(maxf(rc.size.x, rc.size.y) / 9.0))
+				for i in n:
+					var t := (i + 0.5) / n
+					var lp := Vector3(rc.position.x + rc.size.x * (t if horiz else 0.5), 2.3,
+						rc.position.y + rc.size.y * (0.5 if horiz else t))
+					_add_light(lp, Color(1.0, 0.75, 0.45), 0.9, 7.5, "flicker" if i % 2 == 1 else "none")
 
 
 # ------------------------------------------------------------------ Möbel
@@ -390,17 +407,25 @@ func _build_furniture(f: Dictionary) -> void:
 					lb.call(wood_dark, Vector3(sx, 0.38, sz), Vector3(0.08, 0.76, 0.08))
 			lb.call(wood, Vector3(0, 0.79, 0), Vector3(1.76, 0.06, 0.9))
 			# lange Tischdecke (blau-weiß) – darunter kann man sich verstecken
-			var cloth := mat("cloth", Color(0.93, 0.9, 0.8))
-			lb.call(mat("cloth_red", Color(0.7, 0.14, 0.12)), Vector3(0, 0.845, 0), Vector3(1.82, 0.012, 0.36))
-			lb.call(mat("cloth_red", Color(0.7, 0.14, 0.12)), Vector3(0, 0.42, 0.482), Vector3(1.8, 0.1, 0.012))
-			lb.call(cloth, Vector3(0, 0.83, 0), Vector3(1.8, 0.02, 0.94))
+			var school := apt.theme == "school"
+			# lange Tischdecke (in der Schule: Pultverkleidung) – darunter kann man sich verstecken
+			var cloth := mat("desk_side", Color(0.45, 0.5, 0.42)) if school else mat("cloth", Color(0.93, 0.9, 0.8))
+			if not school:
+				lb.call(mat("cloth_red", Color(0.7, 0.14, 0.12)), Vector3(0, 0.845, 0), Vector3(1.82, 0.012, 0.36))
+				lb.call(mat("cloth_red", Color(0.7, 0.14, 0.12)), Vector3(0, 0.42, 0.482), Vector3(1.8, 0.1, 0.012))
+				lb.call(cloth, Vector3(0, 0.83, 0), Vector3(1.8, 0.02, 0.94))
 			lb.call(cloth, Vector3(0, 0.6, 0.47), Vector3(1.8, 0.46, 0.02))
 			lb.call(cloth, Vector3(0, 0.6, -0.47), Vector3(1.8, 0.46, 0.02))
 			lb.call(cloth, Vector3(0.9, 0.6, 0), Vector3(0.02, 0.46, 0.94))
 			lb.call(cloth, Vector3(-0.9, 0.6, 0), Vector3(0.02, 0.46, 0.94))
-			# Deko: Teller und Flasche
-			lb.call(white, Vector3(-0.4, 0.86, 0.05), Vector3(0.26, 0.02, 0.26))
-			lb.call(mat("bottle", Color(0.15, 0.4, 0.2), "", 0.2), Vector3(0.35, 0.97, -0.1), Vector3(0.08, 0.26, 0.08))
+			if school:
+				# Hefte und Bücher
+				lb.call(white, Vector3(-0.45, 0.835, 0.05), Vector3(0.3, 0.02, 0.4))
+				lb.call(mat("book2", Color(0.2, 0.35, 0.7)), Vector3(0.4, 0.845, -0.05), Vector3(0.26, 0.05, 0.36))
+			else:
+				# Deko: Teller und Flasche
+				lb.call(white, Vector3(-0.4, 0.86, 0.05), Vector3(0.26, 0.02, 0.26))
+				lb.call(mat("bottle", Color(0.15, 0.4, 0.2), "", 0.2), Vector3(0.35, 0.97, -0.1), Vector3(0.08, 0.26, 0.08))
 			_add_eyes(spot, Vector3(0.0, 0.22, 0.49))
 			col_h = 0.9
 		"nightstand":
@@ -510,6 +535,16 @@ func _build_furniture(f: Dictionary) -> void:
 				Vector3(rc.size.x - 0.3, 0.024, rc.size.y - 0.3))
 			if horiz:
 				pass
+		"board":
+			# Schultafel an der Wand (hoch an der hinteren Außenwand, sonst niedrig)
+			var high := _back_is_tall(f)
+			var by := 1.45 if high else 0.5
+			var bh := 1.0 if high else 0.5
+			lb.call(mat("board_frame", Color(0.55, 0.4, 0.25)), Vector3(0, by, -0.4), Vector3(L - 0.3, bh + 0.08, 0.04))
+			lb.call(mat("board", Color(0.1, 0.3, 0.2), "", 0.9), Vector3(0, by, -0.375), Vector3(L - 0.4, bh, 0.02))
+			lb.call(mat("chalk", Color(0.9, 0.9, 0.85)), Vector3(-0.5, by + bh * 0.2, -0.362), Vector3(0.9, 0.03, 0.01))
+			lb.call(mat("chalk", Color(0.9, 0.9, 0.85)), Vector3(-0.3, by - bh * 0.05, -0.362), Vector3(1.3, 0.03, 0.01))
+			lb.call(mat("board_frame", Color(0.55, 0.4, 0.25)), Vector3(0, by - bh * 0.5 - 0.05, -0.34), Vector3(L - 0.4, 0.03, 0.1))
 	if def.block:
 		var cs := CollisionShape3D.new()
 		var sh := BoxShape3D.new()

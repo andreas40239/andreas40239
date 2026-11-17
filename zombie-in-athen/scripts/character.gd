@@ -43,6 +43,11 @@ var motion := 0.25             # Auffälligkeit 0..1 (siehe Cfg.sight_range)
 var garlic_t := 0.0
 var souvlaki_t := 0.0
 var has_melon := false
+var has_oil := false
+var frappe_t := 0.0            # Frappé: leise und trotzdem schnell
+var slip_t := 0.0              # Zombie: auf Öl ausgerutscht, liegt am Boden
+var slip_cd := 0.0             # kurz danach rutscht er nicht gleich wieder aus
+var look: Array = [-1, -1, 0]  # Frisur, Haarfarbe, Hut
 var invuln_t := 0.0
 var stun_t := 0.0
 var sprint_t := 0.0
@@ -70,7 +75,9 @@ var _melon_mesh: MeshInstance3D
 var _freeze_ring: MeshInstance3D
 
 
-func setup(p_game, p_name: String, p_shirt: Color, p_variant: int, zombie: bool) -> void:
+## p_look: [Frisur, Haarfarbe, Hut] (siehe Cfg), -1 = aus der Variante ableiten
+func setup(p_game, p_name: String, p_shirt: Color, p_variant: int, zombie: bool, p_look: Array = [-1, -1, 0]) -> void:
+	look = p_look
 	game = p_game
 	cname = p_name
 	shirt = p_shirt
@@ -92,7 +99,7 @@ func setup(p_game, p_name: String, p_shirt: Color, p_variant: int, zombie: bool)
 
 	model = CharModel.new()
 	add_child(model)
-	model.setup(p_shirt, p_variant, zombie)
+	model.setup(p_shirt, p_variant, zombie, look[0], look[1], look[2])
 
 	_label = Label3D.new()
 	_label.text = cname
@@ -180,7 +187,7 @@ func is_active_human() -> bool:
 
 ## Kann sich diese Figur gerade frei bewegen / handeln?
 func can_act() -> bool:
-	return not busy and turn_t <= 0.0 and stun_t <= 0.0
+	return not busy and turn_t <= 0.0 and stun_t <= 0.0 and slip_t <= 0.0
 
 
 func listen_active() -> bool:
@@ -195,6 +202,8 @@ func current_speed() -> float:
 			return Cfg.ZOMBIE_WALK
 		return Cfg.ZOMBIE_CHASE
 	if sneaking:
+		if frappe_t > 0.0:
+			return Cfg.HUMAN_FRAPPE_SNEAK
 		return Cfg.HUMAN_SNEAK * (1.5 if souvlaki_t > 0.0 else 1.0)
 	return Cfg.HUMAN_SOUVLAKI if souvlaki_t > 0.0 else Cfg.HUMAN_RUN
 
@@ -219,6 +228,16 @@ func _physics_process(delta: float) -> void:
 		model.animate(delta, 0.0, "turn")
 		if turn_t <= 0.0:
 			_finish_turning()
+		return
+	if slip_t > 0.0:
+		# ausgerutscht: rutscht noch ein Stück und liegt dann hilflos da
+		velocity = velocity.move_toward(Vector3.ZERO, 7.0 * delta)
+		velocity.y = 0.0
+		move_and_slide()
+		global_position.y = 0.0
+		moving = false
+		listening = false
+		model.animate(delta, 0.0, "zslip")
 		return
 	if brain != null and not player_controlled:
 		brain.think(delta)
@@ -314,6 +333,9 @@ func _puppet_process(delta: float) -> void:
 	elif turn_t > 0.0:
 		pose = "turn"
 		sp = 0.0
+	elif slip_t > 0.0:
+		pose = "zslip"
+		sp = 0.0
 	elif hidden_in != null:
 		pose = hide_pose
 		sp = 0.0
@@ -330,6 +352,9 @@ func _tick_timers(delta: float) -> void:
 	bite_cd = maxf(0.0, bite_cd - delta)
 	garlic_t = maxf(0.0, garlic_t - delta)
 	souvlaki_t = maxf(0.0, souvlaki_t - delta)
+	frappe_t = maxf(0.0, frappe_t - delta)
+	slip_t = maxf(0.0, slip_t - delta)
+	slip_cd = maxf(0.0, slip_cd - delta)
 	invuln_t = maxf(0.0, invuln_t - delta)
 	stun_t = maxf(0.0, stun_t - delta)
 	sprint_t = maxf(0.0, sprint_t - delta)
@@ -410,6 +435,17 @@ func hear(pos: Vector3, lure: bool) -> void:
 		brain.on_noise(pos, lure)
 
 
+## Zombie rutscht auf einer Ölpfütze aus.
+func slip() -> void:
+	slip_t = Cfg.SLIP_TIME
+	slip_cd = Cfg.SLIP_TIME + 2.5
+	sprint_t = 0.0
+	stun_t = 0.0
+	var v := Vector3(velocity.x, 0, velocity.z)
+	velocity = (v.normalized() if v.length() > 0.1 else facing_dir()) * 4.5
+	Sfx.play_at("slip", global_position, 3.0)
+
+
 func try_sprint() -> bool:
 	if not is_zombie or sprint_cd > 0.0 or stun_t > 0.0:
 		return false
@@ -424,7 +460,9 @@ func start_turning() -> void:
 	turn_t = 2.2
 	garlic_t = 0.0
 	souvlaki_t = 0.0
+	frappe_t = 0.0
 	has_melon = false
+	has_oil = false
 	frozen = false
 	velocity = Vector3.ZERO
 	Sfx.play_at("transform", global_position, 0.0)

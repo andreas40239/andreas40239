@@ -71,6 +71,15 @@ func _ready() -> void:
 	await get_tree().create_timer(0.2).timeout
 	_check("Melone geworfen", not p.has_melon)
 
+	# 6) Olivenöl: Button erscheint nur mit Flasche und legt eine Pfütze
+	p.has_oil = true
+	await get_tree().create_timer(0.1).timeout
+	var oc: Vector2 = _btn(hud, "oil")
+	_touch(0, oc, true)
+	_touch(0, oc, false)
+	await get_tree().create_timer(0.2).timeout
+	_check("Öl-Button legt eine Pfütze", not p.has_oil and game._puddles.size() == 1)
+
 	print("TOUCHTEST %s (%d Fehler)" % ["OK" if fails == 0 else "FEHLGESCHLAGEN", fails])
 	get_tree().quit(0 if fails == 0 else 1)
 
