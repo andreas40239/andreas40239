@@ -3,6 +3,7 @@ extends Node3D
 ## Ein Upgrade auf der Karte: "garlic", "souvlaki" oder "melon".
 
 var kind := "garlic"
+var net_id := 0
 var _model: Node3D
 var _ring: MeshInstance3D
 var _t := 0.0

@@ -84,10 +84,6 @@ func set_zombie_mode(z: bool) -> void:
 	_buttons.append({"id": "pause", "off": Vector2(-1, -1), "r": 28.0, "icon": "", "label": "II", "touch": -1})
 
 
-func refresh_roster() -> void:
-	pass   # die Liste wird jedes Frame neu gezeichnet
-
-
 # ------------------------------------------------------------------ Eingabe
 
 func move_vector() -> Vector2:
@@ -654,21 +650,32 @@ func _toggle_pause() -> void:
 		_pause_panel = null
 		get_tree().paused = false
 		return
-	get_tree().paused = true
+	# im Netzwerkspiel läuft die Runde weiter – anhalten geht nur allein
+	if not game.net:
+		get_tree().paused = true
 	_joy_index = -1
 	_joy_vec = Vector2.ZERO
-	var box := _panel("PAUSE", Color(1, 0.9, 0.7))
+	_btn_freeze = false
+	_btn_listen = false
+	var box := _panel("MENÜ" if game.net else "PAUSE", Color(1, 0.9, 0.7))
 	_pause_panel = box.get_meta("root")
+	if game.net:
+		_label(box, "Die Runde läuft weiter!", 20, Color(1, 0.8, 0.5))
 	_button(box, "Weiter", _toggle_pause)
-	_button(box, "Neu starten", func():
-		get_tree().paused = false
-		game.restart())
-	_button(box, "Hauptmenü", func():
+	if not game.net:
+		_button(box, "Neu starten", func():
+			get_tree().paused = false
+			game.restart())
+	_button(box, "Spiel verlassen" if game.net else "Hauptmenü", func():
 		get_tree().paused = false
 		game.to_menu())
 
 
 func show_end(res: Dictionary) -> void:
+	if _pause_panel != null:
+		_pause_panel.queue_free()
+		_pause_panel = null
+		get_tree().paused = false
 	_joy_index = -1
 	_joy_vec = Vector2.ZERO
 	var box := _panel(res.headline, Color(1.0, 0.85, 0.3) if res.player_wins else Color(0.9, 0.2, 0.15))
@@ -701,5 +708,9 @@ func show_end(res: Dictionary) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 24)
 	box.add_child(row)
-	_button(row, "Nochmal spielen", func(): game.restart())
-	_button(row, "Hauptmenü", func(): game.to_menu())
+	if game.is_client:
+		_label(box, "Der Gastgeber kann eine neue Runde starten.", 18, Color(0.8, 0.8, 0.8))
+		_button(row, "Spiel verlassen", func(): game.to_menu())
+	else:
+		_button(row, "Nochmal spielen", func(): game.restart())
+		_button(row, "Spiel beenden" if game.net else "Hauptmenü", func(): game.to_menu())

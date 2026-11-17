@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Zombie in Athen"
 config/description="Isometrisches Zombie-Versteckspiel in einer Athener Wohnung."
-config/version="0.1.0"
+config/version="0.2.0"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 boot_splash/bg_color=Color(0.02, 0.03, 0.06, 1)
@@ -21,6 +21,7 @@ general/default_playback_type.web=0
 [autoload]
 
 GameState="*res://scripts/game_state.gd"
+Net="*res://scripts/net.gd"
 Sfx="*res://scripts/sfx.gd"
 
 [display]

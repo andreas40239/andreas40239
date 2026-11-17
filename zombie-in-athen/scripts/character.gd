@@ -4,8 +4,17 @@ extends CharacterBody3D
 
 var game                       # Game (Hauptszene)
 var cname := ""
-var is_player := false         # die Figur des menschlichen Spielers
-var player_controlled := false # Eingaben kommen vom HUD (sonst von brain)
+var is_player := false         # die Figur des Spielers an DIESEM Gerät
+var player_controlled := false # von einem Menschen gesteuert (HUD oder Netzwerk), sonst von brain
+var owner_peer := 0            # Netzwerk: Peer-ID des steuernden Spielers (0 = Computer)
+var puppet := false            # Netzwerk-Client: Figur wird nur angezeigt, Zustand kommt vom Gastgeber
+var net_pos := Vector3.ZERO
+var net_vel := Vector3.ZERO
+var net_facing := 0.0
+var net_age := 0.0
+var net_chase := -1            # Zombie: Index der Figur, die er gerade verfolgt
+var bite_cd := 0.0             # Sperre nach einem Fehlbiss
+var input_age := 0.0           # Gastgeber: Sekunden seit der letzten Eingabe des Mitspielers
 var is_zombie := false
 var started_as_zombie := false
 var lives := Cfg.MAX_LIVES
@@ -193,6 +202,9 @@ func current_speed() -> float:
 func _physics_process(delta: float) -> void:
 	if game == null or game.paused_logic:
 		return
+	if puppet:
+		_puppet_process(delta)
+		return
 	_tick_timers(delta)
 	if not is_zombie and turn_t <= 0.0 and game.phase != game.Phase.END:
 		alive_time += delta
@@ -210,6 +222,11 @@ func _physics_process(delta: float) -> void:
 		return
 	if brain != null and not player_controlled:
 		brain.think(delta)
+	elif owner_peer > 1:
+		# Mitspieler übers Netz: kommt nichts mehr an, bleibt die Figur stehen
+		input_age += delta
+		if input_age > 0.6:
+			move_dir = Vector3.ZERO
 	if hidden_in != null:
 		velocity = Vector3.ZERO
 		moving = false
@@ -276,7 +293,41 @@ func _physics_process(delta: float) -> void:
 	model.animate(delta, sp, _pose())
 
 
+## Netzwerk-Client: Position weich zum zuletzt gemeldeten Zustand führen und animieren.
+func _puppet_process(delta: float) -> void:
+	_tick_timers(delta)
+	net_age += delta
+	var target := net_pos + net_vel * minf(net_age, 0.12)
+	if busy or hidden_in != null or global_position.distance_to(target) > 3.0:
+		global_position = target
+	else:
+		global_position = global_position.lerp(target, clampf(delta * 18.0, 0.0, 1.0))
+	velocity = net_vel
+	facing = lerp_angle(facing, net_facing, clampf(delta * 14.0, 0.0, 1.0))
+	rotation.y = facing
+	_freeze_ring.visible = frozen and hidden_in == null
+	var pose := _pose()
+	var sp := Vector2(net_vel.x, net_vel.z).length()
+	if busy:
+		pose = busy_pose
+		sp = 2.0
+	elif turn_t > 0.0:
+		pose = "turn"
+		sp = 0.0
+	elif hidden_in != null:
+		pose = hide_pose
+		sp = 0.0
+	model.animate(delta, sp, pose)
+
+
+func mark_zombie() -> void:
+	is_zombie = true
+	model.set_zombie(true)
+	_label.modulate = Color(0.75, 0.95, 0.55)
+
+
 func _tick_timers(delta: float) -> void:
+	bite_cd = maxf(0.0, bite_cd - delta)
 	garlic_t = maxf(0.0, garlic_t - delta)
 	souvlaki_t = maxf(0.0, souvlaki_t - delta)
 	invuln_t = maxf(0.0, invuln_t - delta)
@@ -386,8 +437,7 @@ func _finish_turning() -> void:
 	sprint_cd = 2.0
 	want_sneak = false
 	want_freeze = false
-	model.set_zombie(true)
-	_label.modulate = Color(0.75, 0.95, 0.55)
+	mark_zombie()
 	game.on_turned(self)
 
 

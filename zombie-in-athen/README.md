@@ -34,6 +34,29 @@ Alles erscheint in Rot-Tönen. Menschen sind nur sichtbar, wenn sie sich in Sich
 Buttons: **Beißen**, **Rennen** (3 s, sobald ein Mensch Lärm gemacht hat) und **Horchen**
 (still stehen, alle Menschen erscheinen als gelbes Oval).
 
+## Mehrspieler im WLAN (ohne Server)
+
+2 bis 6 Spieler, alle Handys im selben WLAN – oder ein Handy öffnet einen Hotspot und die
+anderen wählen sich dort ein. Internet wird nicht gebraucht.
+
+1. Alle tippen im Hauptmenü auf **Mehrspieler (WLAN)** und tragen ihren Namen ein.
+2. Einer tippt **Spiel eröffnen** (Gastgeber). Sein Bildschirm zeigt die Adresse an.
+3. Die anderen tippen **Spiel suchen** und wählen das gefundene Spiel. Erscheint es nicht
+   (manche Netze blocken die Suche), die Adresse des Gastgebers eintippen.
+4. Der Gastgeber tippt **Starten**. Freie Plätze bis 4 Menschen übernehmen Computerspieler;
+   dazu kommt wie im Einzelspiel 1 Zombie.
+
+Was man wissen sollte:
+
+* Das Handy des Gastgebers rechnet das Spiel; die anderen schicken ihre Eingaben und zeigen an.
+* Verlässt ein Mitspieler die Runde, übernimmt der Computer seine Figur.
+  Verlässt der Gastgeber die Runde, ist sie für alle vorbei.
+* Nach Spielende startet der Gastgeber mit **Nochmal spielen** eine neue Runde für alle.
+* Pausieren geht im Mehrspieler nicht.
+* In Gäste- oder öffentlichen WLANs sind Geräte oft voneinander abgeschottet – dann den
+  Hotspot eines Handys nehmen.
+* Technisch kennt jedes Handy alle Positionen; gegen Schummeln ist das nicht abgesichert.
+
 ## Steuerung
 
 | Touch | Tastatur (Test am PC) |
@@ -48,7 +71,7 @@ Buttons: **Beißen**, **Rennen** (3 s, sobald ein Mensch Lärm gemacht hat) und 
 
 ## Testlevel
 
-`Testlevel starten` im Hauptmenü: **1 menschlicher Spieler, 3 Computerspieler, 1 Zombie**,
+`Allein spielen` im Hauptmenü: **1 menschlicher Spieler, 3 Computerspieler, 1 Zombie**,
 Wohnung 22 × 16 m mit 6 Räumen, jedes Mal neu erzeugt. Einstellungen in
 [`scripts/game_state.gd`](scripts/game_state.gd) (`TEST_LEVEL`), Balancing-Werte in
 [`scripts/cfg.gd`](scripts/cfg.gd).
@@ -75,6 +98,8 @@ Wohnung 22 × 16 m mit 6 Räumen, jedes Mal neu erzeugt. Einstellungen in
 Startparameter für Tests (nach `--`): `--game` (Menü überspringen), `--seed=N`,
 `--autoplay` (KI steuert den Spieler), `--as-zombie`, `--fast=N` (Zeitraffer),
 `--prep=SEK`, `--match=SEK`, `--shots=ORDNER` (Screenshots), `--debug`.
+Netzwerk: `--host=N` (eröffnen, bei N Spielern starten), `--join=ADRESSE` oder `--join=auto`
+(Spielsuche), `--name=NAME`.
 
 ## Android-APK bauen
 
@@ -95,6 +120,8 @@ tools/run_tests.sh                                          # mit Bildschirm
 
 * `tests/gen_test.gd` – Wohnungsgenerator über 300 Seeds (Pflichträume, Erreichbarkeit, Verstecke)
 * komplette KI-Matches im Zeitraffer ohne Skriptfehler
+* Netzwerkrunde: Gastgeber und zwei Mitspieler als eigene Prozesse auf einem Rechner
+  (einer findet das Spiel über die Suche); alle müssen dieselbe Abschlusstabelle melden
 * `tests/touch_test.gd` – simulierte Finger: Joystick, Multitouch, alle Buttons, Melonenwurf
 
 ## Aufbau
@@ -114,7 +141,8 @@ scripts/
   game.gd              Spielablauf: Phasen, Bisse, Geräusche, Upgrades, Zombie-Sicht, Ende
   hud.gd               Joystick, Buttons, Leben, Timer, Minimap, Ansagen, Endbildschirm
   sfx.gd               Autoload: Soundeffekte, Herzschlag, Musik-Überblendung
-  main_menu.gd         Hauptmenü
+  net.gd               Autoload: WLAN-Mehrspieler (ENet, Spielsuche per UDP-Rundruf, RPCs)
+  main_menu.gd         Hauptmenü und Mehrspieler-Lobby
 shaders/zombie_vision.gdshader   Rot-Sicht (Gelb bleibt erhalten)
 tools/gen_audio.py     erzeugt alle Sounds und die Musik
 tools/gen_graphics.py  erzeugt Texturen, Icons, Titelbild, App-Icon
@@ -138,4 +166,9 @@ Alle Grafiken und Sounds sind **selbst erzeugt** und frei von Fremdrechten:
 * Die APK wurde gebaut und statisch geprüft (arm64-v8a, signiert), aber **noch nicht auf einem
   echten Gerät gestartet**; Performance und Lautstärke-Mix bitte dort prüfen.
 * Die Sounds wurden nur messtechnisch geprüft (Pegel, Länge, Schleifenpunkte), nicht abgehört.
-* Mehrspieler über Netzwerk gibt es noch nicht; Mitspieler sind Computergegner.
+* Der Mehrspielermodus wurde nur mit mehreren Spielinstanzen auf einem Rechner getestet,
+  **nicht in einem echten WLAN zwischen Handys**. Offen sind dort vor allem: funktioniert die
+  Spielsuche auf den Geräten, und wie flüssig fühlt sich die eigene Figur an (sie bewegt sich
+  erst, wenn der Gastgeber geantwortet hat).
+* Mehrspieler nur im lokalen Netz, nicht über das Internet. Später beitreten geht nicht.
+* Netzwerk-Port: UDP 24642 (Spiel) und 24643 (Suche).

@@ -57,6 +57,13 @@ func stream(sname: String) -> AudioStream:
 
 ## Positionaler Effekt in der Spielwelt.
 func play_at(sname: String, pos: Vector3, vol_db := 0.0, pitch := 1.0) -> void:
+	# Gastgeber: Mitspieler hören denselben Effekt
+	if Net.is_host():
+		Net.send_fx("sfx", [sname, pos, vol_db, pitch])
+	play_at_local(sname, pos, vol_db, pitch)
+
+
+func play_at_local(sname: String, pos: Vector3, vol_db := 0.0, pitch := 1.0) -> void:
 	if not GameState.sfx_on:
 		return
 	var s := stream(sname)
@@ -69,6 +76,13 @@ func play_at(sname: String, pos: Vector3, vol_db := 0.0, pitch := 1.0) -> void:
 	p.volume_db = vol_db
 	p.pitch_scale = pitch * randf_range(0.93, 1.07)
 	p.play()
+
+
+## Nicht-positionaler Effekt für alle Spieler (Countdown, Alarm).
+func play_all(sname: String, vol_db := 0.0) -> void:
+	if Net.is_host():
+		Net.send_fx("ui", [sname, vol_db])
+	play(sname, vol_db)
 
 
 ## Nicht-positionaler Effekt (UI, Ansagen).

@@ -26,6 +26,11 @@ var quit_after := 0.0       # Spiel nach N Sekunden (Spielzeit) beenden
 var follow := ""            # Kamera folgt dieser Figur (Namensanfang), nur für Tests
 var debug := false
 var touch_test := false
+var keep_seed := false       # --seed gilt auch für Netzwerk-Runden
+var net_host := 0           # Test: Spiel eröffnen und bei N Spielern starten
+var net_join := ""          # Test: dieser Adresse beitreten
+var net_name := ""
+var rematch := 0            # Test: so viele weitere Runden nach Spielende starten
 var start_game := false     # Menü überspringen
 var music_on := true
 var sfx_on := true
@@ -49,6 +54,15 @@ func _ready() -> void:
 			start_game = true
 		elif a.begins_with("--seed="):
 			level["seed"] = int(a.get_slice("=", 1))
+			keep_seed = true
+		elif a.begins_with("--host="):
+			net_host = int(a.get_slice("=", 1))
+		elif a.begins_with("--join="):
+			net_join = a.get_slice("=", 1)
+		elif a.begins_with("--rematch="):
+			rematch = int(a.get_slice("=", 1))
+		elif a.begins_with("--name="):
+			net_name = a.get_slice("=", 1)
 		elif a.begins_with("--fast="):
 			fast = float(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):

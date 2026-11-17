@@ -26,6 +26,9 @@ var zombie_view := false
 var marker_on := {}            # Character -> bool (gelbes Oval sichtbar)
 var results := {}
 var rng := RandomNumberGenerator.new()
+var net := false               # Netzwerk-Runde
+var is_host := false           # dieses Gerät rechnet das Spiel
+var is_client := false         # dieses Gerät zeigt nur an und schickt Eingaben
 
 var _level: Dictionary
 var _markers := {}             # Character -> Sprite3D
@@ -34,7 +37,6 @@ var _spawned_outside := false
 var _pickup_t := Cfg.PICKUP_FIRST
 var _tick_t := 0.0
 var _pound_t := 0.0
-var _bite_cd := 0.0
 var _vision: ColorRect
 var _vision_strength := 0.0
 var _aim_arrow: Node3D
@@ -46,6 +48,18 @@ var _shot_i := 0
 var _end_t := 0.0
 var _env: Environment
 var _noise_pings: Array[Dictionary] = []   # für die Minimap: {pos, t}
+var _waiting := false          # Gastgeber wartet, bis alle die Szene geladen haben
+var _wait_t := 0.0
+var _begun := false
+var _snap_tick := 0
+var _next_pickup_id := 1
+var _net_pickups := {}         # Client: net_id -> Pickup
+var _bot_t := 0.0              # Test-Bot auf einem Client
+var _bot_dir := Vector3.ZERO
+var _bot_flags := 0
+
+const NF := 26                 # Zahlen je Figur im Schnappschuss
+const POSES := ["inside", "lie", "crouch", "enter"]
 
 
 func _ready() -> void:
@@ -70,25 +84,65 @@ func _ready() -> void:
 	nav = Nav.new()
 	nav.setup(apt)
 
+	net = Net.active()
+	is_host = Net.is_host()
+	is_client = Net.is_client()
+	if net:
+		Net.game = self
+
 	_setup_environment()
-	_spawn_characters()
 	_setup_camera()
 	_setup_overlays()
-
-	hud = HudScript.new()
-	add_child(hud)
-	hud.setup(self)
 	Sfx.reset_levels()
 	Sfx.start_music()
-	if GameState.shots_dir != "":
-		_shot_times = [0.5, 8.0, 20.0, prep_left + 0.6, prep_left + 2.5, prep_left + 12.0,
-			prep_left + 30.0, prep_left + 60.0, prep_left + 100.0]
+	print("LEVEL seed=%d size=%dx%d rooms=%d spots=%d openings=%d" % [s, apt.w, apt.h, apt.rooms.size(), spots.size(), apt.openings.size()])
+	if is_client:
+		# Figuren und Spielzustand kommen vom Gastgeber (net_begin / net_snapshot)
+		paused_logic = true
+		Net.send_ready()
+		return
+	_spawn_characters()
+	_attach_player()
 	if GameState.touch_test:
 		var tt := Node.new()
 		tt.set_script(load("res://tests/touch_test.gd"))
 		add_child(tt)
-	print("LEVEL seed=%d size=%dx%d rooms=%d spots=%d openings=%d" % [s, apt.w, apt.h, apt.rooms.size(), spots.size(), apt.openings.size()])
+	if is_host and Net.players.size() > 1:
+		_waiting = true
+		paused_logic = true
+		hud.announce("WARTE AUF MITSPIELER", "", 30.0)
+	else:
+		_begin()
+
+
+func _exit_tree() -> void:
+	if Net.game == self:
+		Net.game = null
+
+
+func _begin() -> void:
+	_waiting = false
+	paused_logic = false
+	_begun = true
+	if is_host:
+		Net.send_begin(_roster())
 	hud.announce("VERSTECK DICH!", "Die Zombies kommen in %d Sekunden" % int(prep_left), 3.5)
+
+
+## Kamera, Ohr und HUD an die Figur dieses Geräts hängen.
+func _attach_player() -> void:
+	player.is_player = true
+	_listener = AudioListener3D.new()
+	_listener.position.y = 1.5
+	player.add_child(_listener)
+	_listener.make_current()
+	cam.global_position = _cam_pos_for(player.global_position)
+	hud = HudScript.new()
+	add_child(hud)
+	hud.setup(self)
+	if GameState.shots_dir != "":
+		_shot_times = [0.5, 8.0, 20.0, prep_left + 0.6, prep_left + 2.5, prep_left + 12.0,
+			prep_left + 30.0, prep_left + 60.0, prep_left + 100.0]
 
 
 # ------------------------------------------------------------------ Aufbau
@@ -124,41 +178,58 @@ func _setup_environment() -> void:
 
 
 func _spawn_characters() -> void:
-	var used: Array[Vector2i] = []
-	# Spieler startet im Schlafzimmer
+	# menschliche Spieler: allein "Du", im Netzwerk alle aus der Lobby (Gastgeber zuerst)
+	var entries: Array = []
+	if net:
+		var ids: Array = Net.players.keys()
+		ids.sort()
+		for id in ids:
+			entries.append([Net.players[id], id])
+	else:
+		entries.append(["Du", 0])
+	var total := maxi(1 + int(_level.get("ai_humans", 3)), entries.size())
 	var bed_room := 0
 	for r in apt.rooms:
 		if r.type == ApartmentGen.RoomType.BEDROOM:
 			bed_room = r.id
 			break
-	player = _make_char("Du", Cfg.SHIRT_COLORS[0], 0, GameState.as_zombie)
-	player.is_player = true
-	player.player_controlled = not GameState.autoplay
-	if GameState.autoplay:
-		player.brain = (ZombieAI.new(player, self) if GameState.as_zombie else HumanAI.new(player, self))
-	var pc := nav.random_free_in_room(bed_room)
-	used.append(pc)
-	player.global_position = Nav.center(pc)
-	var n_ai := int(_level.get("ai_humans", 3))
-	for i in n_ai:
-		var b := _make_char(Cfg.BOT_NAMES[i % Cfg.BOT_NAMES.size()], Cfg.SHIRT_COLORS[(i + 1) % Cfg.SHIRT_COLORS.size()], i + 1, false)
-		b.brain = HumanAI.new(b, self)
-		var cell := nav.random_free()
-		for tries in 30:
-			cell = nav.random_free()
-			var ok := true
-			for u in used:
-				if Vector2(u - cell).length() < 4.0:
-					ok = false
-			if ok:
-				break
+	var used: Array[Vector2i] = []
+	var bot_i := 0
+	for i in total:
+		var c: Character
+		var color: Color = Cfg.SHIRT_COLORS[i % Cfg.SHIRT_COLORS.size()]
+		if i < entries.size():
+			var owner: int = entries[i][1]
+			var local: bool = (not net) or owner == Net.my_id()
+			var zombie: bool = local and GameState.as_zombie
+			c = _make_char(entries[i][0], color, i, zombie)
+			c.owner_peer = owner
+			if local:
+				player = c
+				c.player_controlled = not GameState.autoplay
+				if GameState.autoplay:
+					c.brain = (ZombieAI.new(c, self) if zombie else HumanAI.new(c, self))
+			else:
+				c.player_controlled = true
+		else:
+			c = _make_char(Cfg.BOT_NAMES[bot_i % Cfg.BOT_NAMES.size()], color, i, false)
+			c.brain = HumanAI.new(c, self)
+			bot_i += 1
+		# Startplätze: der erste im Schlafzimmer, alle mit Abstand zueinander
+		var cell := nav.random_free_in_room(bed_room) if i == 0 else nav.random_free()
+		if i > 0:
+			for tries in 30:
+				cell = nav.random_free()
+				var ok := true
+				for u in used:
+					if Vector2(u - cell).length() < 4.0:
+						ok = false
+				if ok:
+					break
 		used.append(cell)
-		b.global_position = Nav.center(cell)
-		b.facing = rng.randf() * TAU
-	_listener = AudioListener3D.new()
-	_listener.position.y = 1.5
-	player.add_child(_listener)
-	_listener.make_current()
+		c.global_position = Nav.center(cell)
+		if i > 0:
+			c.facing = rng.randf() * TAU
 
 
 func _make_char(cname: String, shirt: Color, variant: int, zombie: bool) -> Character:
@@ -177,7 +248,7 @@ func _setup_camera() -> void:
 	cam.far = 150.0
 	cam.basis = Basis(Vector3.UP, deg_to_rad(Cfg.CAM_YAW_DEG)) * Basis(Vector3.RIGHT, deg_to_rad(Cfg.CAM_PITCH_DEG))
 	add_child(cam)
-	cam.global_position = _cam_pos_for(player.global_position)
+	cam.global_position = _cam_pos_for(Vector3(apt.w * 0.5, 0, apt.h * 0.5))
 	cam.make_current()
 
 
@@ -286,10 +357,21 @@ func nearest_spot_for(c: Character, reach := 1.35) -> HidingSpot:
 # ------------------------------------------------------------------ Hauptschleife
 
 func _physics_process(delta: float) -> void:
+	if _waiting:
+		_wait_t += delta
+		if Net.all_ready() or _wait_t > 8.0:
+			_begin()
+		return
+	if is_client:
+		_client_tick(delta)
+		return
 	if paused_logic:
 		return
 	time += delta
-	_bite_cd = maxf(0.0, _bite_cd - delta)
+	if is_host:
+		_snap_tick += 1
+		if _snap_tick % 2 == 0:
+			Net.send_snapshot(_make_snapshot())
 	match phase:
 		Phase.PREP:
 			prep_left -= delta
@@ -299,7 +381,7 @@ func _physics_process(delta: float) -> void:
 				_tick_t -= delta
 				if _tick_t <= 0.0:
 					_tick_t = 1.0
-					Sfx.play("tick", -4.0)
+					Sfx.play_all("tick", -4.0)
 				_pound_t -= delta
 				if _pound_t <= 0.0 and not _pending.is_empty():
 					_pound_t = rng.randf_range(0.5, 0.9)
@@ -328,19 +410,25 @@ func _physics_process(delta: float) -> void:
 		p.t -= delta
 	_noise_pings = _noise_pings.filter(func(p): return p.t > 0.0)
 
-	if GameState.debug and int(time / 5.0) != int((time - delta) / 5.0):
-		var line := "DBG t=%d" % int(time)
-		for c in chars:
-			var st := "?"
-			if c.brain is ZombieAI:
-				st = ZombieAI.S.keys()[c.brain.state]
-			elif c.brain is HumanAI:
-				st = HumanAI.S.keys()[c.brain.state]
-			line += " | %s %s%s (%.1f,%.1f) L%d B%d" % [c.cname.left(8), st, "*H" if c.hidden_in != null else "", c.global_position.x, c.global_position.z, c.lives, c.bites]
-		print(line)
+	_debug_line(delta)
 	if GameState.quit_after > 0.0 and time >= GameState.quit_after:
 		print("QUIT_AFTER time=%.1f phase=%d humans=%d zombies=%d" % [time, phase, humans().size(), zombies().size()])
 		get_tree().quit()
+
+
+func _debug_line(delta: float) -> void:
+	if not GameState.debug or int(time / 5.0) == int((time - delta) / 5.0):
+		return
+	var line := "DBG t=%d ph=%d" % [int(time), phase]
+	for c in chars:
+		var st := "-"
+		if c.brain is ZombieAI:
+			st = ZombieAI.S.keys()[c.brain.state]
+		elif c.brain is HumanAI:
+			st = HumanAI.S.keys()[c.brain.state]
+		line += " | %s %s%s%s (%.1f,%.1f) L%d B%d" % [c.cname.left(8), st, "*H" if c.hidden_in != null else "", "*Z" if c.is_zombie else "", c.global_position.x, c.global_position.z, c.lives, c.bites]
+	line += " | pickups=%d" % pickups.size()
+	print(line)
 
 
 func _all_turned_done() -> bool:
@@ -351,18 +439,27 @@ func _all_turned_done() -> bool:
 
 
 func _apply_player_input() -> void:
-	if not player.player_controlled:
+	if player == null or not player.player_controlled:
 		return
 	var v: Vector2 = hud.move_vector()
-	player.move_dir = cam_right * v.x + cam_fwd * v.y
+	var mv := cam_right * v.x + cam_fwd * v.y
+	var flags := 0     # Bit 1 = leise, 2 = stillstehen, 4 = horchen
 	if player.is_zombie:
-		player.want_listen = hud.listen_held
-		player.want_sneak = false
-		player.want_freeze = false
+		if hud.listen_held:
+			flags |= 4
 	else:
-		player.want_sneak = hud.sneak_on
-		player.want_freeze = hud.freeze_held
-		player.want_listen = false
+		if hud.sneak_on:
+			flags |= 1
+		if hud.freeze_held:
+			flags |= 2
+	if is_client:
+		if GameState.autoplay:
+			_bot_input()
+			mv = _bot_dir
+			flags = _bot_flags
+		Net.send_input(mv.x, mv.z, flags)
+	else:
+		_set_input(player, mv, flags)
 	if _aiming and not (player.has_melon and player.is_active_human() and player.hidden_in == null):
 		_aiming = false
 	if _aiming:
@@ -385,6 +482,8 @@ func _apply_player_input() -> void:
 
 
 func _process(delta: float) -> void:
+	if player == null:
+		return
 	_update_camera(delta)
 	_update_visibility(delta)
 	_update_lights(delta)
@@ -479,6 +578,8 @@ func _update_audio_levels() -> void:
 			nd = minf(nd, d)
 			if z.brain is ZombieAI and z.brain.target == player and z.brain.state == ZombieAI.S.CHASE:
 				chase = 1.0
+			elif z.puppet and z.net_chase >= 0 and z.net_chase == chars.find(player):
+				chase = 1.0
 		heart = clampf((9.0 - nd) / 7.0, 0.0, 1.0)
 		if player.hidden_in != null and player.hidden_in.sniffed_by != null:
 			heart = 1.0
@@ -513,20 +614,24 @@ func _spawn_zombies_outside() -> void:
 		z.global_position = inside + out_dir * 1.35
 		z.face_towards(inside)
 		_pending.append({"z": z, "win": win, "inside": inside, "out": out_dir})
+		Net.send_event("spawn", [_roster_entry(z)])
 
 
 func _opening_score(win: Dictionary) -> float:
+	# nicht direkt neben einem Menschen einsteigen
 	var inside := Nav.center(win.opening.inside)
-	var d := inside.distance_to(player.global_position)
-	return clampf(d, 0.0, 9.0) + rng.randf() * 4.0
+	var d := 9.0
+	for h in humans():
+		d = minf(d, inside.distance_to(h.global_position))
+	return d + rng.randf() * 4.0
 
 
 func _start_hunt() -> void:
 	phase = Phase.HUNT
 	if not _spawned_outside:
 		_spawn_zombies_outside()
-	Sfx.play("alarm", -2.0)
-	hud.announce("DIE ZOMBIES KOMMEN!", "Renne nicht – sie hören dich.", 3.0)
+	Sfx.play_all("alarm", -2.0)
+	_announce_all("DIE ZOMBIES KOMMEN!", "Renne nicht – sie hören dich.", 3.0)
 	for e in _pending:
 		_break_in(e)
 	_pending.clear()
@@ -538,33 +643,10 @@ func _break_in(e: Dictionary) -> void:
 	var inside: Vector3 = e.inside
 	var out_dir: Vector3 = e.out
 	var edge_pos: Vector3 = inside + out_dir * 0.5
-	if win.door != null:
-		Sfx.play_at("door_break", win.pos, 6.0)
-		var hinge: Node3D = win.door
-		var tw := create_tween()
-		tw.tween_property(hinge, "rotation:y", hinge.rotation.y + 1.75, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		var p := Props.burst(Color(0.3, 0.2, 0.12), 14, 4.0, 0.1)
-		add_child(p)
-		p.global_position = win.pos
-	else:
-		Sfx.play_at("glass_break", win.pos, 6.0)
-		if win.glass != null:
-			win.glass.visible = false
-		var p := Props.burst(Color(0.7, 0.85, 1.0, 0.8), 28, 4.5, 0.09, 1.1)
-		add_child(p)
-		p.global_position = win.pos
-		p.direction = -out_dir + Vector3(0, 0.6, 0)
-		# Scherben am Boden
-		var shard_m := builder.glass_mat()
-		for i in 7:
-			var sh := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(rng.randf_range(0.06, 0.2), 0.01, rng.randf_range(0.05, 0.16))
-			sh.mesh = bm
-			sh.material_override = shard_m
-			add_child(sh)
-			sh.global_position = inside - out_dir * rng.randf_range(-0.2, 0.7) + Vector3(rng.randf_range(-0.5, 0.5), 0.01, rng.randf_range(-0.5, 0.5)) * Vector3(absf(out_dir.z), 1, absf(out_dir.x)) + Vector3(0, 0.005, 0)
-			sh.rotation.y = rng.randf() * TAU
+	var idx := builder.windows.find(win)
+	Sfx.play_at("door_break" if win.door != null else "glass_break", win.pos, 6.0)
+	_break_fx(idx)
+	Net.send_event("break", [idx])
 	# durchs Fenster / die Tür klettern
 	var sill: float = win.sill
 	var tw2 := create_tween()
@@ -579,10 +661,45 @@ func _break_in(e: Dictionary) -> void:
 	emit_noise_ping(win.pos)
 
 
+## Sichtbare Folgen eines Einbruchs (läuft auf jedem Gerät).
+func _break_fx(idx: int) -> void:
+	if idx < 0 or idx >= builder.windows.size():
+		return
+	var win: Dictionary = builder.windows[idx]
+	var inside := Nav.center(win.opening.inside)
+	var out_dir := Vector3(win.opening.out.x, 0, win.opening.out.y)
+	if win.door != null:
+		var hinge: Node3D = win.door
+		var tw := create_tween()
+		tw.tween_property(hinge, "rotation:y", hinge.rotation.y + 1.75, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		var p := Props.burst(Color(0.3, 0.2, 0.12), 14, 4.0, 0.1)
+		add_child(p)
+		p.global_position = win.pos
+		return
+	if win.glass != null:
+		win.glass.visible = false
+	var p := Props.burst(Color(0.7, 0.85, 1.0, 0.8), 28, 4.5, 0.09, 1.1)
+	add_child(p)
+	p.global_position = win.pos
+	p.direction = -out_dir + Vector3(0, 0.6, 0)
+	# Scherben am Boden
+	var shard_m := builder.glass_mat()
+	for i in 7:
+		var sh := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(randf_range(0.06, 0.2), 0.01, randf_range(0.05, 0.16))
+		sh.mesh = bm
+		sh.material_override = shard_m
+		add_child(sh)
+		var side := Vector3(absf(out_dir.z), 0, absf(out_dir.x)) * randf_range(-0.5, 0.5)
+		sh.global_position = inside - out_dir * randf_range(-0.2, 0.7) + side + Vector3(0, 0.015, 0)
+		sh.rotation.y = randf() * TAU
+
+
 # ------------------------------------------------------------------ Geräusche
 
 func emit_noise(pos: Vector3, radius: float, source: Character, lure: bool) -> void:
-	if phase != Phase.HUNT:
+	if phase != Phase.HUNT or is_client:
 		return
 	for z in chars:
 		if not z.is_zombie or z.busy or z == source:
@@ -595,6 +712,7 @@ func emit_noise(pos: Vector3, radius: float, source: Character, lure: bool) -> v
 
 func emit_noise_ping(pos: Vector3) -> void:
 	_noise_pings.append({"pos": pos, "t": 1.5})
+	Net.send_fx("ping", [pos])
 
 
 func noise_pings() -> Array[Dictionary]:
@@ -622,33 +740,75 @@ func try_bite(z: Character, h: Character) -> bool:
 	h.model.play_hit()
 	Sfx.play_at("zombie_bite", h.global_position, 3.0)
 	Sfx.play_at("human_hurt", h.global_position, 0.0, 1.0 + 0.15 * (h.variant % 3))
-	var p := Props.burst(Color(0.7, 0.02, 0.02), 16, 3.0, 0.07, 0.7)
-	add_child(p)
-	p.global_position = h.global_position + Vector3(0, 1.2, 0)
-	if h.is_player:
-		hud.flash(Color(0.8, 0.0, 0.0, 0.55))
-		Input.vibrate_handheld(300)
-		if h.lives > 0:
-			hud.announce("GEBISSEN!", "Lauf weg – der Zombie ist 3 Sekunden abgelenkt. Noch %d Leben." % h.lives, 2.2)
-	elif z.is_player:
-		Input.vibrate_handheld(120)
-		hud.toast("Du hast %s gebissen! (%d Bisse)" % [h.cname, z.bites])
-	else:
-		hud.toast("%s wurde von %s gebissen" % [h.cname, z.cname])
+	_fx("blood", h.global_position + Vector3(0, 1.2, 0))
+	_hit_to(h)
+	if h.lives > 0:
+		_announce_to(h, "GEBISSEN!", "Lauf weg – der Zombie ist 3 Sekunden abgelenkt. Noch %d Leben." % h.lives, 2.2)
+	_toast_to(z, "Du hast %s gebissen! (%d Bisse)" % [h.cname, z.bites])
+	_toast_others("%s wurde von %s gebissen" % [h.cname, z.cname], [h, z])
 	if h.lives <= 0:
 		h.start_turning()
-		if h.is_player:
-			hud.announce("DU WIRST ZUM ZOMBIE!", "", 2.2)
-		else:
-			hud.toast("%s verwandelt sich in einen Zombie!" % h.cname)
+		_announce_to(h, "DU WIRST ZUM ZOMBIE!", "", 2.2)
+		_toast_others("%s verwandelt sich in einen Zombie!" % h.cname, [h])
 	elif h.brain is HumanAI:
 		h.brain.on_bitten()
 	return true
 
 
-## Biss-Button des Spieler-Zombies.
+# ------------------------------------------------------------------ Aktionen der Spieler
+# Die Buttons im HUD rufen player_*() auf. Auf dem Gastgeber (oder allein) wird die
+# Aktion direkt ausgeführt, ein Client schickt sie an den Gastgeber.
+
 func player_bite() -> void:
-	if phase != Phase.HUNT or not player.is_zombie or not player.can_act() or _bite_cd > 0.0:
+	_request("bite")
+
+
+func player_sprint() -> void:
+	_request("sprint")
+
+
+
+
+
+func _request(kind: String, arg := Vector3.ZERO) -> void:
+	if player == null or phase == Phase.END:
+		return
+	if is_client:
+		Net.send_action(kind, arg)
+	else:
+		_do_action(player, kind, arg)
+
+
+func _do_action(c: Character, kind: String, arg: Vector3) -> void:
+	match kind:
+		"hide":
+			_act_hide(c)
+		"bite":
+			_act_bite(c)
+		"sprint":
+			if c.is_zombie and c.heard_t > 0.0 and c.can_act():
+				c.try_sprint()
+		"throw":
+			if c.has_melon and c.is_active_human() and c.hidden_in == null:
+				var d := Vector3(arg.x, 0, arg.z)
+				throw_melon(c, d.normalized() if d.length() > 0.1 else c.facing_dir())
+
+
+func _set_input(c: Character, mv: Vector3, flags: int) -> void:
+	c.move_dir = Vector3(mv.x, 0, mv.z).limit_length(1.0)
+	if c.is_zombie:
+		c.want_listen = (flags & 4) != 0
+		c.want_sneak = false
+		c.want_freeze = false
+	else:
+		c.want_sneak = (flags & 1) != 0
+		c.want_freeze = (flags & 2) != 0
+		c.want_listen = false
+
+
+## Biss eines von einem Menschen gesteuerten Zombies.
+func _act_bite(c: Character) -> void:
+	if phase != Phase.HUNT or not c.is_zombie or not c.can_act() or c.bite_cd > 0.0:
 		return
 	var best: Character = null
 	var bd := INF
@@ -657,37 +817,105 @@ func player_bite() -> void:
 			continue
 		var d := INF
 		if h.hidden_in != null:
-			var sd: float = h.hidden_in.distance_to(player.global_position)
+			var sd: float = h.hidden_in.distance_to(c.global_position)
 			if sd < 1.0:
 				d = sd
 		else:
-			var hd: float = h.global_position.distance_to(player.global_position)
+			var hd: float = h.global_position.distance_to(c.global_position)
 			if hd < Cfg.BITE_RANGE + 0.3:
 				d = hd
 		if d < bd:
 			bd = d
 			best = h
-	if best != null and try_bite(player, best):
+	if best != null and try_bite(c, best):
 		return
 	# daneben
-	_bite_cd = 0.7
-	player.model.play_bite()
-	Sfx.play_at("zombie_groan_2", player.global_position, -6.0, 1.4)
+	c.bite_cd = 0.7
+	c.model.play_bite()
+	Sfx.play_at("zombie_groan_2", c.global_position, -6.0, 1.4)
 
 
-func player_sprint() -> void:
-	if player.is_zombie and player.heard_t > 0.0 and player.can_act():
-		player.try_sprint()
+func _act_hide(c: Character) -> void:
+	if c.is_zombie or c.turn_t > 0.0 or phase == Phase.END:
+		return
+	if c.hidden_in != null:
+		hide_out(c)
+		return
+	var s := nearest_spot_for(c)
+	if s != null:
+		if hide_in(c, s):
+			_toast_to(c, "Versteckt: %s" % s.label())
+	else:
+		_toast_to(c, "Kein freies Versteck in Reichweite")
 
 
 func on_turned(c: Character) -> void:
-	if c.is_player and not GameState.autoplay:
+	if c.player_controlled:
 		c.brain = null
-		hud.set_zombie_mode(true)
-		hud.announce("DU BIST JETZT EIN ZOMBIE", "Beiße die Menschen! Horche, um sie zu finden.", 3.5)
+		if c == player:
+			hud.set_zombie_mode(true)
+		_announce_to(c, "DU BIST JETZT EIN ZOMBIE", "Beiße die Menschen! Horche, um sie zu finden.", 3.5)
 	else:
 		c.brain = ZombieAI.new(c, self)
-	hud.refresh_roster()
+
+
+# --- Meldungen an einzelne oder alle Spieler (lokal oder übers Netz)
+
+func _is_remote(c: Character) -> bool:
+	return is_host and c.owner_peer > 1
+
+
+func _announce_to(c: Character, title: String, sub: String, dur: float) -> void:
+	if c == player:
+		hud.announce(title, sub, dur)
+	elif _is_remote(c):
+		Net.send_event("ann", [title, sub, dur], c.owner_peer)
+
+
+func _announce_all(title: String, sub: String, dur: float) -> void:
+	hud.announce(title, sub, dur)
+	Net.send_event("ann", [title, sub, dur])
+
+
+func _toast_to(c: Character, text: String) -> void:
+	if c == player:
+		hud.toast(text)
+	elif _is_remote(c):
+		Net.send_event("toast", [text], c.owner_peer)
+
+
+func _toast_others(text: String, skip: Array) -> void:
+	if not skip.has(player):
+		hud.toast(text)
+	if is_host:
+		for c in chars:
+			if c.owner_peer > 1 and not skip.has(c):
+				Net.send_event("toast", [text], c.owner_peer)
+
+
+func _hit_to(c: Character) -> void:
+	if c == player:
+		hud.flash(Color(0.8, 0.0, 0.0, 0.55))
+		Input.vibrate_handheld(300)
+	elif _is_remote(c):
+		Net.send_event("hit", [], c.owner_peer)
+
+
+## Partikel-Effekt auf allen Geräten.
+func _fx(kind: String, pos: Vector3) -> void:
+	_fx_local(kind, pos)
+	Net.send_fx("fx", [kind, pos])
+
+
+func _fx_local(kind: String, pos: Vector3) -> void:
+	var p: CPUParticles3D
+	match kind:
+		"blood":
+			p = Props.burst(Color(0.7, 0.02, 0.02), 16, 3.0, 0.07, 0.7)
+		_:
+			p = Props.burst(Color(0.9, 0.15, 0.2), 26, 4.0, 0.1, 0.8)
+	add_child(p)
+	p.global_position = pos
 
 
 # ------------------------------------------------------------------ Verstecken
@@ -729,17 +957,10 @@ func hide_out(c: Character) -> void:
 
 
 func player_hide_toggle() -> void:
-	if player.is_zombie or player.turn_t > 0.0 or phase == Phase.END:
-		return
-	if player.hidden_in != null:
-		hide_out(player)
-		return
-	var s := nearest_spot_for(player)
-	if s != null:
-		if hide_in(player, s):
-			hud.toast("Versteckt: %s" % s.label())
-	else:
+	if is_client and player.hidden_in == null and player.is_active_human() and nearest_spot_for(player) == null:
 		hud.toast("Kein freies Versteck in Reichweite")
+		return
+	_request("hide")
 
 
 # ------------------------------------------------------------------ Upgrades
@@ -781,6 +1002,8 @@ func _spawn_pickup(kind := "", at := Vector3.INF) -> Pickup:
 	var p := Pickup.new()
 	add_child(p)
 	p.setup(kind)
+	p.net_id = _next_pickup_id
+	_next_pickup_id += 1
 	p.global_position = pos
 	pickups.append(p)
 	Sfx.play_at("upgrade_spawn", pos, 0.0)
@@ -795,19 +1018,15 @@ func _collect(h: Character, p: Pickup) -> void:
 		"garlic":
 			h.garlic_t = Cfg.GARLIC_TIME
 			Sfx.play_at("garlic", h.global_position, 0.0)
-			if h.is_player:
-				hud.announce("KNOBLAUCH!", "Du stinkst 20 Sekunden – Zombies halten Abstand.", 2.5)
+			_announce_to(h, "KNOBLAUCH!", "Du stinkst 20 Sekunden – Zombies halten Abstand.", 2.5)
 		"souvlaki":
 			h.souvlaki_t = Cfg.SOUVLAKI_TIME
 			Sfx.play_at("souvlaki", h.global_position, 0.0)
-			if h.is_player:
-				hud.announce("SOUVLAKI!", "20 Sekunden schneller als jeder Zombie.", 2.5)
+			_announce_to(h, "SOUVLAKI!", "20 Sekunden schneller als jeder Zombie.", 2.5)
 		_:
 			h.has_melon = true
-			if h.is_player:
-				hud.announce("WASSERMELONE!", "Melonen-Button halten, Richtung wählen, loslassen.", 3.0)
-	if not h.is_player:
-		hud.toast("%s: %s" % [h.cname, Props.kind_name(p.kind)])
+			_announce_to(h, "WASSERMELONE!", "Melonen-Button halten, Richtung wählen, loslassen.", 3.0)
+	_toast_others("%s: %s" % [h.cname, Props.kind_name(p.kind)], [h])
 	p.queue_free()
 
 
@@ -821,7 +1040,7 @@ func player_throw() -> void:
 	_aiming = false
 	_aim_arrow.visible = false
 	if player.has_melon and player.is_active_human() and player.hidden_in == null:
-		throw_melon(player, _aim_dir if _aim_dir.length() > 0.1 else player.facing_dir())
+		_request("throw", _aim_dir if _aim_dir.length() > 0.1 else player.facing_dir())
 
 
 func _melon_landing(from: Vector3, dir: Vector3) -> Vector3:
@@ -845,11 +1064,25 @@ func throw_melon(c: Character, dir: Vector3) -> void:
 	c.face_towards(c.global_position + dir)
 	var from := c.global_position
 	var land := _melon_landing(from, dir.normalized())
+	var dur := 0.35 + from.distance_to(land) * 0.06
 	Sfx.play_at("melon_throw", from, 0.0)
+	_melon_fx(from, land, dur)
+	Net.send_event("melon", [from, land, dur])
+	_toast_to(c, "Melone geworfen – die Zombies rennen hin!")
+	_toast_others("%s wirft eine Melone – die Zombies rennen hin!" % c.cname, [c])
+	var tw := create_tween()
+	tw.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	tw.tween_interval(dur)
+	tw.tween_callback(func():
+		Sfx.play_at("melon_splat", land, 6.0)
+		emit_noise(land, 999.0, c, true))
+
+
+## Flug und Aufprall der Melone (nur Optik, läuft auf jedem Gerät).
+func _melon_fx(from: Vector3, land: Vector3, dur: float) -> void:
 	var m := Props.melon_mesh(0.2)
 	add_child(m)
 	m.global_position = from + Vector3(0, 1.4, 0)
-	var dur := 0.35 + from.distance_to(land) * 0.06
 	var tw := create_tween()
 	tw.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 	tw.tween_method(func(t: float):
@@ -862,26 +1095,30 @@ func throw_melon(c: Character, dir: Vector3) -> void:
 		var splat := Props.melon_splat()
 		add_child(splat)
 		splat.global_position = land
-		var b := Props.burst(Color(0.9, 0.15, 0.2), 26, 4.0, 0.1, 0.8)
-		add_child(b)
-		b.global_position = land + Vector3(0, 0.2, 0)
-		Sfx.play_at("melon_splat", land, 6.0)
-		emit_noise(land, 999.0, c, true)
-		hud.toast("%s wirft eine Melone – die Zombies rennen hin!" % ("Du" if c.is_player else c.cname))
+		_fx_local("melon", land + Vector3(0, 0.2, 0))
 		get_tree().create_timer(25.0, false).timeout.connect(splat.queue_free))
 
 
 # ------------------------------------------------------------------ Spielende
 
 func _end_game(sunrise: bool) -> void:
-	phase = Phase.END
-	_aiming = false
-	_aim_arrow.visible = false
-	var hs := humans()
 	var top: Character = null
 	for z in zombies():
 		if z.bites > 0 and (top == null or z.bites > top.bites):
 			top = z
+	var stats: Array = []
+	for c in chars:
+		stats.append([c.is_zombie, c.lives, c.bites, c.bites_taken])
+	Net.send_event("end", [sunrise, chars.find(top), stats])
+	_finish(sunrise, top)
+
+
+## Endbildschirm aus Sicht des Spielers an diesem Gerät.
+func _finish(sunrise: bool, top: Character) -> void:
+	phase = Phase.END
+	_aiming = false
+	_aim_arrow.visible = false
+	var hs := humans()
 	var player_wins := false
 	var headline := ""
 	var sub := ""
@@ -907,20 +1144,34 @@ func _end_game(sunrise: bool) -> void:
 	print("RESULT sunrise=%s time=%.1f survivors=%s top=%s player_wins=%s" % [
 		sunrise, time, hs.map(func(h): return h.cname),
 		(top.cname + ":" + str(top.bites)) if top != null else "-", player_wins])
+	print("STATS " + " ".join(chars.map(func(c): return "%s:%s:%d:%d:%d" % [c.cname.replace(" ", "_"), "Z" if c.is_zombie else "H", c.lives, c.bites, c.bites_taken])))
 	if GameState.shots_dir != "":
 		get_tree().create_timer(0.5, true, false, true).timeout.connect(func(): _save_shot("shot_end"))
+	if net and GameState.rematch > 0:
+		# nur für automatische Tests: der Gastgeber startet eine weitere Runde
+		GameState.rematch -= 1
+		if is_host:
+			get_tree().create_timer(2.0, true, false, true).timeout.connect(restart)
+		return
 	if GameState.autoplay and GameState.quit_after > 0.0:
-		get_tree().create_timer(1.0, true, false, true).timeout.connect(get_tree().quit)
+		# der Gastgeber wartet kurz, damit die Clients ihr Ergebnis noch bekommen
+		get_tree().create_timer(3.0 if is_host else 1.0, true, false, true).timeout.connect(get_tree().quit)
 
 
 func restart() -> void:
 	_reset_engine()
-	get_tree().reload_current_scene()
+	if is_host:
+		Net.start_match()
+	elif not net:
+		get_tree().reload_current_scene()
 
 
 func to_menu() -> void:
 	_reset_engine()
 	Sfx.reset_levels()
+	if net:
+		Net.leave()
+	get_tree().paused = false
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
@@ -928,3 +1179,319 @@ func _reset_engine() -> void:
 	Engine.time_scale = 1.0
 	Engine.physics_ticks_per_second = 60
 	Engine.max_physics_steps_per_frame = 8
+
+
+# ------------------------------------------------------------------ Netzwerk
+# Gastgeber: schickt Aufstellung, Schnappschüsse und Ereignisse.
+# Client: baut daraus die Anzeige; eigene Logik läuft dort nicht.
+
+func _roster_entry(c: Character) -> Array:
+	return [c.cname, c.shirt, c.variant, c.started_as_zombie, c.owner_peer]
+
+
+func _roster() -> Array:
+	var out: Array = []
+	for c in chars:
+		out.append(_roster_entry(c))
+	return out
+
+
+func _char_of(peer: int) -> Character:
+	for c in chars:
+		if c.owner_peer == peer:
+			return c
+	return null
+
+
+func _make_snapshot() -> Array:
+	var cf := PackedFloat32Array()
+	cf.resize(chars.size() * NF)
+	for i in chars.size():
+		var c := chars[i]
+		var o := i * NF
+		var p := c.global_position
+		var flags := 0
+		if c.is_zombie: flags |= 1
+		if c.frozen: flags |= 2
+		if c.sneaking: flags |= 4
+		if c.moving: flags |= 8
+		if c.listening: flags |= 16
+		if c.busy: flags |= 32
+		if c.has_melon: flags |= 64
+		var pose := c.busy_pose if c.busy else c.hide_pose
+		var chase := -1
+		if c.brain is ZombieAI and c.brain.state == ZombieAI.S.CHASE and c.brain.target != null:
+			chase = chars.find(c.brain.target)
+		cf[o] = p.x
+		cf[o + 1] = p.y
+		cf[o + 2] = p.z
+		cf[o + 3] = c.facing
+		cf[o + 4] = c.velocity.x
+		cf[o + 5] = c.velocity.z
+		cf[o + 6] = flags
+		cf[o + 7] = c.lives
+		cf[o + 8] = c.bites
+		cf[o + 9] = c.bites_taken
+		cf[o + 10] = c.garlic_t
+		cf[o + 11] = c.souvlaki_t
+		cf[o + 12] = c.stun_t
+		cf[o + 13] = c.sprint_t
+		cf[o + 14] = c.sprint_cd
+		cf[o + 15] = c.heard_t
+		cf[o + 16] = c.noise_t
+		cf[o + 17] = c.invuln_t
+		cf[o + 18] = c.freeze_left
+		cf[o + 19] = c.freeze_lock
+		cf[o + 20] = c.turn_t
+		cf[o + 21] = c.listen_t
+		cf[o + 22] = spots.find(c.hidden_in) if c.hidden_in != null else -1
+		cf[o + 23] = maxi(0, POSES.find(pose))
+		cf[o + 24] = c.motion
+		cf[o + 25] = chase
+	var sniff := PackedInt32Array()
+	for i in spots.size():
+		if spots[i].sniffed_by != null:
+			sniff.append(i)
+	var pk := PackedFloat32Array()
+	for p in pickups:
+		pk.append(p.net_id)
+		pk.append(["garlic", "souvlaki", "melon"].find(p.kind))
+		pk.append(p.global_position.x)
+		pk.append(p.global_position.z)
+	return [phase, prep_left, match_left, time, cf, sniff, pk]
+
+
+# --- Gastgeber
+
+func net_peer_ready(peer: int) -> void:
+	if _begun:
+		Net.send_begin(_roster(), peer)   # Nachzügler
+
+
+func net_input(peer: int, mx: float, mz: float, flags: int) -> void:
+	var c := _char_of(peer)
+	if c != null and c.player_controlled:
+		c.input_age = 0.0
+		_set_input(c, Vector3(mx, 0, mz), flags)
+
+
+func net_action(peer: int, kind: String, arg: Vector3) -> void:
+	var c := _char_of(peer)
+	if c != null and c.player_controlled and not paused_logic:
+		_do_action(c, kind, arg)
+
+
+## Ein Mitspieler ist weg: der Computer übernimmt seine Figur.
+func net_peer_left(peer: int) -> void:
+	var c := _char_of(peer)
+	if c == null:
+		return
+	c.owner_peer = 0
+	c.player_controlled = false
+	c.move_dir = Vector3.ZERO
+	c.want_freeze = false
+	c.want_listen = false
+	if c.is_zombie:
+		c.brain = ZombieAI.new(c, self)
+	else:
+		c.brain = HumanAI.new(c, self)
+	if hud != null and phase != Phase.END:
+		_toast_others("%s hat das Spiel verlassen – der Computer übernimmt." % c.cname, [])
+
+
+# --- Client
+
+func _add_roster_char(e: Array) -> void:
+	var c := _make_char(e[0], e[1], e[2], e[3])
+	c.owner_peer = e[4]
+	c.puppet = true
+	c.player_controlled = c.owner_peer != 0
+	c.set_collision_enabled(false)
+	if c.owner_peer == Net.my_id():
+		player = c
+
+
+func net_begin(roster: Array) -> void:
+	if _begun or not is_client:
+		return
+	for e in roster:
+		_add_roster_char(e)
+	if player == null:
+		player = chars[0]   # sollte nicht vorkommen: dann nur zuschauen
+	_attach_player()
+	_begun = true
+	paused_logic = false
+	hud.announce("VERSTECK DICH!", "Die Zombies kommen in %d Sekunden" % int(prep_left), 3.5)
+
+
+func net_snapshot(a: Array) -> void:
+	if not _begun or not is_client or a.size() < 7:
+		return
+	if phase != Phase.END and int(a[0]) != Phase.END:
+		phase = int(a[0])
+	prep_left = a[1]
+	match_left = a[2]
+	time = a[3]
+	var cf: PackedFloat32Array = a[4]
+	for s in spots:
+		s.slots.clear()
+		s.sniffed_by = null
+	for i in mini(chars.size(), cf.size() / NF):
+		var c := chars[i]
+		var o := i * NF
+		var flags := int(cf[o + 6])
+		c.net_pos = Vector3(cf[o], cf[o + 1], cf[o + 2])
+		c.net_facing = cf[o + 3]
+		c.net_vel = Vector3(cf[o + 4], 0, cf[o + 5])
+		c.net_age = 0.0
+		if (flags & 1) != 0 and not c.is_zombie:
+			c.mark_zombie()
+			if c == player:
+				hud.set_zombie_mode(true)
+		c.frozen = (flags & 2) != 0
+		c.sneaking = (flags & 4) != 0
+		c.moving = (flags & 8) != 0
+		c.listening = (flags & 16) != 0
+		c.busy = (flags & 32) != 0
+		c.has_melon = (flags & 64) != 0
+		c.lives = int(cf[o + 7])
+		c.bites = int(cf[o + 8])
+		c.bites_taken = int(cf[o + 9])
+		c.garlic_t = cf[o + 10]
+		c.souvlaki_t = cf[o + 11]
+		c.stun_t = cf[o + 12]
+		c.sprint_t = cf[o + 13]
+		c.sprint_cd = cf[o + 14]
+		c.heard_t = cf[o + 15]
+		c.noise_t = cf[o + 16]
+		c.invuln_t = cf[o + 17]
+		c.freeze_left = cf[o + 18]
+		c.freeze_lock = cf[o + 19]
+		c.turn_t = cf[o + 20]
+		c.listen_t = cf[o + 21]
+		var si := int(cf[o + 22])
+		var spot: HidingSpot = spots[si] if si >= 0 and si < spots.size() else null
+		if spot != c.hidden_in:
+			(spot if spot != null else c.hidden_in).wobble()
+		c.hidden_in = spot
+		if spot != null:
+			spot.add(c)
+		var pose: String = POSES[clampi(int(cf[o + 23]), 0, POSES.size() - 1)]
+		if c.busy:
+			c.busy_pose = pose
+		else:
+			c.hide_pose = pose
+		c.motion = cf[o + 24]
+		c.net_chase = int(cf[o + 25])
+	var sniff: PackedInt32Array = a[5]
+	for si in sniff:
+		if si >= 0 and si < spots.size():
+			spots[si].sniffed_by = spots[si]   # nur "nicht null" zählt für die Anzeige
+	# Upgrades abgleichen
+	var pk: PackedFloat32Array = a[6]
+	var seen := {}
+	for i in pk.size() / 4:
+		var id := int(pk[i * 4])
+		seen[id] = true
+		if not _net_pickups.has(id):
+			var p := Pickup.new()
+			add_child(p)
+			p.setup(["garlic", "souvlaki", "melon"][clampi(int(pk[i * 4 + 1]), 0, 2)])
+			p.net_id = id
+			p.global_position = Vector3(pk[i * 4 + 2], 0, pk[i * 4 + 3])
+			_net_pickups[id] = p
+			pickups.append(p)
+	for id in _net_pickups.keys():
+		if not seen.has(id):
+			var p: Pickup = _net_pickups[id]
+			pickups.erase(p)
+			_net_pickups.erase(id)
+			p.queue_free()
+
+
+func net_event(kind: String, args: Array) -> void:
+	if not _begun or not is_client:
+		return
+	match kind:
+		"sfx":
+			Sfx.play_at_local(args[0], args[1], args[2], args[3])
+		"ui":
+			Sfx.play(args[0], args[1])
+		"ping":
+			_noise_pings.append({"pos": args[0], "t": 1.5})
+		"fx":
+			_fx_local(args[0], args[1])
+		"spawn":
+			_add_roster_char(args[0])
+		"ann":
+			hud.announce(args[0], args[1], args[2])
+		"toast":
+			hud.toast(args[0])
+		"hit":
+			hud.flash(Color(0.8, 0.0, 0.0, 0.55))
+			Input.vibrate_handheld(300)
+		"break":
+			_break_fx(args[0])
+		"melon":
+			_melon_fx(args[0], args[1], args[2])
+		"end":
+			if phase == Phase.END:
+				return
+			var stats: Array = args[2]
+			for i in mini(chars.size(), stats.size()):
+				var c := chars[i]
+				if stats[i][0] and not c.is_zombie:
+					c.mark_zombie()
+				c.turn_t = 0.0
+				c.lives = stats[i][1]
+				c.bites = stats[i][2]
+				c.bites_taken = stats[i][3]
+			var ti: int = args[1]
+			_finish(args[0], chars[ti] if ti >= 0 and ti < chars.size() else null)
+
+
+func _client_tick(delta: float) -> void:
+	if not _begun or player == null:
+		return
+	if phase != Phase.END:
+		_apply_player_input()
+	_debug_line(delta)
+	_update_audio_levels()
+	for p in _noise_pings:
+		p.t -= delta
+	_noise_pings = _noise_pings.filter(func(p): return p.t > 0.0)
+	if GameState.quit_after > 0.0 and time >= GameState.quit_after:
+		print("QUIT_AFTER time=%.1f phase=%d humans=%d zombies=%d" % [time, phase, humans().size(), zombies().size()])
+		get_tree().quit()
+
+
+## Client: der Gastgeber ist weg.
+func net_closed() -> void:
+	print("NET closed by host")
+	_reset_engine()
+	Sfx.reset_levels()
+	get_tree().paused = false
+	if GameState.autoplay:
+		get_tree().quit()
+		return
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+## Nur für automatische Tests: ein Client, der zufällig herumläuft und Knöpfe drückt.
+func _bot_input() -> void:
+	_bot_t -= get_physics_process_delta_time()
+	if _bot_t > 0.0:
+		return
+	_bot_t = randf_range(0.6, 2.0)
+	var a := randf() * TAU
+	_bot_dir = Vector3(cos(a), 0, sin(a)) if randf() < 0.8 else Vector3.ZERO
+	_bot_flags = (1 if randf() < 0.4 else 0) | (2 if randf() < 0.1 else 0) | (4 if randf() < 0.15 else 0)
+	var r := randf()
+	if r < 0.25:
+		Net.send_action("hide", Vector3.ZERO)
+	elif r < 0.5:
+		Net.send_action("bite", Vector3.ZERO)
+	elif r < 0.6:
+		Net.send_action("sprint", Vector3.ZERO)
+	elif r < 0.7:
+		Net.send_action("throw", _bot_dir)
